@@ -1,0 +1,209 @@
+import React, { useState } from 'react';
+import { base44 } from '@/api/base44Client';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { Button } from "@/components/ui/button";
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardHeader } from "@/components/ui/card";
+import { CalendarDays, Clock, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
+import { format, parseISO } from 'date-fns';
+import { ptBR } from 'date-fns/locale';
+import { validateSchedulingWindowByType, buildDatetime } from '@/lib/scheduling';
+
+export default function SolicitacoesAgendamento({ professional }) {
+  const queryClient = useQueryClient();
+  const [acceptingId, setAcceptingId] = useState(null);
+  const [errorMsg, setErrorMsg] = useState(null);
+
+  // Solicitações: (1) por especialidade (ESPECIALIDADE) + (2) diretas prioritárias (priority) para este profissional
+  const { data: solBySpecialty = [] } = useQuery({
+    queryKey: ['solicitacoes-esp', professional?.id, professional?.specialty],
+    queryFn: () => base44.entities.Appointment.filter({
+      specialty: professional.specialty,
+      appointment_type: 'ESPECIALIDADE',
+      status: 'SOLICITADO',
+    }, '-scheduled_datetime', 50),
+    enabled: !!professional?.id && !!professional?.specialty,
+    refetchInterval: 30_000,
+  });
+
+  const { data: solPriority = [] } = useQuery({
+    queryKey: ['solicitacoes-pri', professional?.id],
+    queryFn: () => base44.entities.Appointment.filter({
+      professional_id: professional.id,
+      appointment_type: 'priority',
+      status: 'SOLICITADO',
+    }, '-scheduled_datetime', 50),
+    enabled: !!professional?.id,
+    refetchInterval: 30_000,
+  });
+
+  const isLoading = false;
+  // Merge and deduplicate
+  const solicitacoes = [...solBySpecialty, ...solPriority].filter(
+    (item, idx, arr) => arr.findIndex(x => x.id === item.id) === idx
+  ).sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''));
+
+  // Consultas já confirmadas do profissional (para verificar conflito)
+  const { data: myConfirmed = [] } = useQuery({
+    queryKey: ['my-confirmed', professional?.id],
+    queryFn: () => base44.entities.Appointment.filter({
+      professional_id: professional.id,
+      status: 'CONFIRMADO',
+    }),
+    enabled: !!professional?.id,
+  });
+
+  // Slots de disponibilidade do profissional
+  const { data: mySlots = [] } = useQuery({
+    queryKey: ['my-slots', professional?.id],
+    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
+    enabled: !!professional?.id,
+  });
+
+  const acceptMutation = useMutation({
+    mutationFn: async (solicitacao) => {
+      setErrorMsg(null);
+      const { scheduled_datetime } = solicitacao;
+      const tipoConsulta = solicitacao.appointment_type || solicitacao.tipo_consulta;
+      const isPriorityOrPlantao = ['prioritario', 'plantao', 'priority', 'instant', 'IMEDIATO'].includes(tipoConsulta);
+
+      // 1. Verificar janela de agendamento (36h apenas para padrão/especialidade)
+      const validation = validateSchedulingWindowByType(scheduled_datetime, tipoConsulta);
+      if (!validation.valid) throw new Error(`Horário inválido: ${validation.reason}`);
+
+      // 2. Verificar disponibilidade — apenas para tipos não-prioritários
+      if (!isPriorityOrPlantao) {
+        const dt = new Date(scheduled_datetime);
+        const weekday = dt.getDay();
+        const timeSlot = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
+        const hasSlot = mySlots.some(s => s.weekday === weekday && s.time_slot === timeSlot);
+        if (!hasSlot) throw new Error('Você não tem disponibilidade configurada neste horário.');
+      }
+
+      // 3. Verificar conflito de horário
+      const conflict = myConfirmed.some(a => a.scheduled_datetime === scheduled_datetime);
+      if (conflict) throw new Error('Você já tem outra consulta confirmada neste horário.');
+
+      // 4. Aceite atômico: re-verificar status antes de salvar
+      const fresh = await base44.entities.Appointment.filter({ id: solicitacao.id });
+      const current = fresh?.[0];
+      if (!current || current.status !== 'SOLICITADO') {
+        throw new Error('Esta solicitação já foi aceita por outro profissional.');
+      }
+
+      // 5. Criar Consulta (entidade central) e confirmar Appointment
+      const consulta = await base44.entities.Consulta.create({
+        paciente_id: solicitacao.patient_id,
+        paciente_nome: solicitacao.patient_name,
+        paciente_email: solicitacao.patient_email || '',
+        profissional_id: professional.id,
+        profissional_nome: professional.full_name,
+        especialidade: solicitacao.specialty,
+        tipo_consulta: tipoConsulta === 'priority' || tipoConsulta === 'prioritario' ? 'prioritario'
+          : tipoConsulta === 'instant' || tipoConsulta === 'plantao' || tipoConsulta === 'IMEDIATO' ? 'plantao'
+          : tipoConsulta === 'ESPECIALIDADE' || tipoConsulta === 'especialidade' ? 'especialidade' : 'padrao',
+        status: 'aguardando',
+        datetime: scheduled_datetime,
+        descricao_sintomas: solicitacao.symptoms || '',
+        preco: solicitacao.price || professional.price_standard || 0,
+      });
+
+      await base44.entities.Appointment.update(solicitacao.id, {
+        professional_id: professional.id,
+        professional_name: professional.full_name,
+        status: 'CONFIRMADO',
+        accepted_at: new Date().toISOString(),
+        consulta_id: consulta.id,
+      });
+      console.log('[Aceitar] consulta_id:', consulta.id, 'tipo:', consulta.tipo_consulta, 'status:', consulta.status);
+      return consulta;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes'] });
+      queryClient.invalidateQueries({ queryKey: ['my-confirmed', professional?.id] });
+      queryClient.invalidateQueries({ queryKey: ['profAppts', professional?.id] });
+      setAcceptingId(null);
+    },
+    onError: (err) => {
+      setErrorMsg(err.message || 'Erro ao aceitar solicitação.');
+      setAcceptingId(null);
+    },
+  });
+
+  const formatDt = (dt) => {
+    if (!dt) return '—';
+    try {
+      return format(new Date(dt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
+    } catch { return dt; }
+  };
+
+  if (isLoading) {
+    return (
+      <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-center h-32">
+        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+      </div>
+    );
+  }
+
+  return (
+    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
+        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <Users className="w-4 h-4 text-blue-500" />
+          Solicitações de Agendamento
+        </h3>
+        <Badge className="bg-blue-100 text-blue-700">{solicitacoes.length}</Badge>
+      </div>
+
+      {errorMsg && (
+        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+          <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+          {errorMsg}
+          <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+        </div>
+      )}
+
+      <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+        {solicitacoes.length === 0 ? (
+          <p className="px-5 py-8 text-sm text-gray-400 text-center">
+            Nenhuma solicitação pendente para {professional.specialty}
+          </p>
+        ) : solicitacoes.map(sol => (
+          <div key={sol.id} className="px-5 py-3 flex items-start justify-between gap-3">
+            <div className="min-w-0 flex-1">
+              <p className="text-xs text-gray-400">{sol.patient_name}</p>
+              <p className="text-sm font-medium text-gray-700">{sol.specialty}</p>
+              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+                <span className="flex items-center gap-1">
+                  <CalendarDays className="w-3.5 h-3.5" />
+                  {formatDt(sol.scheduled_datetime)}
+                </span>
+              </div>
+              {sol.symptoms && (
+                <p className="text-xs text-gray-400 mt-1 line-clamp-1">"{sol.symptoms}"</p>
+              )}
+            </div>
+            <Button
+              size="sm"
+              disabled={acceptingId === sol.id || acceptMutation.isPending}
+              onClick={() => {
+                setAcceptingId(sol.id);
+                acceptMutation.mutate(sol);
+              }}
+              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 h-8 shrink-0"
+            >
+              {acceptingId === sol.id ? (
+                <Loader2 className="w-3.5 h-3.5 animate-spin" />
+              ) : (
+                <>
+                  <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                  Aceitar
+                </>
+              )}
+            </Button>
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
