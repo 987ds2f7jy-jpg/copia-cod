@@ -37,7 +37,7 @@ function App() {
                 <MainPage />
               </LayoutWrapper>
             } />
-            {Object.entries(Pages).map(([path, Page]) => (
+            {Object.entries(Pages).map(([path, Page]: [string, any]) => (
               <Route
                 key={path}
                 path={`/${path}`}
