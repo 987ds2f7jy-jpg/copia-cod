@@ -17,7 +17,7 @@ import { ptBR } from 'date-fns/locale';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
 import ProntuariosAnteriores from '@/components/teleconsulta/ProntuariosAnteriores';
 import AvaliacaoModal from '@/components/teleconsulta/AvaliacaoModal';
-import { isConsultaParticipant } from '@/lib/consultas';
+import { getConsultaParticipantIds, isConsultaParticipant } from '@/lib/consultas';
 import { logUiWarning } from '@/lib/observability';
 
 function VideoPlaceholder({ nome, role }) {
@@ -138,9 +138,33 @@ function TeleconsultaInner({ consultaId }) {
     refetchInterval: 5000,
   });
 
-  const isProfissional = Boolean(consulta && user && consulta.profissional_id === user.id);
+  const { data: currentProfessionalProfile, isLoading: isLoadingProfessionalIdentity } = useQuery({
+    queryKey: ['teleconsulta-professional-identity', user?.id],
+    queryFn: async () => {
+      const [profiles, legacyProfiles] = await Promise.all([
+        base44.entities.ProfessionalProfile.filter({ user_id: user.id }, undefined, 1),
+        base44.entities.Professional.filter({ user_id: user.id }, undefined, 1),
+      ]);
+
+      return profiles?.[0] || legacyProfiles?.[0] || null;
+    },
+    enabled: !!user?.id && user?.role === 'professional',
+    staleTime: 60_000,
+  });
+
+  const participantIds = [
+    user?.id,
+    currentProfessionalProfile?.id,
+    currentProfessionalProfile?.user_id,
+  ].filter(Boolean);
+
+  const isProfissional = Boolean(
+    consulta &&
+    user?.role === 'professional' &&
+    isConsultaParticipant(consulta, participantIds)
+  );
   const isPaciente = Boolean(consulta && user && consulta.paciente_id === user.id);
-  const isParticipant = isConsultaParticipant(consulta, user?.id);
+  const isParticipant = isConsultaParticipant(consulta, participantIds);
 
   const iniciarConsulta = useMutation({
     mutationFn: () => base44.entities.Consulta.update(consultaId, {
@@ -159,16 +183,19 @@ function TeleconsultaInner({ consultaId }) {
   }, [consulta?.id, consulta?.status, isParticipant]);
 
   useEffect(() => {
-    if (consulta && user?.id && !isParticipant) {
+    if (consulta && user?.id && !isParticipant && !(user?.role === 'professional' && isLoadingProfessionalIdentity)) {
       logUiWarning('teleconsulta', {
         consultaId,
         userId: user.id,
         profissionalId: consulta.profissional_id,
+        profissionalUserId: consulta.profissional_user_id || null,
+        professionalProfileId: currentProfessionalProfile?.id || null,
         pacienteId: consulta.paciente_id,
+        consultaParticipantIds: getConsultaParticipantIds(consulta),
         reason: 'unauthorized-access-attempt',
       });
     }
-  }, [consulta?.id, isParticipant, user?.id, consultaId]);
+  }, [consulta?.id, isParticipant, user?.id, consultaId, currentProfessionalProfile?.id, user?.role, isLoadingProfessionalIdentity]);
 
   const encerrar = useMutation({
     mutationFn: () => base44.entities.Consulta.update(consultaId, {
@@ -185,7 +212,7 @@ function TeleconsultaInner({ consultaId }) {
     },
   });
 
-  if (isLoading) {
+  if (isLoading || (user?.role === 'professional' && isLoadingProfessionalIdentity)) {
     return (
       <div className="min-h-screen flex items-center justify-center bg-gray-900">
         <Loader2 className="w-8 h-8 animate-spin text-white" />
@@ -352,7 +379,7 @@ function TeleconsultaInner({ consultaId }) {
                 <ProntuarioForm
                   consultaId={consultaId}
                   pacienteId={consulta.paciente_id}
-                  profissionalId={consulta.profissional_id}
+                  profissionalId={currentProfessionalProfile?.id || consulta.profissional_id}
                 />
               </TabsContent>
             )}

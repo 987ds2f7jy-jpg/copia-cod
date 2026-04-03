@@ -1,12 +1,13 @@
 import { describe, expect, it } from 'vitest';
+import { getConsultaParticipantIds, isConsultaParticipant } from '@/lib/consultas';
 import { buildQuestionCreatePayload, normalizeQuestion } from '@/lib/questions';
 import { buildSaquePayload } from '@/lib/saques';
 import { canWorkOnDuty, normalizePlantaoSpecialty } from '@/lib/professionals';
 
 describe('professional normalization', () => {
   it('normalizes specialties with accents and aliases for duty flow', () => {
-    expect(normalizePlantaoSpecialty('Clínico Geral')).toBe('clinico_geral');
-    expect(normalizePlantaoSpecialty('Psicologia Clínica')).toBe('psicologia');
+    expect(normalizePlantaoSpecialty('ClÃ­nico Geral')).toBe('clinico_geral');
+    expect(normalizePlantaoSpecialty('Psicologia ClÃ­nica')).toBe('psicologia');
     expect(canWorkOnDuty('Psiquiatria')).toBe(true);
   });
 });
@@ -16,12 +17,12 @@ describe('question contract adapters', () => {
     expect(buildQuestionCreatePayload({
       user: { id: 'patient-1', full_name: 'Maria' },
       specialty: 'Cardiologia',
-      questionText: 'Tenho palpitações?',
+      questionText: 'Tenho palpitaÃ§Ãµes?',
     })).toEqual({
       paciente_id: 'patient-1',
       paciente_nome: 'Maria',
       specialty: 'Cardiologia',
-      pergunta: 'Tenho palpitações?',
+      pergunta: 'Tenho palpitaÃ§Ãµes?',
       status: 'PENDENTE',
     });
   });
@@ -32,9 +33,9 @@ describe('question contract adapters', () => {
       paciente_id: 'patient-1',
       paciente_nome: 'Maria',
       specialty: 'Cardiologia',
-      pergunta: 'Tenho palpitações?',
-      resposta: 'Procure avaliação.',
-      answered_by_professional_name: 'Dr. João',
+      pergunta: 'Tenho palpitaÃ§Ãµes?',
+      resposta: 'Procure avaliaÃ§Ã£o.',
+      answered_by_professional_name: 'Dr. JoÃ£o',
       public_profile_id: 'pub-1',
       status: 'RESPONDIDA',
     }, {
@@ -45,9 +46,9 @@ describe('question contract adapters', () => {
       },
     });
 
-    expect(normalized.question_text).toBe('Tenho palpitações?');
-    expect(normalized.answer_text).toBe('Procure avaliação.');
-    expect(normalized.answered_by_name).toBe('Dr. João');
+    expect(normalized.question_text).toBe('Tenho palpitaÃ§Ãµes?');
+    expect(normalized.answer_text).toBe('Procure avaliaÃ§Ã£o.');
+    expect(normalized.answered_by_name).toBe('Dr. JoÃ£o');
     expect(normalized.answered_by_specialty).toBe('Cardiologia');
     expect(normalized.answered_by_public_profile_id).toBe('pub-1');
   });
@@ -70,5 +71,27 @@ describe('saque contract adapters', () => {
     expect(payload.metodo).toBe('PIX');
     expect(payload.observacao).toContain('PIX');
     expect(payload.status).toBe('pendente');
+  });
+});
+
+describe('consulta participant contract', () => {
+  it('accepts both the professional user id and the legacy professional profile id', () => {
+    const consulta = {
+      paciente_id: 'patient-1',
+      profissional_id: 'professional-profile-1',
+      profissional_user_id: 'professional-user-1',
+    };
+
+    expect(getConsultaParticipantIds(consulta)).toEqual([
+      'patient-1',
+      'professional-profile-1',
+      'professional-user-1',
+    ]);
+
+    expect(isConsultaParticipant(consulta, 'patient-1')).toBe(true);
+    expect(isConsultaParticipant(consulta, 'professional-profile-1')).toBe(true);
+    expect(isConsultaParticipant(consulta, 'professional-user-1')).toBe(true);
+    expect(isConsultaParticipant(consulta, ['someone-else', 'professional-user-1'])).toBe(true);
+    expect(isConsultaParticipant(consulta, 'intruder')).toBe(false);
   });
 });
