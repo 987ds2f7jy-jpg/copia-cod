@@ -39,6 +39,8 @@ function TeleconsultaInner({ consultaId }) {
   const [showProntuariosAnt, setShowProntuariosAnt] = useState(false);
   const [showAvaliacao, setShowAvaliacao] = useState(false);
   const autoJoinAttemptRef = useRef(false);
+  const evaluationPromptedRef = useRef(false);
+  const lastConsultaStatusRef = useRef(null);
 
   const { data: consulta, isLoading } = useQuery({
     queryKey: ['consulta', consultaId],
@@ -107,6 +109,8 @@ function TeleconsultaInner({ consultaId }) {
 
   const encerrar = useMutation({
     mutationFn: async () => {
+      autoJoinAttemptRef.current = true;
+
       const updatedConsulta = await base44.entities.Consulta.update(consultaId, {
         status: 'finalizada',
         fim_at: new Date().toISOString(),
@@ -119,6 +123,7 @@ function TeleconsultaInner({ consultaId }) {
       queryClient.invalidateQueries({ queryKey: ['consulta', consultaId] });
 
       if (isPaciente) {
+        evaluationPromptedRef.current = true;
         setShowAvaliacao(true);
         return;
       }
@@ -129,7 +134,41 @@ function TeleconsultaInner({ consultaId }) {
 
   useEffect(() => {
     autoJoinAttemptRef.current = false;
+    evaluationPromptedRef.current = false;
+    lastConsultaStatusRef.current = null;
+    setShowAvaliacao(false);
   }, [consultaId]);
+
+  useEffect(() => {
+    if (!consulta?.status) {
+      return;
+    }
+
+    const previousStatus = lastConsultaStatusRef.current;
+    lastConsultaStatusRef.current = consulta.status;
+
+    if (previousStatus === consulta.status) {
+      return;
+    }
+
+    if (!['finalizada', 'cancelada'].includes(consulta.status)) {
+      return;
+    }
+
+    autoJoinAttemptRef.current = true;
+    void zoomSession.leave();
+
+    if (
+      isPaciente &&
+      consulta.status === 'finalizada' &&
+      previousStatus &&
+      previousStatus !== 'finalizada' &&
+      !evaluationPromptedRef.current
+    ) {
+      evaluationPromptedRef.current = true;
+      setShowAvaliacao(true);
+    }
+  }, [consulta?.status, isPaciente, zoomSession.leave]);
 
   const needsSessionInitialization = Boolean(
     consulta &&
@@ -185,6 +224,8 @@ function TeleconsultaInner({ consultaId }) {
     consulta &&
     isParticipant &&
     consulta.status !== 'finalizada' &&
+    consulta.status !== 'cancelada' &&
+    !encerrar.isPending &&
     !needsSessionInitialization
   );
 
@@ -235,24 +276,42 @@ function TeleconsultaInner({ consultaId }) {
   }
 
   if (consulta.status === 'finalizada') {
+    const shouldShowEvaluation = isPaciente && showAvaliacao;
+
     return (
-      <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-900 text-white">
-        <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
-          <Video className="h-8 w-8 text-emerald-400" />
+      <>
+        <div className="min-h-screen flex flex-col items-center justify-center gap-4 bg-gray-900 px-4 text-center text-white">
+          <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
+            <Video className="h-8 w-8 text-emerald-400" />
+          </div>
+          <h2 className="text-xl font-bold">Consulta Encerrada</h2>
+          <p className="text-gray-400">
+            Duracao: {consulta.inicio_at && consulta.fim_at
+              ? `${Math.round((new Date(consulta.fim_at) - new Date(consulta.inicio_at)) / 60000)} min`
+              : '-'}
+          </p>
+          {!shouldShowEvaluation && (
+            <Button
+              onClick={() => navigate(isPaciente ? '/DashboardPaciente' : '/DashboardProfissional')}
+              className="bg-emerald-600 hover:bg-emerald-700"
+            >
+              Voltar ao Inicio
+            </Button>
+          )}
         </div>
-        <h2 className="text-xl font-bold">Consulta Encerrada</h2>
-        <p className="text-gray-400">
-          Duracao: {consulta.inicio_at && consulta.fim_at
-            ? `${Math.round((new Date(consulta.fim_at) - new Date(consulta.inicio_at)) / 60000)} min`
-            : '-'}
-        </p>
-        <Button
-          onClick={() => navigate(isPaciente ? '/DashboardPaciente' : '/DashboardProfissional')}
-          className="bg-emerald-600 hover:bg-emerald-700"
-        >
-          Voltar ao Inicio
-        </Button>
-      </div>
+
+        {shouldShowEvaluation && (
+          <AvaliacaoModal
+            open={showAvaliacao}
+            consulta={consulta}
+            pacienteId={user?.id}
+            onClose={() => {
+              setShowAvaliacao(false);
+              navigate('/DashboardPaciente');
+            }}
+          />
+        )}
+      </>
     );
   }
 

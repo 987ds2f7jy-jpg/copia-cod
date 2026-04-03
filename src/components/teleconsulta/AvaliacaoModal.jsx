@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useState } from 'react';
 import { base44 } from '@/api/base44Client';
 import { useMutation } from '@tanstack/react-query';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
@@ -10,6 +10,16 @@ export default function AvaliacaoModal({ open, consulta, pacienteId, onClose }) 
   const [nota, setNota] = useState(5);
   const [comentario, setComentario] = useState('');
   const [done, setDone] = useState(false);
+
+  useEffect(() => {
+    if (!open) {
+      return;
+    }
+
+    setNota(5);
+    setComentario('');
+    setDone(false);
+  }, [consulta?.id, open]);
 
   const salvar = useMutation({
     mutationFn: () => base44.entities.AvaliacaoConsulta.create({

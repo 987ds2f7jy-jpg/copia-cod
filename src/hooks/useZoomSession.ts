@@ -58,6 +58,10 @@ function getZoomConnectionErrorMessage(error: unknown) {
   ).toLowerCase();
   const statusCode = (error as any)?.context?.status;
 
+  if (statusCode === 409 || rawMessage.includes('409') || rawMessage.includes('consulta indisponivel')) {
+    return 'Esta consulta ja foi encerrada e nao aceita nova conexao de video.';
+  }
+
   if (
     statusCode === 404 ||
     rawMessage.includes('404') ||
