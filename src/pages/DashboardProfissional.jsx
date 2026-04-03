@@ -31,7 +31,7 @@ import PerformanceBlock from '@/components/dashboard/PerformanceBlock';
 import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
-import { buildConsultaFromAppointment, buildConsultaFromQueueEntry } from '@/lib/consultas';
+import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import { canWorkOnDuty, isProfessionalApprovedStatus, normalizePlantaoSpecialty, PLANTAO_ESPECIALIDADES } from '@/lib/professionals';
 
@@ -244,7 +244,7 @@ function DashboardProfissionalInner() {
   });
   const acceptQueuePatient = useMutation({
     mutationFn: async (queueEntry) => {
-      const consulta = await base44.entities.Consulta.create(buildConsultaFromQueueEntry(queueEntry, professional));
+      const consulta = await createConsultaRecord(buildConsultaFromQueueEntry(queueEntry, professional));
       await base44.entities.Queue.update(queueEntry.id, {
         status: 'in_progress',
         assigned_professional_id: professional.id,
@@ -456,7 +456,7 @@ function DashboardProfissionalInner() {
               if (a.consulta_id) {
                 navigate(`/consulta/${a.consulta_id}`);
               } else {
-                base44.entities.Consulta.create(buildConsultaFromAppointment(a, professional)).then(c => {
+                createConsultaRecord(buildConsultaFromAppointment(a, professional)).then(c => {
                   base44.entities.Appointment.update(a.id, { status: 'CONFIRMADO', consulta_id: c.id });
                   navigate(`/consulta/${c.id}`);
                 });

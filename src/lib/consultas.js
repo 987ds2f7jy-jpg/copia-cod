@@ -1,8 +1,24 @@
+import { base44 } from '@/api/base44Client';
+import { hasColumnMissingError } from '@/lib/errors';
+
+let consultaProfessionalUserIdSupported = true;
+
 export function mapAppointmentTypeToConsultaType(type) {
   if (type === 'priority' || type === 'prioritario') return 'prioritario';
   if (type === 'instant' || type === 'plantao' || type === 'IMEDIATO') return 'plantao';
   if (type === 'ESPECIALIDADE' || type === 'especialidade') return 'especialidade';
   return 'padrao';
+}
+
+export function sanitizeConsultaPayloadForSchema(payload, options = {}) {
+  const { profissionalUserIdSupported = true } = options;
+  const nextPayload = { ...(payload || {}) };
+
+  if (!profissionalUserIdSupported) {
+    delete nextPayload.profissional_user_id;
+  }
+
+  return nextPayload;
 }
 
 export function buildConsultaFromAppointment(appointment, professional, overrides = {}) {
@@ -43,6 +59,31 @@ export function buildConsultaFromQueueEntry(queueEntry, professional) {
     preco: professional.price_standard || 0,
     inicio_at: nowIso,
   };
+}
+
+export async function createConsultaRecord(payload) {
+  const initialPayload = sanitizeConsultaPayloadForSchema(payload, {
+    profissionalUserIdSupported: consultaProfessionalUserIdSupported,
+  });
+
+  try {
+    return await base44.entities.Consulta.create(initialPayload);
+  } catch (error) {
+    if (
+      consultaProfessionalUserIdSupported &&
+      hasColumnMissingError(error, 'profissional_user_id')
+    ) {
+      consultaProfessionalUserIdSupported = false;
+
+      return base44.entities.Consulta.create(
+        sanitizeConsultaPayloadForSchema(payload, {
+          profissionalUserIdSupported: false,
+        }),
+      );
+    }
+
+    throw error;
+  }
 }
 
 export function getConsultaParticipantIds(consulta) {

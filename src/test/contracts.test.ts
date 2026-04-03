@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { getConsultaParticipantIds, isConsultaParticipant } from '@/lib/consultas';
+import { getConsultaParticipantIds, isConsultaParticipant, sanitizeConsultaPayloadForSchema } from '@/lib/consultas';
 import { buildQuestionCreatePayload, normalizeQuestion } from '@/lib/questions';
 import { buildSaquePayload } from '@/lib/saques';
 import { canWorkOnDuty, normalizePlantaoSpecialty } from '@/lib/professionals';
@@ -101,6 +101,21 @@ describe('consulta participant contract', () => {
     expect(isConsultaParticipant(consulta, 'professional-user-1')).toBe(true);
     expect(isConsultaParticipant(consulta, ['someone-else', 'professional-user-1'])).toBe(true);
     expect(isConsultaParticipant(consulta, 'intruder')).toBe(false);
+  });
+});
+
+describe('consulta schema compatibility', () => {
+  it('removes profissional_user_id when the remote schema is still legacy', () => {
+    expect(sanitizeConsultaPayloadForSchema({
+      paciente_id: 'patient-1',
+      profissional_id: 'professional-profile-1',
+      profissional_user_id: 'professional-user-1',
+    }, {
+      profissionalUserIdSupported: false,
+    })).toEqual({
+      paciente_id: 'patient-1',
+      profissional_id: 'professional-profile-1',
+    });
   });
 });
 

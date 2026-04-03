@@ -8,7 +8,7 @@ import { CalendarDays, Clock, CheckCircle, Loader2, AlertCircle, Users } from 'l
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { validateSchedulingWindowByType, buildDatetime } from '@/lib/scheduling';
-import { buildConsultaFromAppointment } from '@/lib/consultas';
+import { buildConsultaFromAppointment, createConsultaRecord } from '@/lib/consultas';
 
 export default function SolicitacoesAgendamento({ professional }) {
   const queryClient = useQueryClient();
@@ -93,7 +93,7 @@ export default function SolicitacoesAgendamento({ professional }) {
       }
 
       // 5. Criar Consulta (entidade central) e confirmar Appointment
-      const consulta = await base44.entities.Consulta.create(buildConsultaFromAppointment(solicitacao, professional, {
+      const consulta = await createConsultaRecord(buildConsultaFromAppointment(solicitacao, professional, {
         status: 'aguardando',
         datetime: scheduled_datetime,
       }));
