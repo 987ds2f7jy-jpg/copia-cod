@@ -28,54 +28,21 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Deepgram not configured.' }, 500);
     }
 
-    // Create a temporary API key via Deepgram REST API
-    const response = await fetch('https://api.deepgram.com/v1/projects', {
+    // Validate the key works by hitting a lightweight endpoint
+    const validateResponse = await fetch('https://api.deepgram.com/v1/projects', {
       headers: { 'Authorization': `Token ${deepgramApiKey}` },
     });
 
-    if (!response.ok) {
-      console.error('[deepgram-token] Failed to list projects:', response.status);
-      return jsonResponse({ error: 'Failed to authenticate with Deepgram.' }, 502);
+    if (!validateResponse.ok) {
+      console.error('[deepgram-token] Invalid Deepgram API key:', validateResponse.status);
+      return jsonResponse({ error: 'Invalid Deepgram API key.' }, 502);
     }
 
-    const projectsData = await response.json();
-    const projectId = projectsData?.projects?.[0]?.project_id;
+    console.info('[deepgram-token] Key validated successfully');
 
-    if (!projectId) {
-      console.error('[deepgram-token] No Deepgram project found');
-      return jsonResponse({ error: 'No Deepgram project found.' }, 500);
-    }
-
-    // Create a temporary key that expires in 60 seconds
-    const keyResponse = await fetch(`https://api.deepgram.com/v1/projects/${projectId}/keys`, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Token ${deepgramApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        comment: 'Temporary transcription key',
-        scopes: ['usage:write'],
-        time_to_live_in_seconds: 60,
-      }),
-    });
-
-    if (!keyResponse.ok) {
-      const errText = await keyResponse.text();
-      console.error('[deepgram-token] Failed to create temp key:', keyResponse.status, errText);
-      return jsonResponse({ error: 'Failed to create temporary Deepgram key.' }, 502);
-    }
-
-    const keyData = await keyResponse.json();
-
-    console.info('[deepgram-token] Temporary key created successfully');
-
-    return jsonResponse({
-      key: keyData.key,
-      expiresIn: 60,
-    });
+    return jsonResponse({ key: deepgramApiKey });
   } catch (error) {
     console.error('[deepgram-token]', error);
-    return jsonResponse({ error: 'Internal error generating Deepgram token.' }, 500);
+    return jsonResponse({ error: 'Internal error.' }, 500);
   }
 });
