@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-legacy-session-token',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-legacy-session-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -46,6 +46,17 @@ function getEnv(name: string) {
   }
 
   return value;
+}
+
+function getFirstEnv(...names: string[]) {
+  for (const name of names) {
+    const value = Deno.env.get(name)?.trim();
+    if (value) {
+      return value;
+    }
+  }
+
+  throw new Error(`Missing required environment variable: ${names.join(' or ')}`);
 }
 
 function toSafeString(value: unknown) {
@@ -323,8 +334,8 @@ Deno.serve(async (req) => {
   try {
     const supabaseUrl = getEnv('SUPABASE_URL');
     const serviceRoleKey = getEnv('SUPABASE_SERVICE_ROLE_KEY');
-    const zoomSdkKey = getEnv('ZOOM_VIDEO_SDK_KEY');
-    const zoomSdkSecret = getEnv('ZOOM_VIDEO_SDK_SECRET');
+    const zoomSdkKey = getFirstEnv('ZOOM_VIDEO_SDK_KEY', 'ZOOM_SDK_KEY');
+    const zoomSdkSecret = getFirstEnv('ZOOM_VIDEO_SDK_SECRET', 'ZOOM_SDK_SECRET');
 
     const adminClient = createClient(supabaseUrl, serviceRoleKey, {
       auth: {
@@ -335,6 +346,7 @@ Deno.serve(async (req) => {
 
     const body = await req.json().catch(() => null);
     const consultationId = toSafeString(body?.consultationId);
+    const requestedRole = body?.participantRole || body?.role;
 
     if (!consultationId) {
       return jsonResponse({ error: 'consultationId is required.' }, 400);
@@ -361,6 +373,20 @@ Deno.serve(async (req) => {
 
     if (!participantRole) {
       return jsonResponse({ error: 'Forbidden.' }, 403);
+    }
+
+    const normalizedRequestedRole = requestedRole === 'host'
+      ? 'professional'
+      : requestedRole === 'participant'
+        ? 'patient'
+        : requestedRole;
+
+    if (
+      normalizedRequestedRole &&
+      normalizedRequestedRole !== participantRole &&
+      String(normalizedRequestedRole) !== String(participantRole === 'professional' ? 1 : 0)
+    ) {
+      return jsonResponse({ error: 'Role mismatch for this consultation.' }, 403);
     }
 
     const sessionName = buildZoomSessionName(consulta as Consulta);

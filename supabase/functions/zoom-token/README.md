@@ -9,6 +9,11 @@ Configure estes secrets no Supabase, nunca no frontend:
 - `ZOOM_VIDEO_SDK_KEY`
 - `ZOOM_VIDEO_SDK_SECRET`
 
+Compatibilidade com o projeto anterior:
+
+- `ZOOM_SDK_KEY`
+- `ZOOM_SDK_SECRET`
+
 Os dados de `API Key` e `API Secret` nao sao necessarios para este fluxo de videochamada.
 
 ## Deploy
@@ -16,6 +21,14 @@ Os dados de `API Key` e `API Secret` nao sao necessarios para este fluxo de vide
 ```bash
 supabase secrets set ZOOM_VIDEO_SDK_KEY=...
 supabase secrets set ZOOM_VIDEO_SDK_SECRET=...
+supabase functions deploy zoom-token
+```
+
+Se voce estiver migrando do outro projeto e ja usa os nomes antigos, tambem funciona:
+
+```bash
+supabase secrets set ZOOM_SDK_KEY=...
+supabase secrets set ZOOM_SDK_SECRET=...
 supabase functions deploy zoom-token
 ```
 
