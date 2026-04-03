@@ -49,6 +49,32 @@ function buildChatMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function getZoomConnectionErrorMessage(error: unknown) {
+  const rawMessage = String(
+    (error as any)?.context?.statusText ||
+    (error as any)?.message ||
+    error ||
+    '',
+  ).toLowerCase();
+  const statusCode = (error as any)?.context?.status;
+
+  if (
+    statusCode === 404 ||
+    rawMessage.includes('404') ||
+    rawMessage.includes('not found') ||
+    rawMessage.includes('edge function') ||
+    rawMessage.includes('functions/v1/zoom-token')
+  ) {
+    return 'Servico de video ainda nao publicado. Publique a funcao zoom-token no Supabase.';
+  }
+
+  if (rawMessage.includes('403') || rawMessage.includes('forbidden')) {
+    return 'Acesso negado ao token da consulta. Verifique se este usuario pertence a esta consulta.';
+  }
+
+  return 'Erro ao conectar na consulta por video.';
+}
+
 export function useZoomSession({
   consultationId,
   participantRole,
@@ -433,7 +459,7 @@ export function useZoomSession({
       clientRef.current = null;
       updateState({
         isConnected: false,
-        error: 'Erro ao conectar na consulta por video.',
+        error: getZoomConnectionErrorMessage(error),
       });
       logUiWarning('zoom', {
         stage: 'join-session',

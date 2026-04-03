@@ -1,20 +1,20 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { motion, AnimatePresence } from 'framer-motion';
+import { Clock, Users, Stethoscope, Loader2, AlertCircle, Video } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Label } from "@/components/ui/label";
-import { Clock, Users, Stethoscope, Loader2, AlertCircle, Video } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Textarea } from '@/components/ui/textarea';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Label } from '@/components/ui/label';
 import { canWorkOnDuty, isProfessionalApprovedStatus } from '@/lib/professionals';
 
 const specialties = [
-  { id: 'clinico_geral', name: 'ClÃ­nico Geral' },
+  { id: 'clinico_geral', name: 'ClÃƒÂ­nico Geral' },
   { id: 'pediatria', name: 'Pediatria' },
   { id: 'psicologia', name: 'Psicologia' },
   { id: 'psiquiatria', name: 'Psiquiatria' },
@@ -42,39 +42,63 @@ function ConsultaAgoraInner() {
     ) || null;
   };
 
-  // Restore + redirecionamento imediato se jÃ¡ estava na fila
+  const findCurrentQueueEntry = async (patientId, queueId) => {
+    if (queueId) {
+      const directMatch = await base44.entities.Queue.filter({ id: queueId }, undefined, 1);
+
+      if (directMatch?.[0] && ['waiting', 'in_progress', 'em_atendimento'].includes(directMatch[0].status)) {
+        return directMatch[0];
+      }
+    }
+
+    const [waiting, inProgress, inAttendance] = await Promise.all([
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'waiting' }),
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'in_progress' }),
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'em_atendimento' }),
+    ]);
+
+    return waiting[0] || inProgress[0] || inAttendance[0] || null;
+  };
+
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      return undefined;
+    }
+
     let active = true;
 
-    const checkActive = async () => {
-      const [waiting, inProg, inAttendance] = await Promise.all([
-        base44.entities.Queue.filter({ patient_id: user.id, status: 'waiting' }),
-        base44.entities.Queue.filter({ patient_id: user.id, status: 'in_progress' }),
-        base44.entities.Queue.filter({ patient_id: user.id, status: 'em_atendimento' }),
-      ]);
-      if (!active) return;
-      const activeQueueEntries = [...inProg, ...inAttendance];
+    const restoreFlow = async () => {
+      const activeConsulta = await findActivePlantaoConsulta(user.id);
+      if (!active) {
+        return;
+      }
 
-      if (waiting.length > 0) {
-        setQueueEntry(waiting[0]);
+      if (activeConsulta) {
+        navigate(`/consulta/${activeConsulta.id}`);
+        return;
+      }
+
+      const currentQueue = await findCurrentQueueEntry(user.id);
+      if (!active) {
+        return;
+      }
+
+      if (currentQueue) {
+        setQueueEntry(currentQueue);
         setStep('queue');
-      } else if (activeQueueEntries.length > 0) {
-        const activeConsulta = await findActivePlantaoConsulta(user.id);
-        if (activeConsulta) {
-          navigate(`/consulta/${activeConsulta.id}`);
-        } else {
-          setQueueEntry(activeQueueEntries[0]);
-          setStep('queue');
-        }
+      } else {
+        setQueueEntry(null);
+        setStep('form');
       }
     };
 
-    checkActive();
-    return () => { active = false; };
+    void restoreFlow();
+
+    return () => {
+      active = false;
+    };
   }, [user?.id, navigate]);
 
-  // Contador de mÃ©dicos em plantÃ£o (busca nas duas entidades)
   const { data: onDutyProfessionals = [] } = useQuery({
     queryKey: ['onDutyProfessionals'],
     queryFn: async () => {
@@ -87,15 +111,17 @@ function ConsultaAgoraInner() {
     refetchInterval: 8000,
   });
 
-  const medicosDisponiveis = onDutyProfessionals.filter(p =>
-    canWorkOnDuty(p.specialty)
+  const medicosDisponiveis = onDutyProfessionals.filter((profile) =>
+    canWorkOnDuty(profile.specialty)
   ).length;
 
   const { data: queueStats } = useQuery({
     queryKey: ['queueStats', selectedSpecialty],
     queryFn: async () => {
       const filters = { status: 'waiting' };
-      if (selectedSpecialty) filters.specialty = selectedSpecialty;
+      if (selectedSpecialty) {
+        filters.specialty = selectedSpecialty;
+      }
       const queue = await base44.entities.Queue.filter(filters);
       return { count: queue.length, estimatedWait: queue.length * 10 };
     },
@@ -103,20 +129,21 @@ function ConsultaAgoraInner() {
   });
 
   const enterQueue = useMutation({
-    mutationFn: async (data) => {
-      const [waiting, inProgress, inAttendance] = await Promise.all([
-        base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'waiting' }),
-        base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'in_progress' }),
-        base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'em_atendimento' }),
-      ]);
-      if (waiting.length > 0) return waiting[0];
-      if (inProgress.length > 0) return inProgress[0];
-      if (inAttendance.length > 0) return inAttendance[0];
+    mutationFn: async (payload) => {
+      const currentQueue = await findCurrentQueueEntry(payload.patient_id);
+      if (currentQueue) {
+        return currentQueue;
+      }
+
       const position = (queueStats?.count || 0) + 1;
-      return base44.entities.Queue.create({ ...data, position, estimated_wait_time: position * 10 });
+      return base44.entities.Queue.create({
+        ...payload,
+        position,
+        estimated_wait_time: position * 10,
+      });
     },
-    onSuccess: (data) => {
-      setQueueEntry(data);
+    onSuccess: (nextQueueEntry) => {
+      setQueueEntry(nextQueueEntry);
       setStep('queue');
       queryClient.invalidateQueries({ queryKey: ['queueStats'] });
     },
@@ -131,20 +158,24 @@ function ConsultaAgoraInner() {
     },
   });
 
-  // Subscribe â€” redireciona imediatamente quando profissional aceitar
   useEffect(() => {
-    if (!queueEntry?.id) return;
+    if (!queueEntry?.id) {
+      return undefined;
+    }
 
     const unsubscribe = base44.entities.Queue.subscribe((event) => {
-      if (event.id === queueEntry.id && event.type === 'update') {
-        setQueueEntry(event.data);
-        if (['in_progress', 'em_atendimento'].includes(event.data.status)) {
-          findActivePlantaoConsulta(user.id).then((activeConsulta) => {
-            if (activeConsulta) {
-              navigate(`/consulta/${activeConsulta.id}`);
-            }
-          });
-        }
+      if (event.id !== queueEntry.id || event.type !== 'update') {
+        return;
+      }
+
+      setQueueEntry(event.data);
+
+      if (['in_progress', 'em_atendimento'].includes(event.data.status)) {
+        findActivePlantaoConsulta(user?.id).then((activeConsulta) => {
+          if (activeConsulta) {
+            navigate(`/consulta/${activeConsulta.id}`);
+          }
+        });
       }
     });
 
@@ -152,7 +183,7 @@ function ConsultaAgoraInner() {
   }, [queueEntry?.id, user?.id, navigate]);
 
   useEffect(() => {
-    if (!user?.id || !queueEntry || !['in_progress', 'em_atendimento'].includes(queueEntry.status)) {
+    if (!user?.id || !queueEntry?.id) {
       return undefined;
     }
 
@@ -162,14 +193,41 @@ function ConsultaAgoraInner() {
       if (activeConsulta) {
         window.clearInterval(intervalId);
         navigate(`/consulta/${activeConsulta.id}`);
+        return;
       }
+
+      const currentQueue = await findCurrentQueueEntry(user.id, queueEntry.id);
+
+      if (!currentQueue || currentQueue.status === 'cancelled') {
+        window.clearInterval(intervalId);
+        setQueueEntry(null);
+        setStep('form');
+        return;
+      }
+
+      setQueueEntry((previous) => {
+        if (!previous) {
+          return currentQueue;
+        }
+
+        const hasChanged =
+          previous.status !== currentQueue.status ||
+          previous.position !== currentQueue.position ||
+          previous.estimated_wait_time !== currentQueue.estimated_wait_time ||
+          previous.assigned_professional_id !== currentQueue.assigned_professional_id;
+
+        return hasChanged ? currentQueue : previous;
+      });
     }, 2500);
 
     return () => window.clearInterval(intervalId);
-  }, [queueEntry?.id, queueEntry?.status, user?.id, navigate]);
+  }, [queueEntry?.id, user?.id, navigate]);
 
   const handleJoinQueue = () => {
-    if (!user || !selectedSpecialty) return;
+    if (!user || !selectedSpecialty) {
+      return;
+    }
+
     enterQueue.mutate({
       patient_id: user.id,
       patient_name: user.full_name,
@@ -184,20 +242,18 @@ function ConsultaAgoraInner() {
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        {/* Header */}
         <div className="text-center mb-8">
           <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-4">
             <Clock className="w-4 h-4" />
             Atendimento Imediato
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Consulta Agora</h1>
-          <p className="text-gray-600">Conecte-se com um mÃ©dico disponÃ­vel em minutos</p>
+          <p className="text-gray-600">Conecte-se com um mÃƒÂ©dico disponÃƒÂ­vel em minutos</p>
         </div>
 
         <AnimatePresence mode="wait">
           {step === 'form' && (
             <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              {/* Contador de mÃ©dicos */}
               <Card className="border-0 shadow-sm mb-6">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
@@ -206,7 +262,7 @@ function ConsultaAgoraInner() {
                         <Stethoscope className="w-5 h-5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{medicosDisponiveis} mÃ©dicos disponÃ­veis</p>
+                        <p className="font-semibold text-gray-900">{medicosDisponiveis} mÃƒÂ©dicos disponÃƒÂ­veis</p>
                         <p className="text-sm text-gray-500">Prontos para atendimento</p>
                       </div>
                     </div>
@@ -220,7 +276,6 @@ function ConsultaAgoraInner() {
                 </CardContent>
               </Card>
 
-              {/* FormulÃ¡rio */}
               <Card className="border-0 shadow-md">
                 <CardHeader>
                   <CardTitle>Entrar na Fila de Atendimento</CardTitle>
@@ -233,8 +288,10 @@ function ConsultaAgoraInner() {
                         <SelectValue placeholder="Selecione a especialidade" />
                       </SelectTrigger>
                       <SelectContent>
-                        {specialties.map(spec => (
-                          <SelectItem key={spec.id} value={spec.id}>{spec.name}</SelectItem>
+                        {specialties.map((specialty) => (
+                          <SelectItem key={specialty.id} value={specialty.id}>
+                            {specialty.name}
+                          </SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
@@ -244,8 +301,8 @@ function ConsultaAgoraInner() {
                     <Label className="mb-2 block">Descreva seus sintomas</Label>
                     <Textarea
                       value={symptoms}
-                      onChange={e => setSymptoms(e.target.value)}
-                      placeholder="Ex: Estou com dor de cabeÃ§a e febre hÃ¡ 2 dias..."
+                      onChange={(event) => setSymptoms(event.target.value)}
+                      placeholder="Ex: Estou com dor de cabeÃƒÂ§a e febre hÃƒÂ¡ 2 dias..."
                       className="min-h-[120px]"
                     />
                   </div>
@@ -291,16 +348,16 @@ function ConsultaAgoraInner() {
                     </div>
                   </div>
 
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">VocÃª estÃ¡ na fila</h2>
+                  <h2 className="text-2xl font-bold text-gray-900 mb-2">VocÃƒÂª estÃƒÂ¡ na fila</h2>
                   <p className="text-gray-600 mb-6">
-                    PosiÃ§Ã£o {queueEntry.position} â€¢ Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
+                    PosiÃƒÂ§ÃƒÂ£o {queueEntry.position} Ã¢â‚¬Â¢ Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
                   </p>
 
                   <div className="p-4 bg-gray-50 rounded-xl mb-6">
                     <div className="flex items-center gap-3 justify-center text-gray-600">
                       <AlertCircle className="w-5 h-5 text-amber-500" />
                       <span className="text-sm">
-                        Mantenha esta pÃ¡gina aberta. VocÃª serÃ¡ redirecionado automaticamente.
+                        Mantenha esta pÃƒÂ¡gina aberta. VocÃƒÂª serÃƒÂ¡ redirecionado automaticamente.
                       </span>
                     </div>
                   </div>
@@ -320,7 +377,6 @@ function ConsultaAgoraInner() {
           )}
         </AnimatePresence>
 
-        {/* Info Cards */}
         <div className="grid sm:grid-cols-3 gap-4 mt-8">
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4 text-center">
@@ -332,7 +388,7 @@ function ConsultaAgoraInner() {
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4 text-center">
               <Stethoscope className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-              <p className="font-medium text-gray-900">MÃ©dicos Verificados</p>
+              <p className="font-medium text-gray-900">MÃƒÂ©dicos Verificados</p>
               <p className="text-sm text-gray-500">CRM ativo</p>
             </CardContent>
           </Card>
@@ -340,7 +396,7 @@ function ConsultaAgoraInner() {
             <CardContent className="p-4 text-center">
               <Video className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
               <p className="font-medium text-gray-900">Teleconsulta</p>
-              <p className="text-sm text-gray-500">VÃ­deo em HD</p>
+              <p className="text-sm text-gray-500">VÃƒÂ­deo em HD</p>
             </CardContent>
           </Card>
         </div>
