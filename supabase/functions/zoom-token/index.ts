@@ -121,8 +121,11 @@ function buildZoomDisplayName({
 }
 
 function hasMissingColumnError(error: unknown, columnName: string) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
-  return message.includes(columnName) && message.includes('column');
+  if (!error) return false;
+  const obj = error as Record<string, unknown>;
+  const message = obj?.message ? String(obj.message) : (error instanceof Error ? error.message : String(error ?? ''));
+  const code = obj?.code ? String(obj.code) : '';
+  return (code === '42703' && message.includes(columnName)) || (message.includes(columnName) && message.includes('column'));
 }
 
 async function createZoomSignature(secret: string, payload: Record<string, unknown>) {
