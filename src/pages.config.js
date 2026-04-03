@@ -1,19 +1,21 @@
-import AdminAprovacao from './pages/AdminAprovacao';
-import AgendamentoPerfil from './pages/AgendamentoPerfil';
-import AgendamentoEspecialidade from './pages/AgendamentoEspecialidade';
-import CadastroPaciente from './pages/CadastroPaciente';
-import CadastroProfissional from './pages/CadastroProfissional';
-import ConsultaAgora from './pages/ConsultaAgora';
-import DashboardPaciente from './pages/DashboardPaciente';
-import DashboardProfissional from './pages/DashboardProfissional';
-import Entrar from './pages/Entrar';
-import Especialidades from './pages/Especialidades';
-import Home from './pages/Home';
-import Perfil from './pages/Perfil';
-import PerfilProfissional from './pages/PerfilProfissional';
-import PergunteEspecialista from './pages/PergunteEspecialista';
-import Teleconsulta from './pages/Teleconsulta';
-import __Layout from './Layout.jsx';
+import { lazy } from 'react';
+
+const AdminAprovacao = lazy(() => import('./pages/AdminAprovacao'));
+const AgendamentoPerfil = lazy(() => import('./pages/AgendamentoPerfil'));
+const AgendamentoEspecialidade = lazy(() => import('./pages/AgendamentoEspecialidade'));
+const CadastroPaciente = lazy(() => import('./pages/CadastroPaciente'));
+const CadastroProfissional = lazy(() => import('./pages/CadastroProfissional'));
+const ConsultaAgora = lazy(() => import('./pages/ConsultaAgora'));
+const DashboardPaciente = lazy(() => import('./pages/DashboardPaciente'));
+const DashboardProfissional = lazy(() => import('./pages/DashboardProfissional'));
+const Entrar = lazy(() => import('./pages/Entrar'));
+const Especialidades = lazy(() => import('./pages/Especialidades'));
+const Home = lazy(() => import('./pages/Home'));
+const Perfil = lazy(() => import('./pages/Perfil'));
+const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
+const PergunteEspecialista = lazy(() => import('./pages/PergunteEspecialista'));
+const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
+const __Layout = lazy(() => import('./Layout.jsx'));
 
 export const PAGES = {
     "AdminAprovacao": AdminAprovacao,

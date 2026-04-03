@@ -1,23 +1,18 @@
 import React from 'react';
 import { useAuth } from '@/components/AuthContext';
-import { createPageUrl } from '@/utils';
 import { useNavigate } from 'react-router-dom';
+import AppLoadingScreen from '@/components/AppLoadingScreen';
 
 export default function ProtectedRoute({ children, requiredRole }) {
-  const { user, loading, isAuthenticated } = useAuth();
+  const { user, loading, isAuthenticated, redirectToLogin } = useAuth();
   const navigate = useNavigate();
 
   if (loading) {
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="w-8 h-8 border-4 border-slate-200 border-t-slate-800 rounded-full animate-spin" />
-      </div>
-    );
+    return <AppLoadingScreen message="Validando acesso..." />;
   }
 
   if (!isAuthenticated) {
-    sessionStorage.setItem('rd_login_next', window.location.pathname + window.location.search);
-    window.location.href = createPageUrl('Entrar');
+    redirectToLogin(window.location.pathname + window.location.search);
     return null;
   }
 

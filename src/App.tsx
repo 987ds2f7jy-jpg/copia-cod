@@ -1,6 +1,5 @@
+import { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster"
-import Teleconsulta from './pages/Teleconsulta';
-import FinanceiroProfissional from './pages/FinanceiroProfissional';
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
 import NavigationTracker from '@/lib/NavigationTracker'
@@ -9,6 +8,10 @@ import { BrowserRouter as Router, Route, Routes, Navigate, useSearchParams } fro
 import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
+import AppLoadingScreen from '@/components/AppLoadingScreen';
+
+const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
+const FinanceiroProfissional = lazy(() => import('./pages/FinanceiroProfissional'));
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -46,37 +49,48 @@ function App() {
       <AuthProvider>
         <Router>
           <NavigationTracker />
-          <Routes>
-            <Route path="/" element={
-              <LayoutWrapper currentPageName={mainPageKey}>
-                <MainPage />
-              </LayoutWrapper>
-            } />
-            {Object.entries(Pages).map(([path, Page]: [string, any]) => (
+          <Suspense fallback={<AppLoadingScreen />}>
+            <Routes>
+              <Route path="/" element={
+                <LayoutWrapper currentPageName={mainPageKey}>
+                  <MainPage />
+                </LayoutWrapper>
+              } />
+              {Object.entries(Pages).map(([path, Page]: [string, any]) => (
+                <Route
+                  key={path}
+                  path={`/${path}`}
+                  element={
+                    <LayoutWrapper currentPageName={path}>
+                      {withRouteProtection(path, <Page />)}
+                    </LayoutWrapper>
+                  }
+                />
+              ))}
+              <Route path="/Agendamento" element={<AgendamentoRedirect />} />
               <Route
-                key={path}
-                path={`/${path}`}
+                path="/consulta/:consultaId"
                 element={
-                  <LayoutWrapper currentPageName={path}>
-                    {withRouteProtection(path, <Page />)}
+                  <LayoutWrapper currentPageName="Teleconsulta">
+                    <ProtectedRoute>
+                      <Teleconsulta />
+                    </ProtectedRoute>
                   </LayoutWrapper>
                 }
               />
-            ))}
-            <Route path="/Agendamento" element={<AgendamentoRedirect />} />
-            <Route
-              path="/consulta/:consultaId"
-              element={
-                <LayoutWrapper currentPageName="Teleconsulta">
-                  <ProtectedRoute>
-                    <Teleconsulta />
-                  </ProtectedRoute>
-                </LayoutWrapper>
-              }
-            />
-            <Route path="/FinanceiroProfissional" element={<LayoutWrapper currentPageName="FinanceiroProfissional"><FinanceiroProfissional /></LayoutWrapper>} />
-            <Route path="*" element={<PageNotFound />} />
-          </Routes>
+              <Route
+                path="/FinanceiroProfissional"
+                element={
+                  <LayoutWrapper currentPageName="FinanceiroProfissional">
+                    <ProtectedRoute requiredRole="professional">
+                      <FinanceiroProfissional />
+                    </ProtectedRoute>
+                  </LayoutWrapper>
+                }
+              />
+              <Route path="*" element={<PageNotFound />} />
+            </Routes>
+          </Suspense>
         </Router>
         <Toaster />
       </AuthProvider>
