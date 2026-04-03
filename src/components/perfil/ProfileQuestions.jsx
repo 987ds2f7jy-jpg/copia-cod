@@ -29,7 +29,7 @@ function QuestionItem({ question }) {
 
 export default function ProfileQuestions({ questions }) {
   const [page, setPage] = useState(1);
-  const answered = questions.filter(q => q.status === 'answered' && q.is_public !== false);
+  const answered = questions.filter(q => q.status === 'RESPONDIDA' && q.answer_text);
   const visible = answered.slice(0, page * PAGE_SIZE);
 
   if (answered.length === 0) return null;

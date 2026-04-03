@@ -18,8 +18,7 @@ import {
   Loader2, Stethoscope, TrendingUp, XCircle, BarChart2, Clock,
   AlertCircle, UserCircle, LayoutDashboard
 } from 'lucide-react';
-import { format, subDays, startOfMonth, endOfMonth, startOfWeek, endOfWeek, isWithinInterval, parseISO } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
+import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion } from 'framer-motion';
 
@@ -32,9 +31,11 @@ import PerformanceBlock from '@/components/dashboard/PerformanceBlock';
 import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
+import { buildConsultaFromAppointment, buildConsultaFromQueueEntry } from '@/lib/consultas';
+import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
+import { canWorkOnDuty, isProfessionalApprovedStatus, normalizePlantaoSpecialty, PLANTAO_ESPECIALIDADES } from '@/lib/professionals';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
-const normalizeSpecialty = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, '_');
 const today = () => format(new Date(), 'yyyy-MM-dd');
 
 function filterByPeriod(appointments, period) {
@@ -86,7 +87,6 @@ const PERIODS = [
 
 // ─── Dashboard Inner ──────────────────────────────────────────────────────────
 // Especialidades habilitadas para plantão
-const PLANTAO_ESPECIALIDADES = ['clinico_geral', 'pediatria', 'psicologia', 'psiquiatria'];
 
 function DashboardProfissionalInner() {
   const { user } = useAuth();
@@ -130,10 +130,10 @@ function DashboardProfissionalInner() {
   const { data: queuePatients = [] } = useQuery({
     queryKey: ['queueWaiting', professional?.id, professional?.specialty],
     queryFn: () => {
-      const normalized = normalizeSpecialty(professional?.specialty);
+      const normalized = normalizePlantaoSpecialty(professional?.specialty);
       return base44.entities.Queue.filter({ specialty: normalized, status: 'waiting' });
     },
-    enabled: !!professional?.id && !!professional?.specialty && PLANTAO_ESPECIALIDADES.includes(normalizeSpecialty(professional?.specialty)),
+    enabled: !!professional?.id && !!professional?.specialty && canWorkOnDuty(professional?.specialty),
     refetchInterval: professional?.is_on_duty ? 10000 : false,
   });
 
@@ -175,7 +175,16 @@ function DashboardProfissionalInner() {
     enabled: !!professional?.id,
   });
 
-  const questions = [...pendingQuestions, ...answeredQuestions];
+  const questionProfilesById = publicProfile?.id ? { [publicProfile.id]: publicProfile } : {};
+  const pendingQuestionsNormalized = useMemo(
+    () => normalizeQuestions(pendingQuestions, questionProfilesById),
+    [pendingQuestions, publicProfile]
+  );
+  const answeredQuestionsNormalized = useMemo(
+    () => normalizeQuestions(answeredQuestions, questionProfilesById),
+    [answeredQuestions, publicProfile]
+  );
+  const questions = [...pendingQuestionsNormalized, ...answeredQuestionsNormalized];
 
   const { data: reviews = [] } = useQuery({
     queryKey: ['profReviews', professional?.id],
@@ -188,16 +197,20 @@ function DashboardProfissionalInner() {
 
   const toggleDuty = useMutation({
     mutationFn: async (isOnDuty) => {
-      const id = professional.id;
-      await Promise.all([
-        base44.entities.ProfessionalProfile.update(id, { is_on_duty: isOnDuty }).catch(() => null),
-        base44.entities.ProfessionalPublicProfile.update(id, { is_on_duty: isOnDuty }).catch(() => null),
-        base44.entities.Professional.update(id, { is_on_duty: isOnDuty }).catch(() => null),
-      ]);
+      const updates = [
+        base44.entities.ProfessionalProfile.update(professional.id, { is_on_duty: isOnDuty }),
+      ];
+
+      if (publicProfile?.id) {
+        updates.push(base44.entities.ProfessionalPublicProfile.update(publicProfile.id, { is_on_duty: isOnDuty }));
+      }
+
+      await Promise.all(updates);
       return isOnDuty;
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['myProfessionalProfile', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['myPublicProfile', professional?.id] });
       queryClient.invalidateQueries({ queryKey: ['onDutyProfessionals'] });
     },
   });
@@ -210,54 +223,28 @@ function DashboardProfissionalInner() {
   const answerQuestion = useMutation({
     mutationFn: async ({ id, answer }) => {
       // Guard: prevent answering already-answered question
-      const current = await base44.entities.Question.filter({ id });
-      if (current?.[0]?.status === 'RESPONDIDA') {
+      const current = await base44.entities.Question.get(id);
+      if (current?.status === 'RESPONDIDA') {
         throw new Error('Esta pergunta já foi respondida.');
       }
-      // Get public profile for the card link
-      let publicProfileId = null;
-      try {
-        const pub = await base44.entities.ProfessionalPublicProfile.filter({ professional_profile_id: professional.id });
-        publicProfileId = pub?.[0]?.id || null;
-      } catch { /* best effort */ }
-
-      return base44.entities.Question.update(id, {
-        answer_text: answer,
-        answered_by_professional_id: professional.id,
-        answered_by_name: professional.full_name,
-        answered_by_specialty: professional.specialty,
-        answered_by_photo: professional.photo_url || null,
-        answered_by_public_profile_id: publicProfileId,
-        answered_at: new Date().toISOString(),
-        status: 'RESPONDIDA',
-      });
+      return base44.entities.Question.update(id, buildQuestionAnswerPayload({
+        professional,
+        publicProfileId: publicProfile?.id,
+        answer,
+      }));
     },
     onSuccess: () => {
       setAnswerModal({ open: false, question: null });
       setAnswerText('');
       queryClient.invalidateQueries({ queryKey: ['pendingQuestions'] });
       queryClient.invalidateQueries({ queryKey: ['answeredQuestions'] });
+      queryClient.invalidateQueries({ queryKey: ['forumPublic'] });
+      queryClient.invalidateQueries({ queryKey: ['perfil-questions'] });
     },
   });
-
   const acceptQueuePatient = useMutation({
     mutationFn: async (queueEntry) => {
-      // Create Consulta record
-      const consulta = await base44.entities.Consulta.create({
-        paciente_id: queueEntry.patient_id,
-        paciente_nome: queueEntry.patient_name,
-        paciente_email: queueEntry.patient_email,
-        profissional_id: professional.id,
-        profissional_nome: professional.full_name,
-        especialidade: queueEntry.specialty,
-        tipo_consulta: 'plantao',
-        status: 'em_atendimento',
-        datetime: new Date().toISOString(),
-        descricao_sintomas: queueEntry.symptoms || '',
-        preco: professional.price_standard || 0,
-        inicio_at: new Date().toISOString(),
-      });
-      // Update queue to trigger patient redirect
+      const consulta = await base44.entities.Consulta.create(buildConsultaFromQueueEntry(queueEntry, professional));
       await base44.entities.Queue.update(queueEntry.id, {
         status: 'in_progress',
         assigned_professional_id: professional.id,
@@ -307,7 +294,7 @@ function DashboardProfissionalInner() {
   }
 
   // Status gate: block pending/rejected/suspended professionals
-  if (professional.status && professional.status !== 'active' && professional.status !== 'approved') {
+  if (professional.status && !isProfessionalApprovedStatus(professional.status)) {
     return <ProfessionalStatusGate professional={professional} />;
   }
 
@@ -469,23 +456,7 @@ function DashboardProfissionalInner() {
               if (a.consulta_id) {
                 navigate(`/consulta/${a.consulta_id}`);
               } else {
-                // Criar Consulta na nova entidade e redirecionar
-                const now = new Date().toISOString();
-                base44.entities.Consulta.create({
-                  paciente_id: a.patient_id,
-                  paciente_nome: a.patient_name,
-                  profissional_id: professional.id,
-                  profissional_nome: professional.full_name,
-                  especialidade: a.specialty,
-                  tipo_consulta: a.appointment_type === 'priority' ? 'prioritario'
-                    : a.appointment_type === 'instant' ? 'plantao'
-                    : a.appointment_type === 'IMEDIATO' ? 'plantao'
-                    : a.appointment_type === 'ESPECIALIDADE' ? 'especialidade' : 'padrao',
-                  status: 'aguardando',
-                  datetime: a.scheduled_datetime || now,
-                  descricao_sintomas: a.symptoms || '',
-                  preco: a.price || 0,
-                }).then(c => {
+                base44.entities.Consulta.create(buildConsultaFromAppointment(a, professional)).then(c => {
                   base44.entities.Appointment.update(a.id, { status: 'CONFIRMADO', consulta_id: c.id });
                   navigate(`/consulta/${c.id}`);
                 });
@@ -515,9 +486,9 @@ function DashboardProfissionalInner() {
               <Badge className="bg-purple-100 text-purple-700">{pendingQ}</Badge>
             </div>
             <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
-              {pendingQuestions.length === 0 ? (
+              {pendingQuestionsNormalized.length === 0 ? (
                 <p className="px-5 py-6 text-sm text-gray-400 text-center">Nenhuma pendente</p>
-              ) : pendingQuestions.slice(0, 6).map(q => (
+              ) : pendingQuestionsNormalized.slice(0, 6).map(q => (
                 <div key={q.id} className="px-5 py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
                     <p className="text-xs text-gray-400 truncate">{q.specialty}</p>

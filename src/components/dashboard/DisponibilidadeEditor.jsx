@@ -47,21 +47,27 @@ export default function DisponibilidadeEditor({ professional }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      // 1. Deletar todos os slots atuais
-      for (const slot of existingSlots) {
-        await base44.entities.AvailabilitySlot.delete(slot.id);
-      }
+      const existingByKey = new Map(
+        existingSlots.map((slot) => [`${slot.weekday}|${slot.time_slot}`, slot])
+      );
+      const desiredKeys = new Set(selected);
 
-      // 2. Criar os novos slots selecionados
-      const toCreate = [];
-      selected.forEach(key => {
-        const [weekday, time_slot] = key.split('|');
-        toCreate.push({ professional_id: professional.id, weekday: Number(weekday), time_slot });
-      });
+      const toCreate = [...desiredKeys]
+        .filter((key) => !existingByKey.has(key))
+        .map((key) => {
+          const [weekday, time_slot] = key.split('|');
+          return { professional_id: professional.id, weekday: Number(weekday), time_slot };
+        });
+
+      const toDelete = existingSlots.filter(
+        (slot) => !desiredKeys.has(`${slot.weekday}|${slot.time_slot}`)
+      );
 
       if (toCreate.length > 0) {
         await base44.entities.AvailabilitySlot.bulkCreate(toCreate);
       }
+
+      await Promise.all(toDelete.map((slot) => base44.entities.AvailabilitySlot.delete(slot.id)));
     },
     onSuccess: () => {
       toast.success('Disponibilidade salva!');

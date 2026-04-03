@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { Clock, XCircle, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { isProfessionalApprovedStatus } from '@/lib/professionals';
 
 /**
  * Bloqueia acesso ao dashboard se o profissional não estiver aprovado.
@@ -12,7 +13,7 @@ export default function ProfessionalStatusGate({ professional, children }) {
   const status = professional?.status;
 
   // Approved OR legacy "active" → allow through
-  if (status === 'approved' || status === 'active') {
+  if (isProfessionalApprovedStatus(status)) {
     return <>{children}</>;
   }
 

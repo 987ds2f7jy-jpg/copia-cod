@@ -8,6 +8,7 @@ import { CalendarDays, Clock, CheckCircle, Loader2, AlertCircle, Users } from 'l
 import { format, parseISO } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { validateSchedulingWindowByType, buildDatetime } from '@/lib/scheduling';
+import { buildConsultaFromAppointment } from '@/lib/consultas';
 
 export default function SolicitacoesAgendamento({ professional }) {
   const queryClient = useQueryClient();
@@ -92,21 +93,10 @@ export default function SolicitacoesAgendamento({ professional }) {
       }
 
       // 5. Criar Consulta (entidade central) e confirmar Appointment
-      const consulta = await base44.entities.Consulta.create({
-        paciente_id: solicitacao.patient_id,
-        paciente_nome: solicitacao.patient_name,
-        paciente_email: solicitacao.patient_email || '',
-        profissional_id: professional.id,
-        profissional_nome: professional.full_name,
-        especialidade: solicitacao.specialty,
-        tipo_consulta: tipoConsulta === 'priority' || tipoConsulta === 'prioritario' ? 'prioritario'
-          : tipoConsulta === 'instant' || tipoConsulta === 'plantao' || tipoConsulta === 'IMEDIATO' ? 'plantao'
-          : tipoConsulta === 'ESPECIALIDADE' || tipoConsulta === 'especialidade' ? 'especialidade' : 'padrao',
+      const consulta = await base44.entities.Consulta.create(buildConsultaFromAppointment(solicitacao, professional, {
         status: 'aguardando',
         datetime: scheduled_datetime,
-        descricao_sintomas: solicitacao.symptoms || '',
-        preco: solicitacao.price || professional.price_standard || 0,
-      });
+      }));
 
       await base44.entities.Appointment.update(solicitacao.id, {
         professional_id: professional.id,

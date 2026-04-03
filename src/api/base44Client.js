@@ -3,6 +3,7 @@
  * Mimics the base44.entities.X.create/filter/update/delete/list API
  */
 import { supabase } from '@/integrations/supabase/client';
+import { logApiError, logApiRequest, logApiResponse, serializeError } from '@/lib/observability';
 
 // Table name mapping (entity name -> PostgreSQL table name)
 const TABLE_MAP = {
@@ -25,18 +26,39 @@ const TABLE_MAP = {
 };
 
 function createEntityProxy(tableName) {
+  async function execute(action, meta, runner) {
+    logApiRequest({ table: tableName, action, ...meta });
+
+    try {
+      const result = await runner();
+      const count = Array.isArray(result) ? result.length : result ? 1 : 0;
+      logApiResponse({ table: tableName, action, count, id: result?.id || null });
+      return result;
+    } catch (error) {
+      logApiError({
+        table: tableName,
+        action,
+        ...meta,
+        error: serializeError(error),
+      });
+      throw error;
+    }
+  }
+
   return {
     /**
      * Create a new record
      */
     async create(data) {
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .insert(data)
-        .select()
-        .single();
-      if (error) throw error;
-      return result;
+      return execute('create', { fields: Object.keys(data || {}) }, async () => {
+        const { data: result, error } = await supabase
+          .from(tableName)
+          .insert(data)
+          .select()
+          .single();
+        if (error) throw error;
+        return result;
+      });
     },
 
     /**
@@ -44,12 +66,14 @@ function createEntityProxy(tableName) {
      */
     async bulkCreate(items) {
       if (!items || items.length === 0) return [];
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .insert(items)
-        .select();
-      if (error) throw error;
-      return result;
+      return execute('bulkCreate', { items: items.length }, async () => {
+        const { data: result, error } = await supabase
+          .from(tableName)
+          .insert(items)
+          .select();
+        if (error) throw error;
+        return result;
+      });
     },
 
     /**
@@ -57,33 +81,28 @@ function createEntityProxy(tableName) {
      * base44 API: .filter(filters, orderBy?, limit?)
      */
     async filter(filters = {}, orderBy, limit) {
-      let query = supabase.from(tableName).select('*');
+      return execute('filter', { filters, orderBy: orderBy || null, limit: limit || null }, async () => {
+        let query = supabase.from(tableName).select('*');
 
-      // Apply filters
-      for (const [key, value] of Object.entries(filters)) {
-        if (value === undefined || value === null) continue;
-        if (typeof value === 'boolean') {
-          query = query.eq(key, value);
-        } else {
+        for (const [key, value] of Object.entries(filters)) {
+          if (value === undefined || value === null) continue;
           query = query.eq(key, value);
         }
-      }
 
-      // Apply ordering
-      if (orderBy) {
-        const desc = orderBy.startsWith('-');
-        const column = desc ? orderBy.slice(1) : orderBy;
-        query = query.order(column, { ascending: !desc });
-      }
+        if (orderBy) {
+          const desc = orderBy.startsWith('-');
+          const column = desc ? orderBy.slice(1) : orderBy;
+          query = query.order(column, { ascending: !desc });
+        }
 
-      // Apply limit
-      if (limit) {
-        query = query.limit(limit);
-      }
+        if (limit) {
+          query = query.limit(limit);
+        }
 
-      const { data, error } = await query;
-      if (error) throw error;
-      return data || [];
+        const { data, error } = await query;
+        if (error) throw error;
+        return data || [];
+      });
     },
 
     /**
@@ -97,25 +116,45 @@ function createEntityProxy(tableName) {
      * Update a record by ID
      */
     async update(id, data) {
-      const { data: result, error } = await supabase
-        .from(tableName)
-        .update(data)
-        .eq('id', id)
-        .select()
-        .single();
-      if (error) throw error;
-      return result;
+      return execute('update', { id, fields: Object.keys(data || {}) }, async () => {
+        const { data: result, error } = await supabase
+          .from(tableName)
+          .update(data)
+          .eq('id', id)
+          .select()
+          .single();
+        if (error) throw error;
+        return result;
+      });
+    },
+
+    /**
+     * Get a record by ID
+     */
+    async get(id) {
+      return execute('get', { id }, async () => {
+        const { data: result, error } = await supabase
+          .from(tableName)
+          .select('*')
+          .eq('id', id)
+          .single();
+        if (error) throw error;
+        return result;
+      });
     },
 
     /**
      * Delete a record by ID
      */
     async delete(id) {
-      const { error } = await supabase
-        .from(tableName)
-        .delete()
-        .eq('id', id);
-      if (error) throw error;
+      return execute('delete', { id }, async () => {
+        const { error } = await supabase
+          .from(tableName)
+          .delete()
+          .eq('id', id);
+        if (error) throw error;
+        return null;
+      });
     },
 
     /**

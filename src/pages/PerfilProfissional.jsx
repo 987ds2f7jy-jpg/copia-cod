@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
@@ -15,6 +15,7 @@ import ProfileQuestions from '@/components/perfil/ProfileQuestions';
 import ProfileCalendar from '@/components/perfil/ProfileCalendar';
 import ProfileGallery from '@/components/perfil/ProfileGallery';
 import ProfileSidebar from '@/components/perfil/ProfileSidebar';
+import { normalizeQuestions } from '@/lib/questions';
 
 export default function PerfilProfissional() {
   const [searchParams] = useSearchParams();
@@ -60,12 +61,17 @@ export default function PerfilProfissional() {
   const { data: questions = [] } = useQuery({
     queryKey: ['perfil-questions', professionalId],
     queryFn: () => base44.entities.Question.filter({
-      answered_by_public_profile_id: professionalId,
+      public_profile_id: professionalId,
       status: 'RESPONDIDA',
     }, '-answered_at', 50),
     enabled: !!professionalId,
     staleTime: 60_000,
   });
+
+  const normalizedQuestions = useMemo(
+    () => normalizeQuestions(questions, professional ? { [professional.id]: professional } : {}),
+    [questions, professional]
+  );
 
   // SEO: set document title dynamically
   useEffect(() => {
@@ -142,9 +148,9 @@ export default function PerfilProfissional() {
               <ProfileReviews reviews={reviews} />
             </motion.div>
 
-            {questions.length > 0 && (
+            {normalizedQuestions.length > 0 && (
               <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: 0.2 }}>
-                <ProfileQuestions questions={questions} />
+                <ProfileQuestions questions={normalizedQuestions} />
               </motion.div>
             )}
           </div>

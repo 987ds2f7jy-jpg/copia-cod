@@ -1,19 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-// Use the same AuthContext as the rest of the app (components/AuthContext for AppUser)
 import { useAuth } from '@/components/AuthContext';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import {
-  Dialog, DialogContent, DialogHeader, DialogTitle,
-} from "@/components/ui/dialog";
-import {
   Mic, MicOff, Video, VideoOff, PhoneOff, Send, Loader2,
-  FileText, MessageSquare, ChevronLeft, Star, Clock, User,
+  FileText, MessageSquare, ChevronLeft, Clock, User,
   AlertCircle, History
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -21,6 +17,8 @@ import { ptBR } from 'date-fns/locale';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
 import ProntuariosAnteriores from '@/components/teleconsulta/ProntuariosAnteriores';
 import AvaliacaoModal from '@/components/teleconsulta/AvaliacaoModal';
+import { isConsultaParticipant } from '@/lib/consultas';
+import { logUiWarning } from '@/lib/observability';
 
 function VideoPlaceholder({ nome, role }) {
   return (
@@ -31,7 +29,7 @@ function VideoPlaceholder({ nome, role }) {
       <p className="text-white text-sm font-medium">{nome || 'Participante'}</p>
       <p className="text-gray-400 text-xs mt-1">{role}</p>
       <div className="absolute top-3 left-3">
-        <Badge className="bg-red-500 text-white text-xs animate-pulse">● AO VIVO</Badge>
+        <Badge className="bg-red-500 text-white text-xs animate-pulse">AO VIVO</Badge>
       </div>
     </div>
   );
@@ -45,6 +43,7 @@ function ChatPanel({ consultaId, userId, userName, userTipo }) {
   const { data: mensagens = [] } = useQuery({
     queryKey: ['mensagensConsulta', consultaId],
     queryFn: () => base44.entities.MensagemConsulta.filter({ consulta_id: consultaId }, 'created_date', 100),
+    enabled: !!consultaId && !!userId,
     refetchInterval: 3000,
   });
 
@@ -66,10 +65,12 @@ function ChatPanel({ consultaId, userId, userName, userTipo }) {
     },
   });
 
-  const handleKeyDown = (e) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      if (texto.trim()) enviar.mutate();
+  const handleKeyDown = (event) => {
+    if (event.key === 'Enter' && !event.shiftKey) {
+      event.preventDefault();
+      if (texto.trim()) {
+        enviar.mutate();
+      }
     }
   };
 
@@ -79,15 +80,16 @@ function ChatPanel({ consultaId, userId, userName, userTipo }) {
         {mensagens.length === 0 && (
           <p className="text-xs text-gray-400 text-center mt-4">Nenhuma mensagem ainda</p>
         )}
-        {mensagens.map(m => {
-          const isMe = m.remetente_id === userId;
+        {mensagens.map((mensagem) => {
+          const isMe = mensagem.remetente_id === userId;
+
           return (
-            <div key={m.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
+            <div key={mensagem.id} className={`flex ${isMe ? 'justify-end' : 'justify-start'}`}>
               <div className={`max-w-[80%] rounded-2xl px-3 py-2 ${isMe ? 'bg-emerald-600 text-white' : 'bg-gray-100 text-gray-800'}`}>
-                {!isMe && <p className="text-xs font-medium mb-1 opacity-70">{m.remetente_nome}</p>}
-                <p className="text-sm leading-relaxed whitespace-pre-wrap">{m.mensagem}</p>
+                {!isMe && <p className="text-xs font-medium mb-1 opacity-70">{mensagem.remetente_nome}</p>}
+                <p className="text-sm leading-relaxed whitespace-pre-wrap">{mensagem.mensagem}</p>
                 <p className={`text-xs mt-1 ${isMe ? 'text-emerald-200' : 'text-gray-400'}`}>
-                  {m.created_date ? format(new Date(m.created_date), 'HH:mm') : ''}
+                  {mensagem.created_date ? format(new Date(mensagem.created_date), 'HH:mm') : ''}
                 </p>
               </div>
             </div>
@@ -95,11 +97,12 @@ function ChatPanel({ consultaId, userId, userName, userTipo }) {
         })}
         <div ref={bottomRef} />
       </div>
+
       <div className="p-3 border-t border-gray-100">
         <div className="flex gap-2">
           <Textarea
             value={texto}
-            onChange={e => setTexto(e.target.value)}
+            onChange={(event) => setTexto(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem... (Enter para enviar)"
             className="resize-none text-sm min-h-[40px] max-h-24"
@@ -130,25 +133,15 @@ function TeleconsultaInner({ consultaId }) {
 
   const { data: consulta, isLoading } = useQuery({
     queryKey: ['consulta', consultaId],
-    queryFn: async () => {
-      // Fetch by listing all and filter by id (entidades não têm endpoint GET by id diretamente)
-      const results = await base44.entities.Consulta.list('-created_date', 200);
-      const found = results.find(c => c.id === consultaId);
-      console.log('[Teleconsulta] consulta encontrada:', found?.id, 'status:', found?.status,
-        'tipo:', found?.tipo_consulta, 'inicio_at:', found?.inicio_at, 'datetime:', found?.datetime);
-      return found || null;
-    },
-    enabled: !!consultaId,
+    queryFn: () => base44.entities.Consulta.get(consultaId),
+    enabled: !!consultaId && !!user?.id,
     refetchInterval: 5000,
   });
 
-  const isProfissional = consulta && user && consulta.profissional_id === user.id;
-  const isPaciente = consulta && user && consulta.paciente_id === user.id;
+  const isProfissional = Boolean(consulta && user && consulta.profissional_id === user.id);
+  const isPaciente = Boolean(consulta && user && consulta.paciente_id === user.id);
+  const isParticipant = isConsultaParticipant(consulta, user?.id);
 
-  console.log('[Teleconsulta] consulta_id:', consultaId, 'status:', consulta?.status,
-    'tipo:', consulta?.tipo_consulta, 'inicio_at:', consulta?.inicio_at, 'user:', user?.id);
-
-  // Iniciar consulta ao montar se ainda não iniciada
   const iniciarConsulta = useMutation({
     mutationFn: () => base44.entities.Consulta.update(consultaId, {
       status: 'em_atendimento',
@@ -160,11 +153,22 @@ function TeleconsultaInner({ consultaId }) {
   });
 
   useEffect(() => {
-    if (consulta && consulta.status === 'aguardando' && (isProfissional || isPaciente)) {
-      console.log('[Teleconsulta] iniciando consulta automaticamente');
+    if (consulta && consulta.status === 'aguardando' && isParticipant && !iniciarConsulta.isPending) {
       iniciarConsulta.mutate();
     }
-  }, [consulta?.id, consulta?.status]);
+  }, [consulta?.id, consulta?.status, isParticipant]);
+
+  useEffect(() => {
+    if (consulta && user?.id && !isParticipant) {
+      logUiWarning('teleconsulta', {
+        consultaId,
+        userId: user.id,
+        profissionalId: consulta.profissional_id,
+        pacienteId: consulta.paciente_id,
+        reason: 'unauthorized-access-attempt',
+      });
+    }
+  }, [consulta?.id, isParticipant, user?.id, consultaId]);
 
   const encerrar = useMutation({
     mutationFn: () => base44.entities.Consulta.update(consultaId, {
@@ -174,9 +178,10 @@ function TeleconsultaInner({ consultaId }) {
     onSuccess: () => {
       if (isPaciente) {
         setShowAvaliacao(true);
-      } else {
-        navigate('/DashboardProfissional');
+        return;
       }
+
+      navigate('/DashboardProfissional');
     },
   });
 
@@ -192,8 +197,19 @@ function TeleconsultaInner({ consultaId }) {
     return (
       <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white gap-4">
         <AlertCircle className="w-12 h-12 text-red-400" />
-        <p className="text-lg">Consulta não encontrada</p>
+        <p className="text-lg">Consulta nao encontrada</p>
         <Button variant="outline" onClick={() => navigate(-1)}>Voltar</Button>
+      </div>
+    );
+  }
+
+  if (!isParticipant) {
+    return (
+      <div className="min-h-screen flex flex-col items-center justify-center bg-gray-900 text-white gap-4 px-4 text-center">
+        <AlertCircle className="w-12 h-12 text-red-400" />
+        <h2 className="text-xl font-bold">Acesso restrito</h2>
+        <p className="text-gray-400 max-w-md">Apenas paciente e profissional vinculados a esta consulta podem acessar esta teleconsulta.</p>
+        <Button variant="outline" onClick={() => navigate('/')}>Voltar</Button>
       </div>
     );
   }
@@ -205,14 +221,14 @@ function TeleconsultaInner({ consultaId }) {
           <Video className="w-8 h-8 text-emerald-400" />
         </div>
         <h2 className="text-xl font-bold">Consulta Encerrada</h2>
-        <p className="text-gray-400">Duração: {
-          consulta.inicio_at && consulta.fim_at
-            ? Math.round((new Date(consulta.fim_at) - new Date(consulta.inicio_at)) / 60000) + ' min'
-            : '—'
-        }</p>
+        <p className="text-gray-400">
+          Duracao: {consulta.inicio_at && consulta.fim_at
+            ? `${Math.round((new Date(consulta.fim_at) - new Date(consulta.inicio_at)) / 60000)} min`
+            : '—'}
+        </p>
         <div className="flex gap-3">
-          <Button onClick={() => navigate('/DashboardPaciente')} className="bg-emerald-600 hover:bg-emerald-700">
-            Voltar ao Início
+          <Button onClick={() => navigate(isPaciente ? '/DashboardPaciente' : '/DashboardProfissional')} className="bg-emerald-600 hover:bg-emerald-700">
+            Voltar ao Inicio
           </Button>
         </div>
       </div>
@@ -221,11 +237,15 @@ function TeleconsultaInner({ consultaId }) {
 
   const nomeOutro = isProfissional ? consulta.paciente_nome : consulta.profissional_nome;
   const userTipo = isProfissional ? 'profissional' : 'paciente';
-  const TIPO_LABELS = { padrao: 'Por Especialidade', prioritario: 'Prioritária', especialidade: 'Por Especialidade', plantao: 'Plantão' };
+  const tipoLabels = {
+    padrao: 'Por Especialidade',
+    prioritario: 'Prioritaria',
+    especialidade: 'Por Especialidade',
+    plantao: 'Plantao',
+  };
 
   return (
     <div className="min-h-screen bg-gray-950 flex flex-col">
-      {/* Header */}
       <div className="bg-gray-900 border-b border-gray-800 px-4 py-3 flex items-center justify-between">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="icon" className="text-gray-400 hover:text-white" onClick={() => navigate(-1)}>
@@ -234,7 +254,7 @@ function TeleconsultaInner({ consultaId }) {
           <div>
             <p className="text-white font-medium text-sm">{nomeOutro || 'Consulta'}</p>
             <div className="flex items-center gap-2">
-              <Badge className="bg-emerald-500/20 text-emerald-400 text-xs">{TIPO_LABELS[consulta.tipo_consulta] || consulta.tipo_consulta}</Badge>
+              <Badge className="bg-emerald-500/20 text-emerald-400 text-xs">{tipoLabels[consulta.tipo_consulta] || consulta.tipo_consulta}</Badge>
               {consulta.inicio_at && (
                 <span className="text-xs text-gray-400 flex items-center gap-1">
                   <Clock className="w-3 h-3" />
@@ -245,29 +265,25 @@ function TeleconsultaInner({ consultaId }) {
           </div>
         </div>
         <Badge className={consulta.status === 'em_atendimento' ? 'bg-green-500/20 text-green-400 animate-pulse' : 'bg-gray-700 text-gray-300'}>
-          {consulta.status === 'em_atendimento' ? '● Em andamento' : consulta.status}
+          {consulta.status === 'em_atendimento' ? 'Em andamento' : consulta.status}
         </Badge>
       </div>
 
-      {/* Layout Desktop: Video + Sidebar */}
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
-        {/* Área principal de vídeo */}
         <div className="flex-1 flex flex-col p-4 gap-3 min-h-[300px] lg:min-h-0">
           <div className="flex-1 relative">
             <VideoPlaceholder nome={nomeOutro} role={isProfissional ? 'Paciente' : `Dr(a). ${consulta.profissional_nome}`} />
-            {/* Mini preview de si mesmo */}
             <div className="absolute bottom-3 right-3 w-28 h-20 rounded-lg overflow-hidden border-2 border-gray-700">
-              <VideoPlaceholder nome={user?.full_name} role="Você" />
+              <VideoPlaceholder nome={user?.full_name} role="Voce" />
             </div>
           </div>
 
-          {/* Controles */}
           <div className="flex items-center justify-center gap-3">
             <Button
               variant="outline"
               size="icon"
               className={`rounded-full w-12 h-12 border-gray-700 ${micOn ? 'bg-gray-800 text-white' : 'bg-red-600 text-white border-red-600'}`}
-              onClick={() => setMicOn(v => !v)}
+              onClick={() => setMicOn((value) => !value)}
             >
               {micOn ? <Mic className="w-5 h-5" /> : <MicOff className="w-5 h-5" />}
             </Button>
@@ -275,7 +291,7 @@ function TeleconsultaInner({ consultaId }) {
               variant="outline"
               size="icon"
               className={`rounded-full w-12 h-12 border-gray-700 ${camOn ? 'bg-gray-800 text-white' : 'bg-red-600 text-white border-red-600'}`}
-              onClick={() => setCamOn(v => !v)}
+              onClick={() => setCamOn((value) => !value)}
             >
               {camOn ? <Video className="w-5 h-5" /> : <VideoOff className="w-5 h-5" />}
             </Button>
@@ -290,7 +306,6 @@ function TeleconsultaInner({ consultaId }) {
           </div>
         </div>
 
-        {/* Sidebar */}
         <div className="lg:w-96 border-t lg:border-t-0 lg:border-l border-gray-800 flex flex-col bg-gray-900">
           <Tabs defaultValue="chat" className="flex-1 flex flex-col min-h-0">
             <TabsList className="bg-gray-800 m-2 rounded-lg shrink-0">
@@ -299,7 +314,7 @@ function TeleconsultaInner({ consultaId }) {
               </TabsTrigger>
               {isProfissional && (
                 <TabsTrigger value="prontuario" className="flex-1 text-gray-300 data-[state=active]:text-white data-[state=active]:bg-gray-700">
-                  <FileText className="w-4 h-4 mr-1" />Prontuário
+                  <FileText className="w-4 h-4 mr-1" />Prontuario
                 </TabsTrigger>
               )}
             </TabsList>
@@ -325,7 +340,7 @@ function TeleconsultaInner({ consultaId }) {
                     onClick={() => setShowProntuariosAnt(true)}
                   >
                     <History className="w-3.5 h-3.5 mr-1" />
-                    Prontuários Anteriores
+                    Prontuarios Anteriores
                   </Button>
                 </div>
                 {consulta.descricao_sintomas && (
@@ -345,7 +360,6 @@ function TeleconsultaInner({ consultaId }) {
         </div>
       </div>
 
-      {/* Modal prontuários anteriores */}
       {isProfissional && (
         <ProntuariosAnteriores
           open={showProntuariosAnt}
@@ -354,7 +368,6 @@ function TeleconsultaInner({ consultaId }) {
         />
       )}
 
-      {/* Modal avaliação pós-consulta */}
       <AvaliacaoModal
         open={showAvaliacao}
         consulta={consulta}
@@ -370,7 +383,7 @@ function TeleconsultaInner({ consultaId }) {
 
 export default function Teleconsulta() {
   const { consultaId } = useParams();
-  // Fallback para query param ?id=xxx
-  const qp = new URLSearchParams(window.location.search).get('id');
-  return <TeleconsultaInner consultaId={consultaId || qp} />;
+  const queryParamId = new URLSearchParams(window.location.search).get('id');
+
+  return <TeleconsultaInner consultaId={consultaId || queryParamId} />;
 }

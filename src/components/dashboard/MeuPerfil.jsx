@@ -87,18 +87,28 @@ export default function MeuPerfil({ professional, publicProfile }) {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    set('photo_url', file_url);
-    setUploading(false);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      set('photo_url', file_url);
+    } catch (error) {
+      toast.error(error?.message || 'Erro ao enviar a foto.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleGalleryUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploadingGallery(true);
-    const uploads = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f })));
-    set('gallery_urls', [...form.gallery_urls, ...uploads.map(u => u.file_url)]);
-    setUploadingGallery(false);
+    try {
+      const uploads = await Promise.all(files.map((file) => base44.integrations.Core.UploadFile({ file })));
+      set('gallery_urls', [...form.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
+    } catch (error) {
+      toast.error(error?.message || 'Erro ao enviar a galeria.');
+    } finally {
+      setUploadingGallery(false);
+    }
   };
 
   const addTag = () => {

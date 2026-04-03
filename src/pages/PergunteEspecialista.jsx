@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
 import { useAuth } from '@/components/AuthContext';
@@ -18,6 +18,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { buildQuestionCreatePayload, normalizeQuestions } from '@/lib/questions';
 
 const SPECIALTIES = [
   { id: 'Todas', name: 'Todas as Especialidades' },
@@ -137,10 +138,15 @@ export default function PergunteEspecialista() {
     queryFn: () => base44.entities.Question.filter({ status: 'RESPONDIDA' }, '-answered_at', 50),
   });
 
+  const { data: professionalPublicProfiles = [] } = useQuery({
+    queryKey: ['forumProfessionalProfiles'],
+    queryFn: () => base44.entities.ProfessionalPublicProfile.filter({ status: 'approved' }, '-created_date', 200),
+  });
+
   // Minhas perguntas (paciente)
   const { data: myQuestions = [] } = useQuery({
     queryKey: ['myQuestions', user?.id],
-    queryFn: () => base44.entities.Question.filter({ patient_id: user.id }, '-created_date', 50),
+    queryFn: () => base44.entities.Question.filter({ paciente_id: user.id }, '-created_date', 50),
     enabled: !!user?.id,
   });
 
@@ -160,6 +166,19 @@ export default function PergunteEspecialista() {
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ['myQuestions', user?.id] }),
   });
 
+  const publicProfilesById = useMemo(
+    () => Object.fromEntries(professionalPublicProfiles.map((profile) => [profile.id, profile])),
+    [professionalPublicProfiles]
+  );
+  const normalizedPublicQuestions = useMemo(
+    () => normalizeQuestions(publicQuestions, publicProfilesById),
+    [publicQuestions, publicProfilesById]
+  );
+  const normalizedMyQuestions = useMemo(
+    () => normalizeQuestions(myQuestions, publicProfilesById),
+    [myQuestions, publicProfilesById]
+  );
+
   const handleSubmit = () => {
     if (!user) {
       window.location.href = createPageUrl('Entrar');
@@ -168,16 +187,15 @@ export default function PergunteEspecialista() {
     if (user.role !== 'patient') return; // só pacientes
     if (!selectedSpecialty || !questionText.trim()) return;
 
-    submitQuestion.mutate({
-      patient_id: user.id,
+    submitQuestion.mutate(buildQuestionCreatePayload({
+      user,
       specialty: selectedSpecialty,
-      question_text: questionText.trim(),
-      status: 'PENDENTE',
-    });
+      questionText,
+    }));
   };
 
   // Filtrar fórum por especialidade no frontend
-  const filteredForum = publicQuestions.filter(q =>
+  const filteredForum = normalizedPublicQuestions.filter(q =>
     filterSpecialty === 'Todas' || q.specialty === filterSpecialty
   );
 
@@ -204,7 +222,7 @@ export default function PergunteEspecialista() {
             <TabsTrigger value="perguntar" className="flex-1 text-xs sm:text-sm">Fazer Pergunta</TabsTrigger>
             {user && (
               <TabsTrigger value="minhas" className="flex-1 text-xs sm:text-sm">
-                Minhas Perguntas {myQuestions.length > 0 && `(${myQuestions.length})`}
+                Minhas Perguntas {normalizedMyQuestions.length > 0 && `(${normalizedMyQuestions.length})`}
               </TabsTrigger>
             )}
           </TabsList>
@@ -342,7 +360,7 @@ export default function PergunteEspecialista() {
           {/* ── ABA: MINHAS PERGUNTAS ── */}
           {user && (
             <TabsContent value="minhas">
-              {myQuestions.length === 0 ? (
+              {normalizedMyQuestions.length === 0 ? (
                 <Card className="border-0 shadow-sm">
                   <CardContent className="p-12 text-center">
                     <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
@@ -351,7 +369,7 @@ export default function PergunteEspecialista() {
                 </Card>
               ) : (
                 <div className="space-y-4">
-                  {myQuestions.map((q) => (
+                {normalizedMyQuestions.map((q) => (
                     <Card key={q.id} className="border-0 shadow-sm">
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between gap-3 mb-3">

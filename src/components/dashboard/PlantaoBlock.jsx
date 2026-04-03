@@ -3,15 +3,12 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Zap, Users, Clock, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
-
-const PLANTAO_ESPECIALIDADES = ['clinico_geral', 'pediatria', 'psicologia', 'psiquiatria'];
-const normalizeSpecialty = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, '_');
+import { canWorkOnDuty } from '@/lib/professionals';
 
 const fmt = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
 
 export default function PlantaoBlock({ professional, queueAll, appointments, onToggle }) {
-  const especialidade = normalizeSpecialty(professional?.specialty);
-  const podeAtualPlantao = PLANTAO_ESPECIALIDADES.includes(especialidade);
+  const podeAtualPlantao = canWorkOnDuty(professional?.specialty);
 
   const instantAppts = appointments.filter(a =>
     (a.appointment_type === 'instant' || a.tipo_consulta === 'plantao') &&

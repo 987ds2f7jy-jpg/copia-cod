@@ -17,6 +17,7 @@ import {
   Loader2, Upload, GraduationCap, Award, User, Camera,
   MapPin, Plus, X, Globe
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const PROFESSIONS = ['Medicina', 'Psicologia', 'Nutrição', 'Fonoaudiologia'];
 
@@ -107,27 +108,42 @@ export default function CadastroProfissional() {
     const file = e.target.files[0];
     if (!file) return;
     setUploading(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    set('diploma_url', file_url);
-    setUploading(false);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      set('diploma_url', file_url);
+    } catch (error) {
+      toast.error(error?.message || 'Nao foi possivel enviar o diploma.');
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handlePhotoUpload = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
     setUploadingPhoto(true);
-    const { file_url } = await base44.integrations.Core.UploadFile({ file });
-    set('photo_url', file_url);
-    setUploadingPhoto(false);
+    try {
+      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      set('photo_url', file_url);
+    } catch (error) {
+      toast.error(error?.message || 'Nao foi possivel enviar a foto.');
+    } finally {
+      setUploadingPhoto(false);
+    }
   };
 
   const handleGalleryUpload = async (e) => {
     const files = Array.from(e.target.files || []);
     if (!files.length) return;
     setUploadingGallery(true);
-    const uploads = await Promise.all(files.map(f => base44.integrations.Core.UploadFile({ file: f })));
-    set('gallery_urls', [...formData.gallery_urls, ...uploads.map(u => u.file_url)]);
-    setUploadingGallery(false);
+    try {
+      const uploads = await Promise.all(files.map((file) => base44.integrations.Core.UploadFile({ file })));
+      set('gallery_urls', [...formData.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
+    } catch (error) {
+      toast.error(error?.message || 'Nao foi possivel enviar a galeria.');
+    } finally {
+      setUploadingGallery(false);
+    }
   };
 
   const addTag = () => {

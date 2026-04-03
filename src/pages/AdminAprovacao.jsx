@@ -9,6 +9,7 @@ import { Loader2, CheckCircle, XCircle, Shield, ExternalLink, Eye } from 'lucide
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { mapAdminActionToStatuses } from '@/lib/professionals';
 
 const STATUS_COLORS = {
   pending_review: 'bg-amber-100 text-amber-700',
@@ -19,7 +20,7 @@ const STATUS_COLORS = {
 };
 
 const STATUS_LABELS = {
-  pending_review: 'Aguardando Análise',
+  pending_review: 'Aguardando Analise',
   approved: 'Aprovado',
   rejected: 'Rejeitado',
   suspended: 'Suspenso',
@@ -31,60 +32,68 @@ export default function AdminAprovacao() {
   const queryClient = useQueryClient();
   const [filterStatus, setFilterStatus] = useState('pending_review');
 
-  // All hooks must be called before any conditional return
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ['admin-public-profiles', filterStatus],
     queryFn: () => {
       const filters = filterStatus !== 'all' ? { status: filterStatus } : {};
       return base44.entities.ProfessionalPublicProfile.filter(filters, '-created_date', 100);
     },
+    enabled: user?.role === 'admin',
   });
 
   const { data: privateProfiles = [] } = useQuery({
     queryKey: ['admin-private-profiles'],
     queryFn: () => base44.entities.ProfessionalProfile.list('-created_date', 200),
+    enabled: user?.role === 'admin',
   });
 
   const approvePublicMutation = useMutation({
     mutationFn: async ({ publicProfileId, privateProfileId, action }) => {
-      const newStatus = action === 'approve' ? 'approved' : action === 'suspend' ? 'suspended' : 'rejected';
-      await base44.entities.ProfessionalPublicProfile.update(publicProfileId, { status: newStatus });
+      const { publicStatus, privateStatus, isOnDuty } = mapAdminActionToStatuses(action);
+
+      await base44.entities.ProfessionalPublicProfile.update(publicProfileId, {
+        status: publicStatus,
+        is_on_duty: isOnDuty,
+      });
+
       if (privateProfileId) {
-        const privateStatus = action === 'approve' ? 'approved' : 'rejected';
-        await base44.entities.ProfessionalProfile.update(privateProfileId, { status: privateStatus });
+        await base44.entities.ProfessionalProfile.update(privateProfileId, {
+          status: privateStatus,
+          is_on_duty: isOnDuty,
+        });
       }
-      return { action, newStatus };
+
+      return { action, newStatus: publicStatus };
     },
     onSuccess: ({ action }) => {
-      toast.success(action === 'approve' ? 'Profissional aprovado! Já aparece na busca.' : action === 'suspend' ? 'Conta suspensa.' : 'Cadastro rejeitado.');
+      toast.success(action === 'approve' ? 'Profissional aprovado! Ja aparece na busca.' : action === 'suspend' ? 'Conta suspensa.' : 'Cadastro rejeitado.');
       queryClient.invalidateQueries({ queryKey: ['admin-public-profiles'] });
+      queryClient.invalidateQueries({ queryKey: ['admin-private-profiles'] });
       queryClient.invalidateQueries({ queryKey: ['professionals'] });
     },
     onError: (err) => toast.error(err?.message || 'Erro ao atualizar status'),
   });
 
-  // Guard — after all hooks
-  if (user && user.role !== 'admin') {
+  if (user?.role !== 'admin') {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
           <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
           <h2 className="text-xl font-semibold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 mt-2">Esta página é exclusiva para administradores.</p>
+          <p className="text-gray-500 mt-2">Esta pagina e exclusiva para administradores.</p>
         </div>
       </div>
     );
   }
 
-  const privateMap = Object.fromEntries(privateProfiles.map(p => [p.id, p]));
-  const pendingCount = profiles.filter(p => ['pending_review', 'pending'].includes(p.status)).length;
+  const privateMap = Object.fromEntries(privateProfiles.map((profile) => [profile.id, profile]));
+  const pendingCount = profiles.filter((profile) => ['pending_review', 'pending'].includes(profile.status)).length;
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
-
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Aprovação de Profissionais</h1>
+          <h1 className="text-3xl font-bold text-gray-900 mb-1">Aprovacao de Profissionais</h1>
           <p className="text-gray-500">Gerencie o cadastro dos profissionais na plataforma</p>
         </div>
 
@@ -95,21 +104,24 @@ export default function AdminAprovacao() {
             { key: 'rejected', label: 'Rejeitados', count: null },
             { key: 'suspended', label: 'Suspensos', count: null },
             { key: 'all', label: 'Todos', count: null },
-          ].map(f => (
+          ].map((filter) => (
             <button
-              key={f.key}
-              onClick={() => setFilterStatus(f.key)}
+              key={filter.key}
+              onClick={() => setFilterStatus(filter.key)}
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${
-                filterStatus === f.key
+                filterStatus === filter.key
                   ? 'bg-emerald-600 text-white'
                   : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
               }`}
             >
-              {f.label}
-              {f.count !== null && f.count > 0 && (
+              {filter.label}
+              {filter.count !== null && filter.count > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  filterStatus === f.key ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
-                }`}>{f.count}</span>
+                  filterStatus === filter.key ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
+                }`}
+                >
+                  {filter.count}
+                </span>
               )}
             </button>
           ))}
@@ -124,7 +136,7 @@ export default function AdminAprovacao() {
             <CardContent className="p-12 text-center">
               <CheckCircle className="w-16 h-16 text-gray-200 mx-auto mb-4" />
               <h3 className="text-lg font-medium text-gray-700">Nenhum cadastro neste status</h3>
-              <p className="text-gray-400 text-sm mt-1">Novos cadastros aparecerão aqui para análise</p>
+              <p className="text-gray-400 text-sm mt-1">Novos cadastros aparecerao aqui para analise</p>
             </CardContent>
           </Card>
         ) : (
@@ -140,8 +152,7 @@ export default function AdminAprovacao() {
                       <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0">
                         {pub.photo_url
                           ? <img src={pub.photo_url} alt={pub.full_name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">{pub.full_name?.[0]}</div>
-                        }
+                          : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">{pub.full_name?.[0]}</div>}
                       </div>
 
                       <div className="flex-1 min-w-0">
@@ -180,8 +191,12 @@ export default function AdminAprovacao() {
                           {priv?.diploma_url && (
                             <div>
                               <p className="text-xs text-gray-400">Diploma</p>
-                              <a href={priv.diploma_url} target="_blank" rel="noopener noreferrer"
-                                className="flex items-center gap-1 text-emerald-600 hover:underline font-medium">
+                              <a
+                                href={priv.diploma_url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-1 text-emerald-600 hover:underline font-medium"
+                              >
                                 Ver documento <ExternalLink className="w-3 h-3" />
                               </a>
                             </div>

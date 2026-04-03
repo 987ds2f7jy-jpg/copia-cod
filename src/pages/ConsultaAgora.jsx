@@ -11,8 +11,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Clock, Users, Stethoscope, Loader2, AlertCircle, Video } from 'lucide-react';
-
-const PLANTAO_ESPECIALIDADES = ['clinico_geral', 'pediatria', 'psicologia', 'psiquiatria'];
+import { canWorkOnDuty, isProfessionalApprovedStatus } from '@/lib/professionals';
 
 const specialties = [
   { id: 'clinico_geral', name: 'Clínico Geral' },
@@ -20,8 +19,6 @@ const specialties = [
   { id: 'psicologia', name: 'Psicologia' },
   { id: 'psiquiatria', name: 'Psiquiatria' },
 ];
-
-const normalizeSpecialty = (s) => (s || '').toLowerCase().trim().replace(/\s+/g, '_');
 
 function ConsultaAgoraInner() {
   const navigate = useNavigate();
@@ -70,16 +67,16 @@ function ConsultaAgoraInner() {
     queryKey: ['onDutyProfessionals'],
     queryFn: async () => {
       const [profiles, publicProfiles] = await Promise.all([
-        base44.entities.ProfessionalProfile.filter({ is_on_duty: true, status: 'active' }),
-        base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true, status: 'active' }),
+        base44.entities.ProfessionalProfile.filter({ is_on_duty: true }),
+        base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true }),
       ]);
-      return [...profiles, ...publicProfiles];
+      return [...profiles, ...publicProfiles].filter((profile) => isProfessionalApprovedStatus(profile.status));
     },
     refetchInterval: 8000,
   });
 
   const medicosDisponiveis = onDutyProfessionals.filter(p =>
-    PLANTAO_ESPECIALIDADES.includes(normalizeSpecialty(p.specialty))
+    canWorkOnDuty(p.specialty)
   ).length;
 
   const { data: queueStats } = useQuery({
@@ -95,8 +92,12 @@ function ConsultaAgoraInner() {
 
   const enterQueue = useMutation({
     mutationFn: async (data) => {
-      const existing = await base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'waiting' });
-      if (existing.length > 0) return existing[0];
+      const [waiting, inProgress] = await Promise.all([
+        base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'waiting' }),
+        base44.entities.Queue.filter({ patient_id: data.patient_id, status: 'in_progress' }),
+      ]);
+      if (waiting.length > 0) return waiting[0];
+      if (inProgress.length > 0) return inProgress[0];
       const position = (queueStats?.count || 0) + 1;
       return base44.entities.Queue.create({ ...data, position, estimated_wait_time: position * 10 });
     },
