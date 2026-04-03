@@ -3,6 +3,14 @@ import { getConsultaParticipantIds, isConsultaParticipant } from '@/lib/consulta
 import { buildQuestionCreatePayload, normalizeQuestion } from '@/lib/questions';
 import { buildSaquePayload } from '@/lib/saques';
 import { canWorkOnDuty, normalizePlantaoSpecialty } from '@/lib/professionals';
+import {
+  buildConsultaRoomPayload,
+  buildZoomDisplayName,
+  buildZoomSessionKey,
+  buildZoomSessionName,
+  buildZoomUserIdentity,
+  getZoomSdkRole,
+} from '@/lib/zoom';
 
 describe('professional normalization', () => {
   it('normalizes specialties with accents and aliases for duty flow', () => {
@@ -93,5 +101,50 @@ describe('consulta participant contract', () => {
     expect(isConsultaParticipant(consulta, 'professional-user-1')).toBe(true);
     expect(isConsultaParticipant(consulta, ['someone-else', 'professional-user-1'])).toBe(true);
     expect(isConsultaParticipant(consulta, 'intruder')).toBe(false);
+  });
+});
+
+describe('zoom session contract', () => {
+  it('builds deterministic room metadata from the consultation id', () => {
+    expect(buildConsultaRoomPayload('123e4567-e89b-12d3-a456-426614174000')).toEqual({
+      sala_id: 'consulta-123e4567-e89b-12d3-a456-426614174000',
+      token_sala: '123e4567e89b12d3a456426614174000',
+    });
+  });
+
+  it('reuses persisted room metadata when already present', () => {
+    const consulta = {
+      id: 'consulta-1',
+      sala_id: 'teleconsulta-segura-1',
+      token_sala: 'abc123',
+    };
+
+    expect(buildZoomSessionName(consulta)).toBe('teleconsulta-segura-1');
+    expect(buildZoomSessionKey(consulta)).toBe('abc123');
+  });
+
+  it('creates scoped Zoom identities per participant role', () => {
+    expect(buildZoomUserIdentity({
+      userId: '123e4567-e89b-12d3-a456-426614174000',
+      participantRole: 'patient',
+    })).toBe('pt-123e4567e89b12d3a456426614174000');
+
+    expect(buildZoomUserIdentity({
+      userId: '123e4567-e89b-12d3-a456-426614174000',
+      participantRole: 'professional',
+    })).toBe('pr-123e4567e89b12d3a456426614174000');
+
+    expect(getZoomSdkRole('patient')).toBe(0);
+    expect(getZoomSdkRole('professional')).toBe(1);
+  });
+
+  it('keeps a human-readable display name for the Zoom room', () => {
+    const displayName = buildZoomDisplayName({
+      user: { full_name: 'Dra. Maria Silva' },
+      participantRole: 'professional',
+      consulta: { profissional_nome: 'Dra. Maria Silva' },
+    });
+
+    expect(displayName).toBe('Dra. Maria Silva');
   });
 });
