@@ -227,38 +227,15 @@ export default function PreenchimentoAutomaticoProntuario({
   }, []);
 
   const processTranscriptWithGroq = async (transcript: string) => {
-    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
-
-    if (!groqApiKey) {
-      throw new Error('Defina NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY antes de usar o preenchimento automático.');
-    }
-
-    const { default: Groq } = await import('groq-sdk');
-
-    const groq = new Groq({
-      apiKey: groqApiKey,
-      // Seguindo a exigência atual do projeto. Em produção, prefira mover esta chamada para backend seguro.
-      dangerouslyAllowBrowser: true,
+    const { data, error } = await supabase.functions.invoke('groq-completion', {
+      body: { transcript },
     });
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.2,
-      messages: [
-        {
-          role: 'user',
-          content: buildGroqPrompt(transcript),
-        },
-      ],
-    });
-
-    const content = completion.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('A IA não retornou um conteúdo válido para o prontuário.');
+    if (error || !data?.content) {
+      throw new Error(data?.error || error?.message || 'A IA não retornou um conteúdo válido para o prontuário.');
     }
 
-    return parseGroqJsonResponse(content);
+    return parseGroqJsonResponse(data.content);
   };
 
   const appendFinalTranscript = (nextChunk: string) => {
