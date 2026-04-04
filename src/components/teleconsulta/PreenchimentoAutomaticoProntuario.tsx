@@ -258,20 +258,6 @@ export default function PreenchimentoAutomaticoProntuario({
       return;
     }
 
-    const deepgramApiKey = getClientEnvValue('NEXT_PUBLIC_DEEPGRAM_API_KEY', 'VITE_DEEPGRAM_API_KEY');
-    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
-
-    if (!deepgramApiKey || !groqApiKey) {
-      const message = 'Configure NEXT_PUBLIC_DEEPGRAM_API_KEY ou VITE_DEEPGRAM_API_KEY, e NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY para usar o preenchimento automático.';
-      setErrorMessage(message);
-      toast({
-        title: 'Não foi possível iniciar a IA',
-        description: message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
       setErrorMessage(null);
       setTranscriptFull('');
@@ -280,6 +266,17 @@ export default function PreenchimentoAutomaticoProntuario({
       lastTranscriptSnapshotRef.current = '';
       setIsPanelOpen(true);
       setIsListening(true);
+
+      // Fetch Deepgram key from edge function
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('deepgram-token', {
+        body: {},
+      });
+
+      if (tokenError || !tokenData?.key) {
+        throw new Error(tokenData?.error || tokenError?.message || 'Não foi possível obter o token do Deepgram.');
+      }
+
+      const deepgramApiKey = tokenData.key;
 
       const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
 
