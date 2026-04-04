@@ -41,6 +41,18 @@ const EMPTY_PRONTUARIO_FIELDS: ProntuarioAutomaticoFields = {
   recomendacoes_e_conduta: '',
 };
 
+function getClientEnvValue(...keys: string[]) {
+  for (const key of keys) {
+    const value = import.meta.env[key as keyof ImportMetaEnv];
+
+    if (typeof value === 'string' && value.trim()) {
+      return value.trim();
+    }
+  }
+
+  return '';
+}
+
 function buildGroqPrompt(transcriptFull: string) {
   return `Você é um médico brasileiro experiente. Organize a transcrição da consulta no formato JSON exatamente com estes campos:
 
@@ -214,10 +226,10 @@ export default function PreenchimentoAutomaticoProntuario({
   }, []);
 
   const processTranscriptWithGroq = async (transcript: string) => {
-    const groqApiKey = import.meta.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
 
     if (!groqApiKey) {
-      throw new Error('Defina NEXT_PUBLIC_GROQ_API_KEY antes de usar o preenchimento automático.');
+      throw new Error('Defina NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY antes de usar o preenchimento automático.');
     }
 
     const { default: Groq } = await import('groq-sdk');
@@ -268,11 +280,11 @@ export default function PreenchimentoAutomaticoProntuario({
       return;
     }
 
-    const deepgramApiKey = import.meta.env.NEXT_PUBLIC_DEEPGRAM_API_KEY;
-    const groqApiKey = import.meta.env.NEXT_PUBLIC_GROQ_API_KEY;
+    const deepgramApiKey = getClientEnvValue('NEXT_PUBLIC_DEEPGRAM_API_KEY', 'VITE_DEEPGRAM_API_KEY');
+    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
 
     if (!deepgramApiKey || !groqApiKey) {
-      const message = 'Configure NEXT_PUBLIC_DEEPGRAM_API_KEY e NEXT_PUBLIC_GROQ_API_KEY para usar o preenchimento automático.';
+      const message = 'Configure NEXT_PUBLIC_DEEPGRAM_API_KEY ou VITE_DEEPGRAM_API_KEY, e NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY para usar o preenchimento automático.';
       setErrorMessage(message);
       toast({
         title: 'Não foi possível iniciar a IA',
