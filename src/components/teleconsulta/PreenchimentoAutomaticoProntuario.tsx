@@ -5,6 +5,7 @@ import { Loader2, Sparkles, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export type ProntuarioAutomaticoFields = {
   motivo_da_consulta: string;
@@ -47,36 +48,6 @@ const EMPTY_PRONTUARIO_FIELDS: ProntuarioAutomaticoFields = {
   avaliacao_diagnostica: '',
   recomendacoes_e_conduta: '',
 };
-
-function getClientEnvValue(...keys: string[]) {
-  for (const key of keys) {
-    const value = import.meta.env[key as keyof ImportMetaEnv];
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-
-  return '';
-}
-
-function buildGroqPrompt(transcriptFull: string) {
-  return `Você é um médico brasileiro experiente. Organize a transcrição da consulta no formato JSON exatamente com estes campos:
-
-{
-  "motivo_da_consulta": "...",
-  "historico_e_fatores_de_risco": "...",
-  "exames_imagens": "...",
-  "exame_fisico": "...",
-  "avaliacao_diagnostica": "...",
-  "recomendacoes_e_conduta": "..."
-}
-
-Transcrição completa da consulta:
-"""${transcriptFull}"""
-
-Responda APENAS com o JSON válido, sem nenhum texto adicional.`;
-}
 
 function parseGroqJsonResponse(rawContent: string): ProntuarioAutomaticoFields {
   const cleaned = rawContent
@@ -257,38 +228,15 @@ export default function PreenchimentoAutomaticoProntuario({
   }, []);
 
   const processTranscriptWithGroq = async (transcript: string) => {
-    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
-
-    if (!groqApiKey) {
-      throw new Error('Defina NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY antes de usar o preenchimento automático.');
-    }
-
-    const { default: Groq } = await import('groq-sdk');
-
-    const groq = new Groq({
-      apiKey: groqApiKey,
-      // Seguindo a exigência atual do projeto. Em produção, prefira mover esta chamada para backend seguro.
-      dangerouslyAllowBrowser: true,
+    const { data, error } = await supabase.functions.invoke('groq-completion', {
+      body: { transcript },
     });
 
-    const completion = await groq.chat.completions.create({
-      model: 'llama-3.1-8b-instant',
-      temperature: 0.2,
-      messages: [
-        {
-          role: 'user',
-          content: buildGroqPrompt(transcript),
-        },
-      ],
-    });
-
-    const content = completion.choices?.[0]?.message?.content;
-
-    if (!content) {
-      throw new Error('A IA não retornou um conteúdo válido para o prontuário.');
+    if (error || !data?.content) {
+      throw new Error(data?.error || error?.message || 'A IA não retornou um conteúdo válido para o prontuário.');
     }
 
-    return parseGroqJsonResponse(content);
+    return parseGroqJsonResponse(data.content);
   };
 
   const appendFinalTranscript = (nextChunk: string) => {
@@ -311,20 +259,6 @@ export default function PreenchimentoAutomaticoProntuario({
       return;
     }
 
-    const deepgramApiKey = getClientEnvValue('NEXT_PUBLIC_DEEPGRAM_API_KEY', 'VITE_DEEPGRAM_API_KEY');
-    const groqApiKey = getClientEnvValue('NEXT_PUBLIC_GROQ_API_KEY', 'VITE_GROQ_API_KEY');
-
-    if (!deepgramApiKey || !groqApiKey) {
-      const message = 'Configure NEXT_PUBLIC_DEEPGRAM_API_KEY ou VITE_DEEPGRAM_API_KEY, e NEXT_PUBLIC_GROQ_API_KEY ou VITE_GROQ_API_KEY para usar o preenchimento automático.';
-      setErrorMessage(message);
-      toast({
-        title: 'Não foi possível iniciar a IA',
-        description: message,
-        variant: 'destructive',
-      });
-      return;
-    }
-
     try {
       setErrorMessage(null);
       setTranscriptFull('');
@@ -333,6 +267,17 @@ export default function PreenchimentoAutomaticoProntuario({
       lastTranscriptSnapshotRef.current = '';
       setIsPanelOpen(true);
       setIsListening(true);
+
+      // Fetch Deepgram key from edge function
+      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('deepgram-token', {
+        body: {},
+      });
+
+      if (tokenError || !tokenData?.key) {
+        throw new Error(tokenData?.error || tokenError?.message || 'Não foi possível obter o token do Deepgram.');
+      }
+
+      const deepgramApiKey = tokenData.key;
 
       const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
 
