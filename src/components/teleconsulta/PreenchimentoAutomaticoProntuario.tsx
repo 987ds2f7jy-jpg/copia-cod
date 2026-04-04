@@ -294,21 +294,18 @@ export default function PreenchimentoAutomaticoProntuario({
       const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
 
       const deepgramClient = createClient(deepgramApiKey);
+      const listenOptions = {
+        model: 'nova-3',
+        language: 'pt',
+        smart_format: true,
+        interim_results: true,
+        punctuate: true,
+      };
       const connection = typeof deepgramClient.listen?.live === 'function'
-        ? deepgramClient.listen.live({
-            model: 'nova-3',
-            language: 'pt',
-            smart_format: true,
-            interim_results: true,
-            punctuate: true,
-          })
-        : await deepgramClient.listen?.v1?.connect({
-            model: 'nova-3',
-            language: 'pt',
-            smart_format: true,
-            interim_results: true,
-            punctuate: true,
-          });
+        ? deepgramClient.listen.live(listenOptions)
+        : typeof (deepgramClient.listen as any)?.v1?.connect === 'function'
+          ? await (deepgramClient.listen as any).v1.connect(listenOptions)
+          : null;
 
       if (!connection) {
         throw new Error('Não foi possível abrir a conexão de transcrição ao vivo.');
