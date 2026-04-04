@@ -86,6 +86,42 @@ function convertFloat32ToInt16Buffer(input: Float32Array) {
   return pcmBuffer;
 }
 
+function downsampleTo16kHz(input: Float32Array, sourceSampleRate: number) {
+  const targetSampleRate = 16000;
+
+  if (sourceSampleRate === targetSampleRate) {
+    return input;
+  }
+
+  if (sourceSampleRate < targetSampleRate) {
+    return input;
+  }
+
+  const sampleRateRatio = sourceSampleRate / targetSampleRate;
+  const newLength = Math.round(input.length / sampleRateRatio);
+  const result = new Float32Array(newLength);
+
+  let offsetResult = 0;
+  let offsetBuffer = 0;
+
+  while (offsetResult < result.length) {
+    const nextOffsetBuffer = Math.round((offsetResult + 1) * sampleRateRatio);
+    let accumulator = 0;
+    let count = 0;
+
+    for (let index = offsetBuffer; index < nextOffsetBuffer && index < input.length; index += 1) {
+      accumulator += input[index];
+      count += 1;
+    }
+
+    result[offsetResult] = count > 0 ? accumulator / count : 0;
+    offsetResult += 1;
+    offsetBuffer = nextOffsetBuffer;
+  }
+
+  return result;
+}
+
 function normalizeTranscriptPayload(payload: any) {
   const data = payload?.type === 'Results' ? payload : payload?.channel ? payload : payload?.data || payload;
   const transcript = String(data?.channel?.alternatives?.[0]?.transcript || '').trim();
@@ -93,6 +129,8 @@ function normalizeTranscriptPayload(payload: any) {
   return {
     transcript,
     isFinal: Boolean(data?.is_final),
+    speechFinal: Boolean(data?.speech_final),
+    type: String(data?.type || payload?.type || ''),
   };
 }
 
@@ -197,6 +235,7 @@ export default function PreenchimentoAutomaticoProntuario({
   });
   const deepgramConnectionRef = useRef<DeepgramConnectionLike | null>(null);
   const transcriptFullRef = useRef('');
+  const currentUtteranceSegmentsRef = useRef<string[]>([]);
   const lastTranscriptSnapshotRef = useRef('');
   const isUnmountingRef = useRef(false);
 
@@ -254,6 +293,43 @@ export default function PreenchimentoAutomaticoProntuario({
     setInterimTranscript('');
   };
 
+  const updateLiveTranscript = (partialTranscript = '') => {
+    const stableTranscript = currentUtteranceSegmentsRef.current.join(' ').trim();
+    const partial = partialTranscript.trim();
+    const nextLiveTranscript = [stableTranscript, partial].filter(Boolean).join(' ').trim();
+
+    setInterimTranscript(nextLiveTranscript);
+  };
+
+  const pushStableSegment = (segment: string) => {
+    const trimmedSegment = segment.trim();
+
+    if (!trimmedSegment) {
+      return;
+    }
+
+    const lastSegment = currentUtteranceSegmentsRef.current[currentUtteranceSegmentsRef.current.length - 1];
+    if (lastSegment === trimmedSegment) {
+      return;
+    }
+
+    currentUtteranceSegmentsRef.current = [...currentUtteranceSegmentsRef.current, trimmedSegment];
+  };
+
+  const commitCurrentUtterance = () => {
+    const utterance = currentUtteranceSegmentsRef.current.join(' ').replace(/\s+/g, ' ').trim();
+
+    if (!utterance) {
+      setInterimTranscript('');
+      return;
+    }
+
+    appendFinalTranscript(utterance);
+    currentUtteranceSegmentsRef.current = [];
+    setInterimTranscript('');
+    lastTranscriptSnapshotRef.current = '';
+  };
+
   const startListening = async () => {
     if (disabled || isListening || isProcessing) {
       return;
@@ -264,6 +340,7 @@ export default function PreenchimentoAutomaticoProntuario({
       setTranscriptFull('');
       setInterimTranscript('');
       transcriptFullRef.current = '';
+      currentUtteranceSegmentsRef.current = [];
       lastTranscriptSnapshotRef.current = '';
       setIsPanelOpen(true);
       setIsListening(true);
@@ -304,8 +381,11 @@ export default function PreenchimentoAutomaticoProntuario({
         smart_format: true,
         interim_results: true,
         punctuate: true,
+        endpointing: 500,
+        utterance_end_ms: 1200,
+        vad_events: true,
         encoding: 'linear16',
-        sample_rate: audioContext.sampleRate,
+        sample_rate: 16000,
         channels: 1,
         no_delay: true,
       };
@@ -333,6 +413,9 @@ export default function PreenchimentoAutomaticoProntuario({
         const normalized = normalizeTranscriptPayload(payload);
 
         if (!normalized.transcript) {
+          if (normalized.type === 'UtteranceEnd') {
+            commitCurrentUtterance();
+          }
           return;
         }
 
@@ -344,17 +427,27 @@ export default function PreenchimentoAutomaticoProntuario({
         lastTranscriptSnapshotRef.current = snapshot;
 
         if (normalized.isFinal) {
-          appendFinalTranscript(normalized.transcript);
+          pushStableSegment(normalized.transcript);
+
+          if (normalized.speechFinal) {
+            commitCurrentUtterance();
+            return;
+          }
+
+          updateLiveTranscript();
           return;
         }
 
-        setInterimTranscript(normalized.transcript);
+        updateLiveTranscript(normalized.transcript);
       });
 
       connection.on?.('message', (payload: any) => {
         const normalized = normalizeTranscriptPayload(payload);
 
         if (!normalized.transcript) {
+          if (normalized.type === 'UtteranceEnd') {
+            commitCurrentUtterance();
+          }
           return;
         }
 
@@ -366,11 +459,18 @@ export default function PreenchimentoAutomaticoProntuario({
         lastTranscriptSnapshotRef.current = snapshot;
 
         if (normalized.isFinal) {
-          appendFinalTranscript(normalized.transcript);
+          pushStableSegment(normalized.transcript);
+
+          if (normalized.speechFinal) {
+            commitCurrentUtterance();
+            return;
+          }
+
+          updateLiveTranscript();
           return;
         }
 
-        setInterimTranscript(normalized.transcript);
+        updateLiveTranscript(normalized.transcript);
       });
 
       connection.on?.(errorEventName, (event: any) => {
@@ -387,7 +487,8 @@ export default function PreenchimentoAutomaticoProntuario({
         }
 
         const inputBuffer = event.inputBuffer.getChannelData(0);
-        const pcmBuffer = convertFloat32ToInt16Buffer(inputBuffer);
+        const downsampledBuffer = downsampleTo16kHz(inputBuffer, audioContext.sampleRate);
+        const pcmBuffer = convertFloat32ToInt16Buffer(downsampledBuffer);
         sendAudioChunk(deepgramConnectionRef.current, pcmBuffer);
       };
 
@@ -430,6 +531,7 @@ export default function PreenchimentoAutomaticoProntuario({
       mediaStreamRef.current = null;
 
       await new Promise((resolve) => window.setTimeout(resolve, 350));
+      commitCurrentUtterance();
       closeDeepgramConnection(deepgramConnectionRef.current);
       deepgramConnectionRef.current = null;
 
