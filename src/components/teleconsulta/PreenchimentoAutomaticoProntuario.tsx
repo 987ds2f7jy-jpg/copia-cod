@@ -5,6 +5,7 @@ import { Loader2, Sparkles, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
+import { supabase } from '@/integrations/supabase/client';
 
 export type ProntuarioAutomaticoFields = {
   motivo_da_consulta: string;
