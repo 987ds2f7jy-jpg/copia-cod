@@ -42,36 +42,6 @@ const EMPTY_PRONTUARIO_FIELDS: ProntuarioAutomaticoFields = {
   recomendacoes_e_conduta: '',
 };
 
-function getClientEnvValue(...keys: string[]) {
-  for (const key of keys) {
-    const value = import.meta.env[key as keyof ImportMetaEnv];
-
-    if (typeof value === 'string' && value.trim()) {
-      return value.trim();
-    }
-  }
-
-  return '';
-}
-
-function buildGroqPrompt(transcriptFull: string) {
-  return `Você é um médico brasileiro experiente. Organize a transcrição da consulta no formato JSON exatamente com estes campos:
-
-{
-  "motivo_da_consulta": "...",
-  "historico_e_fatores_de_risco": "...",
-  "exames_imagens": "...",
-  "exame_fisico": "...",
-  "avaliacao_diagnostica": "...",
-  "recomendacoes_e_conduta": "..."
-}
-
-Transcrição completa da consulta:
-"""${transcriptFull}"""
-
-Responda APENAS com o JSON válido, sem nenhum texto adicional.`;
-}
-
 function parseGroqJsonResponse(rawContent: string): ProntuarioAutomaticoFields {
   const cleaned = rawContent
     .trim()
