@@ -27,6 +27,13 @@ type DeepgramConnectionLike = {
   socket?: { close?: (code?: number, reason?: string) => void };
 };
 
+type AudioProcessingRefs = {
+  audioContext: AudioContext | null;
+  sourceNode: MediaStreamAudioSourceNode | null;
+  processorNode: ScriptProcessorNode | null;
+  gainNode: GainNode | null;
+};
+
 interface PreenchimentoAutomaticoProntuarioProps {
   disabled?: boolean;
   onApply: (data: ProntuarioAutomaticoFields) => void;
@@ -96,18 +103,16 @@ function parseGroqJsonResponse(rawContent: string): ProntuarioAutomaticoFields {
   };
 }
 
-function selectRecorderMimeType() {
-  if (typeof MediaRecorder === 'undefined' || typeof MediaRecorder.isTypeSupported !== 'function') {
-    return undefined;
+function convertFloat32ToInt16Buffer(input: Float32Array) {
+  const pcmBuffer = new ArrayBuffer(input.length * 2);
+  const pcmView = new DataView(pcmBuffer);
+
+  for (let index = 0; index < input.length; index += 1) {
+    const sample = Math.max(-1, Math.min(1, input[index]));
+    pcmView.setInt16(index * 2, sample < 0 ? sample * 0x8000 : sample * 0x7fff, true);
   }
 
-  const supportedMimeTypes = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-  ];
-
-  return supportedMimeTypes.find((mimeType) => MediaRecorder.isTypeSupported(mimeType));
+  return pcmBuffer;
 }
 
 function normalizeTranscriptPayload(payload: any) {
@@ -138,12 +143,32 @@ async function getConsultaMediaStream(): Promise<MediaStream> {
   });
 }
 
-function stopMediaCapture(stream: MediaStream | null, recorder: MediaRecorder | null) {
-  if (recorder && recorder.state !== 'inactive') {
-    recorder.stop();
+function stopMediaCapture(stream: MediaStream | null) {
+  stream?.getTracks().forEach((track) => track.stop());
+}
+
+async function stopAudioProcessing(audioRefs: AudioProcessingRefs) {
+  try {
+    audioRefs.processorNode?.disconnect();
+    audioRefs.sourceNode?.disconnect();
+    audioRefs.gainNode?.disconnect();
+  } catch {
+    // noop
   }
 
-  stream?.getTracks().forEach((track) => track.stop());
+  audioRefs.processorNode = null;
+  audioRefs.sourceNode = null;
+  audioRefs.gainNode = null;
+
+  if (audioRefs.audioContext) {
+    try {
+      await audioRefs.audioContext.close();
+    } catch {
+      // noop
+    }
+  }
+
+  audioRefs.audioContext = null;
 }
 
 function closeDeepgramConnection(connection: DeepgramConnectionLike | null) {
@@ -193,7 +218,12 @@ export default function PreenchimentoAutomaticoProntuario({
 
   const transcriptScrollRef = useRef<HTMLDivElement | null>(null);
   const mediaStreamRef = useRef<MediaStream | null>(null);
-  const mediaRecorderRef = useRef<MediaRecorder | null>(null);
+  const audioProcessingRef = useRef<AudioProcessingRefs>({
+    audioContext: null,
+    sourceNode: null,
+    processorNode: null,
+    gainNode: null,
+  });
   const deepgramConnectionRef = useRef<DeepgramConnectionLike | null>(null);
   const transcriptFullRef = useRef('');
   const lastTranscriptSnapshotRef = useRef('');
@@ -221,7 +251,8 @@ export default function PreenchimentoAutomaticoProntuario({
     return () => {
       isUnmountingRef.current = true;
       closeDeepgramConnection(deepgramConnectionRef.current);
-      stopMediaCapture(mediaStreamRef.current, mediaRecorderRef.current);
+      stopMediaCapture(mediaStreamRef.current);
+      void stopAudioProcessing(audioProcessingRef.current);
     };
   }, []);
 
@@ -305,6 +336,22 @@ export default function PreenchimentoAutomaticoProntuario({
 
       const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
 
+      const stream = await getConsultaMediaStream();
+      mediaStreamRef.current = stream;
+
+      const audioContext = new window.AudioContext();
+      await audioContext.resume();
+
+      const sourceNode = audioContext.createMediaStreamSource(stream);
+      const processorNode = audioContext.createScriptProcessor(4096, 1, 1);
+      const gainNode = audioContext.createGain();
+      gainNode.gain.value = 0;
+
+      audioProcessingRef.current.audioContext = audioContext;
+      audioProcessingRef.current.sourceNode = sourceNode;
+      audioProcessingRef.current.processorNode = processorNode;
+      audioProcessingRef.current.gainNode = gainNode;
+
       const deepgramClient = createClient(deepgramApiKey);
       const listenOptions = {
         model: 'nova-3',
@@ -312,6 +359,10 @@ export default function PreenchimentoAutomaticoProntuario({
         smart_format: true,
         interim_results: true,
         punctuate: true,
+        encoding: 'linear16',
+        sample_rate: audioContext.sampleRate,
+        channels: 1,
+        no_delay: true,
       };
       const connection = typeof deepgramClient.listen?.live === 'function'
         ? deepgramClient.listen.live(listenOptions)
@@ -385,37 +436,25 @@ export default function PreenchimentoAutomaticoProntuario({
       connection.connect?.();
       await connection.waitForOpen?.();
 
-      const stream = await getConsultaMediaStream();
-      mediaStreamRef.current = stream;
-
-      const mimeType = selectRecorderMimeType();
-      const recorder = mimeType
-        ? new MediaRecorder(stream, { mimeType })
-        : new MediaRecorder(stream);
-
-      mediaRecorderRef.current = recorder;
-
-      recorder.ondataavailable = async (event) => {
-        if (!event.data || event.data.size === 0 || !deepgramConnectionRef.current) {
+      processorNode.onaudioprocess = (event) => {
+        if (!deepgramConnectionRef.current) {
           return;
         }
 
-        const chunk = await event.data.arrayBuffer();
-        sendAudioChunk(deepgramConnectionRef.current, chunk);
+        const inputBuffer = event.inputBuffer.getChannelData(0);
+        const pcmBuffer = convertFloat32ToInt16Buffer(inputBuffer);
+        sendAudioChunk(deepgramConnectionRef.current, pcmBuffer);
       };
 
-      recorder.onerror = (event: Event) => {
-        const recorderError = (event as any)?.error;
-        setErrorMessage(recorderError?.message || 'Não foi possível capturar o áudio da consulta.');
-      };
-
-      recorder.start(250);
+      sourceNode.connect(processorNode);
+      processorNode.connect(gainNode);
+      gainNode.connect(audioContext.destination);
     } catch (error) {
       closeDeepgramConnection(deepgramConnectionRef.current);
-      stopMediaCapture(mediaStreamRef.current, mediaRecorderRef.current);
+      stopMediaCapture(mediaStreamRef.current);
+      void stopAudioProcessing(audioProcessingRef.current);
       deepgramConnectionRef.current = null;
       mediaStreamRef.current = null;
-      mediaRecorderRef.current = null;
       setIsListening(false);
       setIsPanelOpen(false);
 
@@ -441,24 +480,11 @@ export default function PreenchimentoAutomaticoProntuario({
     setIsPanelOpen(false);
 
     try {
-      if (mediaRecorderRef.current && mediaRecorderRef.current.state !== 'inactive') {
-        await new Promise<void>((resolve) => {
-          const recorder = mediaRecorderRef.current;
-          if (!recorder) {
-            resolve();
-            return;
-          }
-
-          recorder.addEventListener('stop', () => resolve(), { once: true });
-          recorder.stop();
-        });
-      }
-
+      await stopAudioProcessing(audioProcessingRef.current);
       mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
       mediaStreamRef.current = null;
-      mediaRecorderRef.current = null;
 
-      await new Promise((resolve) => window.setTimeout(resolve, 250));
+      await new Promise((resolve) => window.setTimeout(resolve, 350));
       closeDeepgramConnection(deepgramConnectionRef.current);
       deepgramConnectionRef.current = null;
 
