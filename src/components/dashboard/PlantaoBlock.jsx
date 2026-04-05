@@ -7,7 +7,7 @@ import { canWorkOnDuty } from '@/lib/professionals';
 
 const fmt = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
 
-export default function PlantaoBlock({ professional, queueAll, appointments, onToggle }) {
+export default function PlantaoBlock({ professional, isOnDuty = false, canToggle = true, queueAll, appointments, onToggle }) {
   const podeAtualPlantao = canWorkOnDuty(professional?.specialty);
 
   const instantAppts = appointments.filter(a =>
@@ -31,12 +31,12 @@ export default function PlantaoBlock({ professional, queueAll, appointments, onT
           </CardTitle>
           <div className="flex items-center gap-2">
             <Switch
-              checked={professional?.is_on_duty || false}
+              checked={isOnDuty}
               onCheckedChange={onToggle}
-              disabled={!podeAtualPlantao}
+              disabled={!podeAtualPlantao || !canToggle}
             />
-            <Badge className={professional?.is_on_duty ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}>
-              {professional?.is_on_duty ? 'Ativo' : 'Inativo'}
+            <Badge className={isOnDuty ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}>
+              {isOnDuty ? 'Ativo' : 'Inativo'}
             </Badge>
           </div>
         </div>

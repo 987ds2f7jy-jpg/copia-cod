@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect, useCallback } fr
 import { useQueryClient } from '@tanstack/react-query';
 import { authService } from '@/services/authService';
 import { getUserFacingErrorMessage } from '@/lib/errors';
+import { resetProfessionalDutyForUser } from '@/lib/professionals';
 
 const AuthContext = createContext(null);
 
@@ -76,6 +77,14 @@ export function AuthProvider({ children }) {
   }, []);
 
   const logout = useCallback(async () => {
+    if (user?.role === 'professional' && user?.id) {
+      try {
+        await resetProfessionalDutyForUser(user.id);
+      } catch {
+        // Best effort only. Logout must still complete.
+      }
+    }
+
     await authService.logout(user);
     setUser(null);
     queryClient.clear();

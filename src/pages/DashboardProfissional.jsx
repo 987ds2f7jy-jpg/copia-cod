@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import MeuPerfil from '@/components/dashboard/MeuPerfil';
 import SolicitacoesAgendamento from '@/components/dashboard/SolicitacoesAgendamento';
@@ -33,7 +33,14 @@ import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
 import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
-import { canWorkOnDuty, isProfessionalApprovedStatus, normalizePlantaoSpecialty, PLANTAO_ESPECIALIDADES } from '@/lib/professionals';
+import {
+  canWorkOnDuty,
+  isProfessionalApprovedStatus,
+  normalizePlantaoSpecialty,
+  PLANTAO_ESPECIALIDADES,
+  sendKeepaliveDutyOff,
+  setProfessionalPublicDuty,
+} from '@/lib/professionals';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -95,6 +102,10 @@ function DashboardProfissionalInner() {
   const [period, setPeriod] = useState('month');
   const [answerModal, setAnswerModal] = useState({ open: false, question: null });
   const [answerText, setAnswerText] = useState('');
+  const [sessionDutyState, setSessionDutyState] = useState(false);
+  const didResetDutyOnSessionRef = useRef(false);
+  const activeDutyProfileIdRef = useRef(null);
+  const activeDutyStatusRef = useRef(false);
 
   // Load professional profile — via React Query for proper loading/error states
   const { data: professional, isLoading: loadingProfessional, isError: profError } = useQuery({
@@ -119,6 +130,8 @@ function DashboardProfissionalInner() {
     staleTime: 60_000,
   });
 
+  const currentDutyStatus = sessionDutyState;
+
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: appointments = [], isLoading: loadingAppts } = useQuery({
     queryKey: ['profAppts', professional?.id],
@@ -133,8 +146,8 @@ function DashboardProfissionalInner() {
       const normalized = normalizePlantaoSpecialty(professional?.specialty);
       return base44.entities.Queue.filter({ specialty: normalized, status: 'waiting' });
     },
-    enabled: !!professional?.id && !!professional?.specialty && canWorkOnDuty(professional?.specialty),
-    refetchInterval: professional?.is_on_duty ? 10000 : false,
+    enabled: !!professional?.id && !!professional?.specialty && canWorkOnDuty(professional?.specialty) && currentDutyStatus,
+    refetchInterval: currentDutyStatus ? 10000 : false,
   });
 
   // Consultas de hoje (todos os tipos)
@@ -196,24 +209,71 @@ function DashboardProfissionalInner() {
   const queryClient = useQueryClient();
 
   const toggleDuty = useMutation({
+    onMutate: (isOnDuty) => {
+      setSessionDutyState(Boolean(isOnDuty));
+    },
     mutationFn: async (isOnDuty) => {
-      const updates = [
-        base44.entities.ProfessionalProfile.update(professional.id, { is_on_duty: isOnDuty }),
-      ];
-
-      if (publicProfile?.id) {
-        updates.push(base44.entities.ProfessionalPublicProfile.update(publicProfile.id, { is_on_duty: isOnDuty }));
+      if (!publicProfile?.id) {
+        throw new Error('Perfil publico nao encontrado.');
       }
 
-      await Promise.all(updates);
-      return isOnDuty;
+      await setProfessionalPublicDuty(publicProfile.id, isOnDuty);
+      return Boolean(isOnDuty);
+    },
+    onError: () => {
+      setSessionDutyState(Boolean(publicProfile?.is_on_duty));
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['myProfessionalProfile', user?.id] });
       queryClient.invalidateQueries({ queryKey: ['myPublicProfile', professional?.id] });
       queryClient.invalidateQueries({ queryKey: ['onDutyProfessionals'] });
     },
   });
+
+  useEffect(() => {
+    activeDutyProfileIdRef.current = publicProfile?.id || null;
+    activeDutyStatusRef.current = currentDutyStatus;
+  }, [currentDutyStatus, publicProfile?.id]);
+
+  useEffect(() => {
+    if (!publicProfile?.id) {
+      setSessionDutyState(false);
+      return;
+    }
+
+    if (!didResetDutyOnSessionRef.current) {
+      didResetDutyOnSessionRef.current = true;
+
+      if (publicProfile.is_on_duty) {
+        setSessionDutyState(false);
+        toggleDuty.mutate(false);
+        return;
+      }
+    }
+
+    setSessionDutyState(Boolean(publicProfile.is_on_duty));
+  }, [publicProfile?.id, publicProfile?.is_on_duty]);
+
+  useEffect(() => {
+    const handlePageHide = () => {
+      if (!activeDutyStatusRef.current || !activeDutyProfileIdRef.current) {
+        return;
+      }
+
+      sendKeepaliveDutyOff(activeDutyProfileIdRef.current);
+    };
+
+    window.addEventListener('pagehide', handlePageHide);
+
+    return () => {
+      window.removeEventListener('pagehide', handlePageHide);
+
+      if (!activeDutyStatusRef.current || !activeDutyProfileIdRef.current) {
+        return;
+      }
+
+      void setProfessionalPublicDuty(activeDutyProfileIdRef.current, false);
+    };
+  }, []);
 
   const updateAppointment = useMutation({
     mutationFn: ({ id, data }) => base44.entities.Appointment.update(id, data),
@@ -439,13 +499,15 @@ function DashboardProfissionalInner() {
         <div className="grid lg:grid-cols-3 gap-4">
           <PlantaoBlock
             professional={professional}
+            isOnDuty={currentDutyStatus}
+            canToggle={Boolean(publicProfile?.id)}
             queueAll={queueAll}
             appointments={appointments}
             onToggle={(v) => toggleDuty.mutate(v)}
             plantaoEspecialidades={PLANTAO_ESPECIALIDADES}
           />
           <QueueWidget
-            queuePatients={queuePatients}
+            queuePatients={currentDutyStatus ? queuePatients : []}
             onAccept={(p) => acceptQueuePatient.mutate(p)}
             accepting={acceptQueuePatient.isPending}
           />

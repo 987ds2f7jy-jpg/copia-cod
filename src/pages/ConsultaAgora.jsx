@@ -28,10 +28,10 @@ function buildProfessionalKey(profile) {
   return profile?.user_id || profile?.professional_profile_id || profile?.id || '';
 }
 
-function mergeOnDutyProfessionals(profiles = [], publicProfiles = []) {
+function normalizeOnDutyProfessionals(publicProfiles = []) {
   const merged = new Map();
 
-  const register = (profile, source) => {
+  publicProfiles.forEach((profile) => {
     if (!profile?.is_on_duty || !isProfessionalApprovedStatus(profile.status) || !canWorkOnDuty(profile.specialty)) {
       return;
     }
@@ -41,20 +41,11 @@ function mergeOnDutyProfessionals(profiles = [], publicProfiles = []) {
       return;
     }
 
-    const nextEntry = {
+    merged.set(key, {
       ...profile,
-      source,
       normalizedSpecialty: normalizePlantaoSpecialty(profile.specialty),
-    };
-
-    const currentEntry = merged.get(key);
-    if (!currentEntry || source === 'private') {
-      merged.set(key, nextEntry);
-    }
-  };
-
-  profiles.forEach((profile) => register(profile, 'private'));
-  publicProfiles.forEach((profile) => register(profile, 'public'));
+    });
+  });
 
   return Array.from(merged.values());
 }
@@ -151,12 +142,8 @@ function ConsultaAgoraInner() {
   const { data: onDutyProfessionals = [] } = useQuery({
     queryKey: ['onDutyProfessionals'],
     queryFn: async () => {
-      const [profiles, publicProfiles] = await Promise.all([
-        base44.entities.ProfessionalProfile.filter({ is_on_duty: true }),
-        base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true }),
-      ]);
-
-      return mergeOnDutyProfessionals(profiles, publicProfiles);
+      const publicProfiles = await base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true });
+      return normalizeOnDutyProfessionals(publicProfiles);
     },
     refetchInterval: 8000,
   });
