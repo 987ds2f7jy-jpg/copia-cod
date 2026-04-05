@@ -1,8 +1,8 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Clock, Users, Stethoscope, Loader2, AlertCircle, Video } from 'lucide-react';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
+import { AnimatePresence, motion } from 'framer-motion';
+import { AlertCircle, Clock, Loader2, Stethoscope, Users, Video } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { base44 } from '@/api/base44Client';
@@ -11,14 +11,53 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Label } from '@/components/ui/label';
-import { canWorkOnDuty, isProfessionalApprovedStatus } from '@/lib/professionals';
+import {
+  canWorkOnDuty,
+  isProfessionalApprovedStatus,
+  normalizePlantaoSpecialty,
+} from '@/lib/professionals';
 
-const specialties = [
-  { id: 'clinico_geral', name: 'ClÃƒÂ­nico Geral' },
+const SPECIALTIES = [
+  { id: 'clinico_geral', name: 'Clinico Geral' },
   { id: 'pediatria', name: 'Pediatria' },
   { id: 'psicologia', name: 'Psicologia' },
   { id: 'psiquiatria', name: 'Psiquiatria' },
 ];
+
+function buildProfessionalKey(profile) {
+  return profile?.user_id || profile?.professional_profile_id || profile?.id || '';
+}
+
+function mergeOnDutyProfessionals(profiles = [], publicProfiles = []) {
+  const merged = new Map();
+
+  const register = (profile, source) => {
+    if (!profile?.is_on_duty || !isProfessionalApprovedStatus(profile.status) || !canWorkOnDuty(profile.specialty)) {
+      return;
+    }
+
+    const key = buildProfessionalKey(profile);
+    if (!key) {
+      return;
+    }
+
+    const nextEntry = {
+      ...profile,
+      source,
+      normalizedSpecialty: normalizePlantaoSpecialty(profile.specialty),
+    };
+
+    const currentEntry = merged.get(key);
+    if (!currentEntry || source === 'private') {
+      merged.set(key, nextEntry);
+    }
+  };
+
+  profiles.forEach((profile) => register(profile, 'private'));
+  publicProfiles.forEach((profile) => register(profile, 'public'));
+
+  return Array.from(merged.values());
+}
 
 function ConsultaAgoraInner() {
   const navigate = useNavigate();
@@ -28,6 +67,16 @@ function ConsultaAgoraInner() {
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [queueEntry, setQueueEntry] = useState(null);
+
+  const selectedSpecialtyLabel = useMemo(
+    () => SPECIALTIES.find((specialty) => specialty.id === selectedSpecialty)?.name || '',
+    [selectedSpecialty],
+  );
+
+  const selectedSpecialtyNormalized = useMemo(
+    () => normalizePlantaoSpecialty(selectedSpecialty),
+    [selectedSpecialty],
+  );
 
   const findActivePlantaoConsulta = async (patientId) => {
     if (!patientId) {
@@ -106,22 +155,34 @@ function ConsultaAgoraInner() {
         base44.entities.ProfessionalProfile.filter({ is_on_duty: true }),
         base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true }),
       ]);
-      return [...profiles, ...publicProfiles].filter((profile) => isProfessionalApprovedStatus(profile.status));
+
+      return mergeOnDutyProfessionals(profiles, publicProfiles);
     },
     refetchInterval: 8000,
   });
 
-  const medicosDisponiveis = onDutyProfessionals.filter((profile) =>
-    canWorkOnDuty(profile.specialty)
-  ).length;
+  const availableProfessionals = useMemo(() => {
+    if (!selectedSpecialtyNormalized) {
+      return onDutyProfessionals;
+    }
+
+    return onDutyProfessionals.filter(
+      (profile) => profile.normalizedSpecialty === selectedSpecialtyNormalized,
+    );
+  }, [onDutyProfessionals, selectedSpecialtyNormalized]);
+
+  const medicosDisponiveis = availableProfessionals.length;
+  const hasAvailableProfessionals = medicosDisponiveis > 0;
 
   const { data: queueStats } = useQuery({
     queryKey: ['queueStats', selectedSpecialty],
     queryFn: async () => {
       const filters = { status: 'waiting' };
+
       if (selectedSpecialty) {
         filters.specialty = selectedSpecialty;
       }
+
       const queue = await base44.entities.Queue.filter(filters);
       return { count: queue.length, estimatedWait: queue.length * 10 };
     },
@@ -224,7 +285,7 @@ function ConsultaAgoraInner() {
   }, [queueEntry?.id, user?.id, navigate]);
 
   const handleJoinQueue = () => {
-    if (!user || !selectedSpecialty) {
+    if (!user || !selectedSpecialty || !hasAvailableProfessionals) {
       return;
     }
 
@@ -241,29 +302,35 @@ function ConsultaAgoraInner() {
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8">
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-4">
-            <Clock className="w-4 h-4" />
+      <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
+        <div className="mb-8 text-center">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
+            <Clock className="h-4 w-4" />
             Atendimento Imediato
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Consulta Agora</h1>
-          <p className="text-gray-600">Conecte-se com um mÃƒÂ©dico disponÃƒÂ­vel em minutos</p>
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">Consulta Agora</h1>
+          <p className="text-gray-600">Conecte-se com um medico disponivel em minutos</p>
         </div>
 
         <AnimatePresence mode="wait">
           {step === 'form' && (
             <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              <Card className="border-0 shadow-sm mb-6">
+              <Card className="mb-6 border-0 shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <Stethoscope className="w-5 h-5 text-emerald-600" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
+                        <Stethoscope className="h-5 w-5 text-emerald-600" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">{medicosDisponiveis} mÃƒÂ©dicos disponÃƒÂ­veis</p>
-                        <p className="text-sm text-gray-500">Prontos para atendimento</p>
+                        <p className="font-semibold text-gray-900">
+                          {medicosDisponiveis} medicos disponiveis
+                        </p>
+                        <p className="text-sm text-gray-500">
+                          {selectedSpecialty
+                            ? `Plantao ativo em ${selectedSpecialtyLabel}`
+                            : 'Prontos para atendimento'}
+                        </p>
                       </div>
                     </div>
                     {queueStats && (
@@ -288,7 +355,7 @@ function ConsultaAgoraInner() {
                         <SelectValue placeholder="Selecione a especialidade" />
                       </SelectTrigger>
                       <SelectContent>
-                        {specialties.map((specialty) => (
+                        {SPECIALTIES.map((specialty) => (
                           <SelectItem key={specialty.id} value={specialty.id}>
                             {specialty.name}
                           </SelectItem>
@@ -302,15 +369,21 @@ function ConsultaAgoraInner() {
                     <Textarea
                       value={symptoms}
                       onChange={(event) => setSymptoms(event.target.value)}
-                      placeholder="Ex: Estou com dor de cabeÃƒÂ§a e febre hÃƒÂ¡ 2 dias..."
+                      placeholder="Ex: Estou com dor de cabeca e febre ha 2 dias..."
                       className="min-h-[120px]"
                     />
                   </div>
 
-                  {selectedSpecialty && queueStats && (
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
+                  {selectedSpecialty && !hasAvailableProfessionals && (
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                      Nenhum profissional dessa especialidade esta com plantao ativo agora. Selecione outra especialidade para entrar na fila.
+                    </div>
+                  )}
+
+                  {selectedSpecialty && queueStats && hasAvailableProfessionals && (
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
                       <div className="flex items-center gap-2 text-amber-700">
-                        <Clock className="w-5 h-5" />
+                        <Clock className="h-5 w-5" />
                         <span className="font-medium">
                           Tempo estimado de espera: ~{queueStats.estimatedWait || 10} minutos
                         </span>
@@ -320,13 +393,14 @@ function ConsultaAgoraInner() {
 
                   <Button
                     onClick={handleJoinQueue}
-                    disabled={!selectedSpecialty || enterQueue.isPending}
-                    className="w-full h-14 gradient-primary border-0 text-white text-lg"
+                    disabled={!selectedSpecialty || !hasAvailableProfessionals || enterQueue.isPending}
+                    className="gradient-primary h-14 w-full border-0 text-lg text-white"
                   >
-                    {enterQueue.isPending
-                      ? <Loader2 className="w-5 h-5 animate-spin mr-2" />
-                      : <Users className="w-5 h-5 mr-2" />
-                    }
+                    {enterQueue.isPending ? (
+                      <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                    ) : (
+                      <Users className="mr-2 h-5 w-5" />
+                    )}
                     Entrar na Fila
                   </Button>
                 </CardContent>
@@ -338,26 +412,26 @@ function ConsultaAgoraInner() {
             <motion.div key="queue" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
               <Card className="border-0 shadow-md">
                 <CardContent className="p-8 text-center">
-                  <div className="relative w-32 h-32 mx-auto mb-6">
+                  <div className="relative mx-auto mb-6 h-32 w-32">
                     <div className="absolute inset-0 rounded-full border-4 border-emerald-100" />
-                    <div className="absolute inset-0 rounded-full border-4 border-emerald-500 border-t-transparent animate-spin" />
-                    <div className="absolute inset-4 rounded-full bg-emerald-50 flex items-center justify-center">
+                    <div className="absolute inset-0 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
+                    <div className="absolute inset-4 flex items-center justify-center rounded-full bg-emerald-50">
                       <span className="text-4xl font-bold text-emerald-600">
                         {queueEntry.position || 1}
                       </span>
                     </div>
                   </div>
 
-                  <h2 className="text-2xl font-bold text-gray-900 mb-2">VocÃƒÂª estÃƒÂ¡ na fila</h2>
-                  <p className="text-gray-600 mb-6">
-                    PosiÃƒÂ§ÃƒÂ£o {queueEntry.position} Ã¢â‚¬Â¢ Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
+                  <h2 className="mb-2 text-2xl font-bold text-gray-900">Voce esta na fila</h2>
+                  <p className="mb-6 text-gray-600">
+                    Posicao {queueEntry.position} - Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
                   </p>
 
-                  <div className="p-4 bg-gray-50 rounded-xl mb-6">
-                    <div className="flex items-center gap-3 justify-center text-gray-600">
-                      <AlertCircle className="w-5 h-5 text-amber-500" />
+                  <div className="mb-6 rounded-xl bg-gray-50 p-4">
+                    <div className="flex items-center justify-center gap-3 text-gray-600">
+                      <AlertCircle className="h-5 w-5 text-amber-500" />
                       <span className="text-sm">
-                        Mantenha esta pÃƒÂ¡gina aberta. VocÃƒÂª serÃƒÂ¡ redirecionado automaticamente.
+                        Mantenha esta pagina aberta. Voce sera redirecionado automaticamente.
                       </span>
                     </div>
                   </div>
@@ -366,9 +440,9 @@ function ConsultaAgoraInner() {
                     variant="outline"
                     onClick={() => leaveQueue.mutate(queueEntry.id)}
                     disabled={leaveQueue.isPending}
-                    className="text-red-600 border-red-200 hover:bg-red-50"
+                    className="border-red-200 text-red-600 hover:bg-red-50"
                   >
-                    {leaveQueue.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+                    {leaveQueue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sair da Fila
                   </Button>
                 </CardContent>
@@ -377,26 +451,26 @@ function ConsultaAgoraInner() {
           )}
         </AnimatePresence>
 
-        <div className="grid sm:grid-cols-3 gap-4 mt-8">
+        <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4 text-center">
-              <Clock className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <Clock className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
               <p className="font-medium text-gray-900">Atendimento 24h</p>
               <p className="text-sm text-gray-500">Todos os dias</p>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4 text-center">
-              <Stethoscope className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
-              <p className="font-medium text-gray-900">MÃƒÂ©dicos Verificados</p>
+              <Stethoscope className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
+              <p className="font-medium text-gray-900">Medicos Verificados</p>
               <p className="text-sm text-gray-500">CRM ativo</p>
             </CardContent>
           </Card>
           <Card className="border-0 shadow-sm">
             <CardContent className="p-4 text-center">
-              <Video className="w-8 h-8 text-emerald-600 mx-auto mb-2" />
+              <Video className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
               <p className="font-medium text-gray-900">Teleconsulta</p>
-              <p className="text-sm text-gray-500">VÃƒÂ­deo em HD</p>
+              <p className="text-sm text-gray-500">Video em HD</p>
             </CardContent>
           </Card>
         </div>
