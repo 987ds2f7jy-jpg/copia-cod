@@ -5,12 +5,42 @@ import { logUiWarning } from '@/lib/observability';
 
 let authUserIdSupportedPromise;
 
+const APP_USER_ALLOWED_FIELDS = new Set([
+  'full_name',
+  'email',
+  'password_hash',
+  'role',
+  'session_token',
+  'token_expires_at',
+  'is_active',
+  'phone',
+  'cpf',
+  'birth_date',
+  'sex',
+  'address',
+  'city',
+  'state',
+  'profile_complete',
+  'auth_user_id',
+]);
+
 function firstOrNull(items) {
   return Array.isArray(items) && items.length > 0 ? items[0] : null;
 }
 
 function normalizeEmail(email) {
   return email?.toLowerCase().trim() || '';
+}
+
+function sanitizeAppUserPayload(data = {}) {
+  return Object.entries(data).reduce((payload, [key, value]) => {
+    if (!APP_USER_ALLOWED_FIELDS.has(key) || value === undefined) {
+      return payload;
+    }
+
+    payload[key] = key === 'email' ? normalizeEmail(value) : value;
+    return payload;
+  }, {});
 }
 
 async function supportsAuthUserIdColumn() {
@@ -115,10 +145,7 @@ export const appUserRepository = {
   },
 
   async create(data) {
-    return base44.entities.AppUser.create({
-      ...data,
-      email: normalizeEmail(data.email),
-    });
+    return base44.entities.AppUser.create(sanitizeAppUserPayload(data));
   },
 
   async update(id, data) {
@@ -126,11 +153,7 @@ export const appUserRepository = {
       return null;
     }
 
-    const payload = { ...data };
-
-    if (payload.email) {
-      payload.email = normalizeEmail(payload.email);
-    }
+    const payload = sanitizeAppUserPayload(data);
 
     return base44.entities.AppUser.update(id, payload);
   },

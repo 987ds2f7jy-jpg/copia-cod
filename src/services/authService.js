@@ -257,9 +257,7 @@ export const authService = {
       const passwordHash = await hashPassword(registrationData.password);
       const token = generateToken();
       const expiresAt = newExpiry();
-
-      const newUser = await appUserRepository.create({
-        ...payload,
+      const appUserPayload = {
         full_name: registrationData.full_name.trim(),
         email: registrationData.email,
         password_hash: passwordHash,
@@ -267,7 +265,17 @@ export const authService = {
         session_token: token,
         token_expires_at: expiresAt,
         is_active: true,
-      });
+        phone: payload.phone || '',
+        cpf: payload.cpf || '',
+        birth_date: payload.birth_date || '',
+        sex: payload.sex || '',
+        address: payload.address || '',
+        city: payload.city || '',
+        state: payload.state || '',
+        profile_complete: Boolean(payload.profile_complete),
+      };
+
+      const newUser = await appUserRepository.create(appUserPayload);
 
       legacySessionRepository.setSession(token, expiresAt);
 
