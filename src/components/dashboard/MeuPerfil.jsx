@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 import { base44 } from '@/api/base44Client';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -43,6 +43,12 @@ export default function MeuPerfil({ professional, publicProfile }) {
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
+  const { data: availabilitySlots = [] } = useQuery({
+    queryKey: ['avail-slots', professional?.id],
+    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
+    enabled: !!professional?.id,
+  });
+
   const [form, setForm] = useState({
     photo_url: publicProfile?.photo_url || professional?.photo_url || '',
     bio: publicProfile?.bio || professional?.bio || '',
@@ -62,19 +68,24 @@ export default function MeuPerfil({ professional, publicProfile }) {
     prioritario_ativo: publicProfile?.prioritario_ativo || professional?.prioritario_ativo || false,
   });
 
+  const hasGranularAvailability = useMemo(
+    () => availabilitySlots.length > 0,
+    [availabilitySlots.length],
+  );
+
   // Validação para ativar perfil (só bloqueia na ativação, nunca na desativação)
   const validatePerfilAtivo = () => {
     const hasPrice = parseFloat(form.price_standard) > 0;
-    // Disponibilidade: aceita tanto available_days/hours legado quanto slots granulares (validamos o preço + ao menos 1 dia)
-    const hasDays = form.available_days?.length > 0;
+    const hasDays = form.available_days?.length > 0 || hasGranularAvailability;
     console.log('[MeuPerfil] validar ativação:', {
       price_standard: form.price_standard,
       hasPrice,
       available_days: form.available_days,
       hasDays,
+      availability_slots_count: availabilitySlots.length,
     });
-    if (!hasPrice && !hasDays) return 'É necessário configurar valor da consulta e pelo menos um horário disponível.';
-    if (!hasPrice) return 'Defina o valor da consulta padrão antes de ativar.';
+    if (!hasPrice && !hasDays) return 'E necessario configurar valor da consulta e pelo menos um horario disponivel.';
+    if (!hasPrice) return 'Defina o valor da consulta padrao antes de ativar.';
     if (!hasDays) return 'Configure sua disponibilidade antes de ativar.';
     return null;
   };
@@ -128,7 +139,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       const priceStd = parseFloat(form.price_standard) || 0;
       const pricePri = parseFloat(form.price_priority) || 0;
 
-      const updates = {
+      const publicUpdates = {
         photo_url: form.photo_url,
         bio: form.bio,
         instagram_url: form.instagram_url,
@@ -156,21 +167,24 @@ export default function MeuPerfil({ professional, publicProfile }) {
         register_state: professional?.register_state || publicProfile?.register_state || '',
       };
 
-      // Update ProfessionalProfile (private)
-      await base44.entities.ProfessionalProfile.update(professional.id, {
+      const privateUpdates = {
         bio: form.bio,
         photo_url: form.photo_url,
         price_standard: priceStd,
         price_priority: pricePri,
         available_days: form.available_days,
         available_hours: form.available_hours,
-        perfil_ativo: form.perfil_ativo,
         prioritario_ativo: form.prioritario_ativo,
+      };
+
+      // Update ProfessionalProfile (private/admin)
+      await base44.entities.ProfessionalProfile.update(professional.id, {
+        ...privateUpdates,
       });
 
-      // Update ProfessionalPublicProfile (public)
+      // Update ProfessionalPublicProfile (public/professional autonomy)
       if (publicProfile?.id) {
-        await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, updates);
+        await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, publicUpdates);
       }
     },
     onSuccess: () => {
