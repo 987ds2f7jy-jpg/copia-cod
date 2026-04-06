@@ -194,21 +194,38 @@ export default function Home() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Serviços</h2>
           </div>
-          <div className="flex justify-center">
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
-              className="w-full max-w-xs"
             >
               <Link to="/SolicitacaoExames">
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
                   <CardContent className="p-6 text-center">
                     <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center mx-auto mb-4">
                       <ClipboardList className="w-7 h-7" />
                     </div>
                     <p className="font-medium text-gray-900 text-sm mb-1">Solicitação de Exames</p>
                     <p className="text-xs text-gray-500">Pedidos digitais para exames laboratoriais e de imagem com orientação médica.</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.1 }}
+              viewport={{ once: true }}
+            >
+              <Link to="/RenovacaoReceitas">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">💊</span>
+                    </div>
+                    <p className="font-medium text-gray-900 text-sm mb-1">Renovação de Receitas</p>
+                    <p className="text-xs text-gray-500">Prescrições rápidas com envio digital para medicações de uso contínuo.</p>
                   </CardContent>
                 </Card>
               </Link>
