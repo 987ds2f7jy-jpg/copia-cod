@@ -15,6 +15,7 @@ const Perfil = lazy(() => import('./pages/Perfil'));
 const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
 const PergunteEspecialista = lazy(() => import('./pages/PergunteEspecialista'));
 const SolicitacaoExames = lazy(() => import('./pages/SolicitacaoExames'));
+const RenovacaoReceitas = lazy(() => import('./pages/RenovacaoReceitas'));
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
 const __Layout = lazy(() => import('./Layout.jsx'));
 
