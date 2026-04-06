@@ -23,6 +23,7 @@ const TABLE_MAP = {
   Queue: 'queues',
   Review: 'reviews',
   Saque: 'saques',
+  SolicitacaoExame: 'solicitacoes_exames',
 };
 
 function createEntityProxy(tableName) {
