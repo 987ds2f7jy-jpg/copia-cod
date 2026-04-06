@@ -21,6 +21,7 @@ import {
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion } from 'framer-motion';
+import { toast } from '@/components/ui/use-toast';
 
 import KPICard from '@/components/dashboard/KPICard';
 import RevenueChart from '@/components/dashboard/RevenueChart';
