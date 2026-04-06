@@ -1,11 +1,45 @@
 import React from 'react';
 import { useQuery } from '@tanstack/react-query';
+import { differenceInYears } from 'date-fns';
 import { format } from 'date-fns';
-import { ClipboardList, Loader2, Mail, Phone, User } from 'lucide-react';
+import { ClipboardList, Loader2, User } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { listDirectSolicitacoesForProfessional } from '@/lib/solicitacoesExames';
+
+function formatSexLabel(value) {
+  if (!value) {
+    return 'Nao informado';
+  }
+
+  const normalized = String(value).trim().toLowerCase();
+
+  if (normalized === 'masculino') {
+    return 'Masculino';
+  }
+
+  if (normalized === 'feminino') {
+    return 'Feminino';
+  }
+
+  return 'Outro';
+}
+
+function formatAge(value) {
+  if (!value) {
+    return 'Nao informado';
+  }
+
+  const date = new Date(value);
+
+  if (Number.isNaN(date.getTime())) {
+    return 'Nao informado';
+  }
+
+  const age = differenceInYears(new Date(), date);
+  return age >= 0 ? `${age} anos` : 'Nao informado';
+}
 
 async function loadPatientLookup(pacienteIds) {
   const uniqueIds = Array.from(new Set((pacienteIds || []).filter(Boolean)));
@@ -16,8 +50,22 @@ async function loadPatientLookup(pacienteIds) {
 
   const results = await Promise.all(
     uniqueIds.map(async (patientId) => {
-      const matches = await base44.entities.AppUser.filter({ id: patientId }, undefined, 1);
-      return matches?.[0] || null;
+      const [appUsers, latestProntuarios] = await Promise.all([
+        base44.entities.AppUser.filter({ id: patientId }, undefined, 1),
+        base44.entities.Prontuario.filter({ paciente_id: patientId }, '-created_date', 1),
+      ]);
+
+      const appUser = appUsers?.[0] || null;
+      const latestProntuario = latestProntuarios?.[0] || null;
+
+      if (!appUser) {
+        return null;
+      }
+
+      return {
+        ...appUser,
+        doencas_previas: latestProntuario?.historico_risco || '',
+      };
     }),
   );
 
@@ -67,13 +115,12 @@ export default function ServicosExtras({ professional, onAtender }) {
           visibleSolicitacoes.map((solicitacao) => {
             const patient = patientLookup[solicitacao.paciente_id] || null;
             const patientName = solicitacao.paciente_nome || patient?.full_name || 'Paciente';
-            const patientEmail = solicitacao.paciente_email || patient?.email || '';
-            const patientPhone = solicitacao.paciente_telefone || patient?.phone || '';
             const mergedSolicitacao = {
               ...solicitacao,
-              paciente_email: patientEmail,
-              paciente_telefone: patientPhone,
               paciente_nome: patientName,
+              paciente_sexo: patient?.sex || '',
+              paciente_idade: formatAge(patient?.birth_date),
+              doencas_previas: patient?.doencas_previas || '',
             };
 
             return (
@@ -89,20 +136,12 @@ export default function ServicosExtras({ professional, onAtender }) {
                 </div>
 
                 <div className="space-y-1 text-xs text-gray-500">
-                  {mergedSolicitacao.exame_solicitado && <p>Exame: {mergedSolicitacao.exame_solicitado}</p>}
-                  {mergedSolicitacao.motivo && <p className="line-clamp-2">Motivo: {mergedSolicitacao.motivo}</p>}
-                  {patientEmail && (
-                    <p className="flex items-center gap-1">
-                      <Mail className="w-3 h-3 shrink-0" />
-                      <span className="truncate">{patientEmail}</span>
-                    </p>
-                  )}
-                  {patientPhone && (
-                    <p className="flex items-center gap-1">
-                      <Phone className="w-3 h-3 shrink-0" />
-                      <span>{patientPhone}</span>
-                    </p>
-                  )}
+                  <p className="line-clamp-2">Motivo: {mergedSolicitacao.motivo || 'Exames de rotina / check-up preventivo'}</p>
+                  <p>Sexo: {formatSexLabel(mergedSolicitacao.paciente_sexo)}</p>
+                  <p>Idade: {mergedSolicitacao.paciente_idade}</p>
+                  <p className="line-clamp-2">
+                    Doencas previas: {mergedSolicitacao.doencas_previas || 'Nao informado'}
+                  </p>
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
