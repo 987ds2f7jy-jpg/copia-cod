@@ -528,10 +528,19 @@ function DashboardProfissionalInner() {
           />
         </div>
 
-        {/* Solicitações de Agendamento por Especialidade */}
-        <div className="grid lg:grid-cols-2 gap-4">
+        {/* Solicitações de Agendamento + Serviços Extras */}
+        <div className="grid lg:grid-cols-3 gap-4">
           <SolicitacoesAgendamento professional={professional} />
           <MinhasConsultasHoje appointments={appointments} professional={professional} />
+          <ServicosExtras
+            professional={professional}
+            onAtender={(s) => {
+              toast({
+                title: `Solicitação de ${s.tipo === 'checkup' ? 'Check-Up' : 'Exames Específicos'}`,
+                description: `Paciente: ${s.paciente_nome}. Exame: ${s.exame_solicitado}`,
+              });
+            }}
+          />
         </div>
 
         {/* Bottom row: Performance + Financial + Questions */}
