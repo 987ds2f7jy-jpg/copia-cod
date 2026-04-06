@@ -2,7 +2,7 @@ import React from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { differenceInYears } from 'date-fns';
 import { format } from 'date-fns';
-import { ClipboardList, Loader2, User } from 'lucide-react';
+import { ClipboardList, Loader2, Paperclip, User } from 'lucide-react';
 import { base44 } from '@/api/base44Client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -130,18 +130,46 @@ export default function ServicosExtras({ professional, onAtender }) {
                     <User className="w-4 h-4 text-gray-400 shrink-0" />
                     <span className="text-sm font-medium text-gray-800 truncate">{patientName}</span>
                   </div>
-                  <Badge variant="outline" className="border-emerald-300 text-emerald-700 text-xs">
-                    Check-Up
+                  <Badge
+                    variant="outline"
+                    className={
+                      solicitacao.tipo === 'renovacao_receitas'
+                        ? 'border-violet-300 text-violet-700 text-xs'
+                        : 'border-emerald-300 text-emerald-700 text-xs'
+                    }
+                  >
+                    {solicitacao.tipo === 'renovacao_receitas' ? 'Renovacao de Receitas' : 'Check-Up'}
                   </Badge>
                 </div>
 
                 <div className="space-y-1 text-xs text-gray-500">
-                  <p className="line-clamp-2">Motivo: {mergedSolicitacao.motivo || 'Exames de rotina / check-up preventivo'}</p>
-                  <p>Sexo: {formatSexLabel(mergedSolicitacao.paciente_sexo)}</p>
-                  <p>Idade: {mergedSolicitacao.paciente_idade}</p>
-                  <p className="line-clamp-2">
-                    Doencas previas: {mergedSolicitacao.doencas_previas || 'Nao informado'}
-                  </p>
+                  {solicitacao.tipo === 'renovacao_receitas' ? (
+                    <>
+                      <p>Medicamento: {mergedSolicitacao.nome_medicamento || 'Nao informado'}</p>
+                      <p>Dosagem: {mergedSolicitacao.dosagem || 'Nao informado'}</p>
+                      <p>Frequencia: {mergedSolicitacao.frequencia || 'Nao informado'}</p>
+                      {mergedSolicitacao.arquivo_receita_url && (
+                        <a
+                          href={mergedSolicitacao.arquivo_receita_url}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center gap-1 text-violet-600 hover:underline"
+                        >
+                          <Paperclip className="w-3 h-3 shrink-0" />
+                          Ver receita anexada
+                        </a>
+                      )}
+                    </>
+                  ) : (
+                    <>
+                      <p className="line-clamp-2">Motivo: {mergedSolicitacao.motivo || 'Exames de rotina / check-up preventivo'}</p>
+                      <p>Sexo: {formatSexLabel(mergedSolicitacao.paciente_sexo)}</p>
+                      <p>Idade: {mergedSolicitacao.paciente_idade}</p>
+                      <p className="line-clamp-2">
+                        Doencas previas: {mergedSolicitacao.doencas_previas || 'Nao informado'}
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div className="flex items-center justify-between gap-3">

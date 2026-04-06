@@ -97,6 +97,31 @@ export async function createSpecificExamRequest(user, { exame, motivo, sintomas 
   });
 }
 
+export async function createPrescriptionRenewalRequest(user, {
+  nomeMedicamento,
+  dosagem,
+  frequencia,
+  arquivoReceitaUrl,
+}) {
+  const authenticatedUser = ensureAuthenticatedUser(user);
+
+  return createSolicitacaoExameWithFallback({
+    ...buildPacienteSnapshot(authenticatedUser),
+    tipo: 'renovacao_receitas',
+    exame_solicitado: '',
+    motivo: '',
+    sintomas: '',
+    status: 'pending',
+    assintomatico_confirmado: false,
+    nome_medicamento: nomeMedicamento,
+    dosagem,
+    frequencia,
+    arquivo_receita_url: arquivoReceitaUrl,
+    fluxo_destino: 'dashboard',
+    especialidade_destino: CLINICO_GERAL,
+  });
+}
+
 export function persistSpecificExamRedirect(data) {
   if (typeof window === 'undefined') {
     return;
@@ -160,6 +185,12 @@ export function shouldShowSolicitacaoForProfessional(solicitacao, professional) 
 
   if (solicitacao.tipo === 'especificos') {
     return false;
+  }
+
+  if (solicitacao.tipo === 'renovacao_receitas') {
+    const targetSpecialty = normalizeConsultaAgoraSpecialty(solicitacao.especialidade_destino || CLINICO_GERAL);
+    const targetFlow = solicitacao.fluxo_destino || 'dashboard';
+    return targetFlow === 'dashboard' && targetSpecialty === CLINICO_GERAL && professionalSpecialty === CLINICO_GERAL;
   }
 
   return true;
