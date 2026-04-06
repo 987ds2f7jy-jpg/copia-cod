@@ -14,6 +14,7 @@ const Home = lazy(() => import('./pages/Home'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
 const PergunteEspecialista = lazy(() => import('./pages/PergunteEspecialista'));
+const SolicitacaoExames = lazy(() => import('./pages/SolicitacaoExames'));
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
 const __Layout = lazy(() => import('./Layout.jsx'));
 
@@ -32,6 +33,7 @@ export const PAGES = {
     "Perfil": Perfil,
     "PerfilProfissional": PerfilProfissional,
     "PergunteEspecialista": PergunteEspecialista,
+    "SolicitacaoExames": SolicitacaoExames,
     "Teleconsulta": Teleconsulta,
 }
 

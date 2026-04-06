@@ -21,6 +21,7 @@ import {
 import { format, subDays, startOfMonth, endOfMonth } from 'date-fns';
 import { createPageUrl } from '@/utils';
 import { motion } from 'framer-motion';
+import { toast } from '@/components/ui/use-toast';
 
 import KPICard from '@/components/dashboard/KPICard';
 import RevenueChart from '@/components/dashboard/RevenueChart';
@@ -31,6 +32,7 @@ import PerformanceBlock from '@/components/dashboard/PerformanceBlock';
 import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
+import ServicosExtras from '@/components/dashboard/ServicosExtras';
 import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import {
@@ -527,10 +529,19 @@ function DashboardProfissionalInner() {
           />
         </div>
 
-        {/* Solicitações de Agendamento por Especialidade */}
-        <div className="grid lg:grid-cols-2 gap-4">
+        {/* Solicitações de Agendamento + Serviços Extras */}
+        <div className="grid lg:grid-cols-3 gap-4">
           <SolicitacoesAgendamento professional={professional} />
           <MinhasConsultasHoje appointments={appointments} professional={professional} />
+          <ServicosExtras
+            professional={professional}
+            onAtender={(s) => {
+              toast({
+                title: `Solicitação de ${s.tipo === 'checkup' ? 'Check-Up' : 'Exames Específicos'}`,
+                description: `Paciente: ${s.paciente_nome}. Exame: ${s.exame_solicitado}`,
+              });
+            }}
+          />
         </div>
 
         {/* Bottom row: Performance + Financial + Questions */}
