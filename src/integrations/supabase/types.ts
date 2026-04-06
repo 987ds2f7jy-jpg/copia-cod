@@ -895,12 +895,16 @@ export type Database = {
       }
       solicitacoes_exames: {
         Row: {
+          arquivo_receita_url: string | null
           assintomatico_confirmado: boolean | null
           created_date: string
+          dosagem: string | null
           exame_solicitado: string | null
+          frequencia: string | null
           id: string
           medico_id: string | null
           motivo: string | null
+          nome_medicamento: string | null
           paciente_id: string
           paciente_nome: string | null
           sintomas: string | null
@@ -909,12 +913,16 @@ export type Database = {
           updated_at: string
         }
         Insert: {
+          arquivo_receita_url?: string | null
           assintomatico_confirmado?: boolean | null
           created_date?: string
+          dosagem?: string | null
           exame_solicitado?: string | null
+          frequencia?: string | null
           id?: string
           medico_id?: string | null
           motivo?: string | null
+          nome_medicamento?: string | null
           paciente_id: string
           paciente_nome?: string | null
           sintomas?: string | null
@@ -923,12 +931,16 @@ export type Database = {
           updated_at?: string
         }
         Update: {
+          arquivo_receita_url?: string | null
           assintomatico_confirmado?: boolean | null
           created_date?: string
+          dosagem?: string | null
           exame_solicitado?: string | null
+          frequencia?: string | null
           id?: string
           medico_id?: string | null
           motivo?: string | null
+          nome_medicamento?: string | null
           paciente_id?: string
           paciente_nome?: string | null
           sintomas?: string | null
