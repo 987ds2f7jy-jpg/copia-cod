@@ -7,7 +7,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { 
   Search, Clock, MessageSquare, Shield, Star, 
   ArrowRight, CheckCircle, Stethoscope, Heart,
-  Brain, Bone, Eye, Baby, UserRound
+  Brain, Bone, Eye, Baby, UserRound, ClipboardList
 } from 'lucide-react';
 
 const specialties = [
