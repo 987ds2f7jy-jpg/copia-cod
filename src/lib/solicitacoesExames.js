@@ -12,7 +12,11 @@ const PLANTAO_STORAGE_KEY = 'rd.solicitacaoExames.plantao';
 const CLINICO_GERAL = 'clinico_geral';
 
 function hasMissingColumnError(error, columnName) {
-  const message = error instanceof Error ? error.message : String(error ?? '');
+  const message = error instanceof Error
+    ? error.message
+    : typeof error?.message === 'string'
+      ? error.message
+      : String(error ?? '');
   return message.includes(columnName) && message.includes('column');
 }
 
