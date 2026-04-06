@@ -1,5 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Clock, Loader2, Stethoscope, Users, Video } from 'lucide-react';
@@ -16,6 +16,11 @@ import {
   isProfessionalApprovedStatus,
   normalizePlantaoSpecialty,
 } from '@/lib/professionals';
+import {
+  clearSpecificExamRedirect,
+  normalizeConsultaAgoraSpecialty,
+  readSpecificExamRedirect,
+} from '@/lib/solicitacoesExames';
 
 const SPECIALTIES = [
   { id: 'clinico_geral', name: 'Clinico Geral' },
@@ -52,6 +57,7 @@ function normalizeOnDutyProfessionals(publicProfiles = []) {
 
 function ConsultaAgoraInner() {
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const queryClient = useQueryClient();
   const { user } = useAuth();
   const [step, setStep] = useState('form');
@@ -68,6 +74,27 @@ function ConsultaAgoraInner() {
     () => normalizePlantaoSpecialty(selectedSpecialty),
     [selectedSpecialty],
   );
+
+  useEffect(() => {
+    if (step !== 'form') {
+      return;
+    }
+
+    const specialtyFromUrl = normalizeConsultaAgoraSpecialty(searchParams.get('especialidade'));
+    const symptomsFromUrl = searchParams.get('sintomas') || '';
+    const storedRedirect = readSpecificExamRedirect();
+    const specialtyFromStorage = normalizeConsultaAgoraSpecialty(storedRedirect?.especialidade);
+    const nextSpecialty = specialtyFromUrl || specialtyFromStorage;
+    const nextSymptoms = symptomsFromUrl || storedRedirect?.sintomas || '';
+
+    if (nextSpecialty && !selectedSpecialty) {
+      setSelectedSpecialty(nextSpecialty);
+    }
+
+    if (nextSymptoms && !symptoms) {
+      setSymptoms(nextSymptoms);
+    }
+  }, [searchParams, selectedSpecialty, step, symptoms]);
 
   const findActivePlantaoConsulta = async (patientId) => {
     if (!patientId) {
@@ -193,6 +220,7 @@ function ConsultaAgoraInner() {
     onSuccess: (nextQueueEntry) => {
       setQueueEntry(nextQueueEntry);
       setStep('queue');
+      clearSpecificExamRedirect();
       queryClient.invalidateQueries({ queryKey: ['queueStats'] });
     },
   });
@@ -202,6 +230,7 @@ function ConsultaAgoraInner() {
     onSuccess: () => {
       setQueueEntry(null);
       setStep('form');
+      clearSpecificExamRedirect();
       queryClient.invalidateQueries({ queryKey: ['queueStats'] });
     },
   });
