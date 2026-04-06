@@ -10,14 +10,38 @@ const OPTIONAL_COLUMNS = [
 
 const PLANTAO_STORAGE_KEY = 'rd.solicitacaoExames.plantao';
 const CLINICO_GERAL = 'clinico_geral';
+let optionalSolicitacaoFieldsSupported = null;
 
-function hasMissingColumnError(error, columnName) {
+function getErrorMessage(error) {
   const message = error instanceof Error
     ? error.message
     : typeof error?.message === 'string'
       ? error.message
       : String(error ?? '');
+  return message;
+}
+
+function hasMissingColumnError(error, columnName) {
+  const message = getErrorMessage(error);
   return message.includes(columnName) && message.includes('column');
+}
+
+function hasTipoConstraintError(error) {
+  const message = getErrorMessage(error);
+  return (
+    message.includes('solicitacoes_exames_tipo_check') ||
+    (message.includes('check constraint') && message.includes('tipo'))
+  );
+}
+
+function stripOptionalSolicitacaoFields(payload) {
+  const nextPayload = { ...payload };
+
+  OPTIONAL_COLUMNS.forEach((columnName) => {
+    delete nextPayload[columnName];
+  });
+
+  return nextPayload;
 }
 
 function ensureAuthenticatedUser(user) {
@@ -38,19 +62,35 @@ function buildPacienteSnapshot(user) {
 }
 
 async function createSolicitacaoExameWithFallback(payload) {
-  let nextPayload = { ...payload };
+  let nextPayload = optionalSolicitacaoFieldsSupported === false
+    ? stripOptionalSolicitacaoFields(payload)
+    : { ...payload };
+  let retriedWithoutOptionalFields = optionalSolicitacaoFieldsSupported === false;
 
   while (true) {
     try {
-      return await base44.entities.SolicitacaoExame.create(nextPayload);
-    } catch (error) {
-      const missingColumn = OPTIONAL_COLUMNS.find((columnName) => hasMissingColumnError(error, columnName));
+      const result = await base44.entities.SolicitacaoExame.create(nextPayload);
 
-      if (!missingColumn) {
-        throw error;
+      if (optionalSolicitacaoFieldsSupported === null) {
+        optionalSolicitacaoFieldsSupported = true;
       }
 
-      delete nextPayload[missingColumn];
+      return result;
+    } catch (error) {
+      const missingOptionalColumn = OPTIONAL_COLUMNS.some((columnName) => hasMissingColumnError(error, columnName));
+
+      if (missingOptionalColumn && !retriedWithoutOptionalFields) {
+        optionalSolicitacaoFieldsSupported = false;
+        retriedWithoutOptionalFields = true;
+        nextPayload = stripOptionalSolicitacaoFields(payload);
+        continue;
+      }
+
+      if (hasTipoConstraintError(error) && payload.tipo === 'renovacao_receitas') {
+        throw new Error('O banco ainda nao aceita o tipo renovacao_receitas. Aplique a migration da tabela solicitacoes_exames.');
+      }
+
+      throw error;
     }
   }
 }

@@ -44,6 +44,18 @@ export default function RenovacaoReceitas() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
 
+  function getUserFacingErrorMessage(error) {
+    if (error instanceof Error && error.message) {
+      return error.message;
+    }
+
+    if (typeof error?.message === 'string' && error.message) {
+      return error.message;
+    }
+
+    return 'Nao foi possivel enviar a solicitacao.';
+  }
+
   function handleFileChange(event) {
     const file = event.target.files?.[0];
 
@@ -111,7 +123,7 @@ export default function RenovacaoReceitas() {
 
       toast({
         title: 'Erro',
-        description: error instanceof Error ? error.message : 'Nao foi possivel enviar a solicitacao.',
+        description: getUserFacingErrorMessage(error),
         variant: 'destructive',
       });
     } finally {
