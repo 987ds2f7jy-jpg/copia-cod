@@ -893,6 +893,51 @@ export type Database = {
         }
         Relationships: []
       }
+      solicitacoes_exames: {
+        Row: {
+          assintomatico_confirmado: boolean | null
+          created_date: string
+          exame_solicitado: string | null
+          id: string
+          medico_id: string | null
+          motivo: string | null
+          paciente_id: string
+          paciente_nome: string | null
+          sintomas: string | null
+          status: string | null
+          tipo: string
+          updated_at: string
+        }
+        Insert: {
+          assintomatico_confirmado?: boolean | null
+          created_date?: string
+          exame_solicitado?: string | null
+          id?: string
+          medico_id?: string | null
+          motivo?: string | null
+          paciente_id: string
+          paciente_nome?: string | null
+          sintomas?: string | null
+          status?: string | null
+          tipo: string
+          updated_at?: string
+        }
+        Update: {
+          assintomatico_confirmado?: boolean | null
+          created_date?: string
+          exame_solicitado?: string | null
+          id?: string
+          medico_id?: string | null
+          motivo?: string | null
+          paciente_id?: string
+          paciente_nome?: string | null
+          sintomas?: string | null
+          status?: string | null
+          tipo?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
