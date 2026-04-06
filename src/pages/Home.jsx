@@ -188,6 +188,35 @@ export default function Home() {
         </div>
       </section>
 
+      {/* Serviços Section */}
+      <section className="py-16 bg-gray-50">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="text-center mb-10">
+            <h2 className="text-3xl font-bold text-gray-900 mb-4">Serviços</h2>
+          </div>
+          <div className="flex justify-center">
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="w-full max-w-xs"
+            >
+              <Link to="/SolicitacaoExames">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center mx-auto mb-4">
+                      <ClipboardList className="w-7 h-7" />
+                    </div>
+                    <p className="font-medium text-gray-900 text-sm mb-1">Solicitação de Exames</p>
+                    <p className="text-xs text-gray-500">Pedidos digitais para exames laboratoriais e de imagem com orientação médica.</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+
       {/* Features Section */}
       <section className="py-20 bg-gray-50">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
