@@ -35,6 +35,7 @@ export const PAGES = {
     "PerfilProfissional": PerfilProfissional,
     "PergunteEspecialista": PergunteEspecialista,
     "SolicitacaoExames": SolicitacaoExames,
+    "RenovacaoReceitas": RenovacaoReceitas,
     "Teleconsulta": Teleconsulta,
 }
 

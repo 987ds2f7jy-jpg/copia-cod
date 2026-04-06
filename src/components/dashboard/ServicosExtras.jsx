@@ -38,15 +38,29 @@ export default function ServicosExtras({ professional, onAtender }) {
                 <User className="w-4 h-4 text-gray-400 shrink-0" />
                 <span className="text-sm font-medium text-gray-800 truncate">{s.paciente_nome || 'Paciente'}</span>
               </div>
-              <Badge variant="outline" className={s.tipo === 'checkup' ? 'border-emerald-300 text-emerald-700 text-xs' : 'border-blue-300 text-blue-700 text-xs'}>
-                {s.tipo === 'checkup' ? 'Check-Up' : 'Exames Específicos'}
+              <Badge variant="outline" className={
+                s.tipo === 'checkup' ? 'border-emerald-300 text-emerald-700 text-xs'
+                : s.tipo === 'renovacao_receitas' ? 'border-violet-300 text-violet-700 text-xs'
+                : 'border-blue-300 text-blue-700 text-xs'
+              }>
+                {s.tipo === 'checkup' ? 'Check-Up' : s.tipo === 'renovacao_receitas' ? 'Renovação de Receitas' : 'Exames Específicos'}
               </Badge>
             </div>
-            {s.exame_solicitado && (
-              <p className="text-xs text-gray-500">Exame: {s.exame_solicitado}</p>
-            )}
-            {s.motivo && (
-              <p className="text-xs text-gray-500 line-clamp-1">Motivo: {s.motivo}</p>
+            {s.tipo === 'renovacao_receitas' ? (
+              <>
+                {s.nome_medicamento && <p className="text-xs text-gray-500">Medicamento: {s.nome_medicamento} {s.dosagem && `- ${s.dosagem}`}</p>}
+                {s.frequencia && <p className="text-xs text-gray-500">Frequência: {s.frequencia}</p>}
+                {s.arquivo_receita_url && (
+                  <a href={s.arquivo_receita_url} target="_blank" rel="noopener noreferrer" className="text-xs text-blue-600 hover:underline">
+                    📎 Ver receita anterior
+                  </a>
+                )}
+              </>
+            ) : (
+              <>
+                {s.exame_solicitado && <p className="text-xs text-gray-500">Exame: {s.exame_solicitado}</p>}
+                {s.motivo && <p className="text-xs text-gray-500 line-clamp-1">Motivo: {s.motivo}</p>}
+              </>
             )}
             <div className="flex items-center justify-between">
               <span className="text-xs text-gray-400">
