@@ -31,6 +31,7 @@ import PerformanceBlock from '@/components/dashboard/PerformanceBlock';
 import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
+import ServicosExtras from '@/components/dashboard/ServicosExtras';
 import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import {
