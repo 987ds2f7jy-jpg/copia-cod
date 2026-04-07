@@ -896,17 +896,22 @@ export type Database = {
       solicitacoes_exames: {
         Row: {
           arquivo_receita_url: string | null
+          arquivos_urls: string[] | null
           assintomatico_confirmado: boolean | null
           created_date: string
+          dados_saude: Json | null
           dosagem: string | null
+          especificacao_laudo: Json | null
           exame_solicitado: string | null
           frequencia: string | null
           id: string
           medico_id: string | null
           motivo: string | null
           nome_medicamento: string | null
+          paciente_email: string | null
           paciente_id: string
           paciente_nome: string | null
+          paciente_telefone: string | null
           sintomas: string | null
           status: string | null
           tipo: string
@@ -914,17 +919,22 @@ export type Database = {
         }
         Insert: {
           arquivo_receita_url?: string | null
+          arquivos_urls?: string[] | null
           assintomatico_confirmado?: boolean | null
           created_date?: string
+          dados_saude?: Json | null
           dosagem?: string | null
+          especificacao_laudo?: Json | null
           exame_solicitado?: string | null
           frequencia?: string | null
           id?: string
           medico_id?: string | null
           motivo?: string | null
           nome_medicamento?: string | null
+          paciente_email?: string | null
           paciente_id: string
           paciente_nome?: string | null
+          paciente_telefone?: string | null
           sintomas?: string | null
           status?: string | null
           tipo: string
@@ -932,17 +942,22 @@ export type Database = {
         }
         Update: {
           arquivo_receita_url?: string | null
+          arquivos_urls?: string[] | null
           assintomatico_confirmado?: boolean | null
           created_date?: string
+          dados_saude?: Json | null
           dosagem?: string | null
+          especificacao_laudo?: Json | null
           exame_solicitado?: string | null
           frequencia?: string | null
           id?: string
           medico_id?: string | null
           motivo?: string | null
           nome_medicamento?: string | null
+          paciente_email?: string | null
           paciente_id?: string
           paciente_nome?: string | null
+          paciente_telefone?: string | null
           sintomas?: string | null
           status?: string | null
           tipo?: string
