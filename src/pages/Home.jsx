@@ -194,7 +194,7 @@ export default function Home() {
           <div className="text-center mb-10">
             <h2 className="text-3xl font-bold text-gray-900 mb-4">Serviços</h2>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 max-w-2xl mx-auto">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
@@ -226,6 +226,24 @@ export default function Home() {
                     </div>
                     <p className="font-medium text-gray-900 text-sm mb-1">Renovação de Receitas</p>
                     <p className="text-xs text-gray-500">Prescrições rápidas com envio digital para medicações de uso contínuo.</p>
+                  </CardContent>
+                </Card>
+              </Link>
+            </motion.div>
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.2 }}
+              viewport={{ once: true }}
+            >
+              <Link to="/LaudosMedicos">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
+                  <CardContent className="p-6 text-center">
+                    <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-4">
+                      <span className="text-2xl">📄</span>
+                    </div>
+                    <p className="font-medium text-gray-900 text-sm mb-1">Laudos Médicos</p>
+                    <p className="text-xs text-gray-500">Emissão digital com assinatura eletrônica certificada e envio imediato.</p>
                   </CardContent>
                 </Card>
               </Link>
