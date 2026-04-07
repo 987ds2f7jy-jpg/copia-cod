@@ -35,6 +35,7 @@ import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGat
 import ServicosExtras from '@/components/dashboard/ServicosExtras';
 import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
+import { attachLaudoContextToQueue, markLaudoSolicitacaoInProgress } from '@/lib/solicitacoesExames';
 import {
   canWorkOnDuty,
   isProfessionalApprovedStatus,
@@ -144,9 +145,10 @@ function DashboardProfissionalInner() {
   // Queue filtered by normalized specialty
   const { data: queuePatients = [] } = useQuery({
     queryKey: ['queueWaiting', professional?.id, professional?.specialty],
-    queryFn: () => {
+    queryFn: async () => {
       const normalized = normalizePlantaoSpecialty(professional?.specialty);
-      return base44.entities.Queue.filter({ specialty: normalized, status: 'waiting' });
+      const queueEntries = await base44.entities.Queue.filter({ specialty: normalized, status: 'waiting' });
+      return attachLaudoContextToQueue(queueEntries);
     },
     enabled: !!professional?.id && !!professional?.specialty && canWorkOnDuty(professional?.specialty) && currentDutyStatus,
     refetchInterval: currentDutyStatus ? 10000 : false,
@@ -307,14 +309,20 @@ function DashboardProfissionalInner() {
   const acceptQueuePatient = useMutation({
     mutationFn: async (queueEntry) => {
       const consulta = await createConsultaRecord(buildConsultaFromQueueEntry(queueEntry, professional));
-      await base44.entities.Queue.update(queueEntry.id, {
-        status: 'in_progress',
-        assigned_professional_id: professional.id,
-      });
+      await Promise.all([
+        base44.entities.Queue.update(queueEntry.id, {
+          status: 'in_progress',
+          assigned_professional_id: professional.id,
+        }),
+        queueEntry.laudo_medico || queueEntry.solicitacao_exame_id
+          ? markLaudoSolicitacaoInProgress(queueEntry, professional.id)
+          : Promise.resolve(null),
+      ]);
       return consulta;
     },
     onSuccess: (consulta) => {
       queryClient.invalidateQueries({ queryKey: ['queueWaiting', professional?.id] });
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes-exames', professional?.id, professional?.specialty] });
       navigate(`/consulta/${consulta.id}`);
     },
   });
