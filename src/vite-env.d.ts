@@ -10,6 +10,7 @@ interface ImportMetaEnv {
   readonly VITE_SUPABASE_URL: string;
   readonly VITE_ENABLE_SUPABASE_AUTH?: "true" | "false";
   readonly VITE_APP_ENV?: "development" | "staging" | "production" | "test";
+  readonly VITE_MAPBOX_TOKEN?: string;
 }
 
 interface ImportMeta {
