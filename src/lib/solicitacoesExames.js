@@ -267,6 +267,19 @@ function buildLaudoQueueSymptoms({ tipoLaudo, diagnostico, finalidade }) {
   ].filter(Boolean).join('. ');
 }
 
+export function isLaudoQueueEntry(queueEntry) {
+  if (!queueEntry) {
+    return false;
+  }
+
+  if (queueEntry.solicitacao_exame_id) {
+    return true;
+  }
+
+  const symptoms = String(queueEntry.symptoms || '').toLowerCase();
+  return symptoms.includes('[laudo medico:');
+}
+
 export async function createQueueEntryWithFallback(payload) {
   let nextPayload = optionalQueueFieldsSupported === false
     ? stripOptionalQueueFields(payload)
@@ -321,7 +334,7 @@ export async function createLaudoQueueEntry({
 }) {
   const existingEntry = await findCurrentQueueEntry(patientId, CLINICO_GERAL);
 
-  if (existingEntry) {
+  if (existingEntry && isLaudoQueueEntry(existingEntry)) {
     return {
       entry: existingEntry,
       reusedExisting: true,
@@ -497,7 +510,7 @@ export async function listDirectSolicitacoesForProfessional(professional) {
 }
 
 export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
-  if (!queueEntry?.patient_id) {
+  if (!queueEntry?.patient_id || !isLaudoQueueEntry(queueEntry)) {
     return null;
   }
 
@@ -553,6 +566,13 @@ export async function attachLaudoContextToQueue(queueEntries = []) {
 
   const enrichedEntries = await Promise.all(
     normalizedEntries.map(async (entry) => {
+      if (!isLaudoQueueEntry(entry)) {
+        return {
+          ...entry,
+          laudo_medico: null,
+        };
+      }
+
       const laudoSolicitacao = await resolveLaudoSolicitacaoFromQueue(entry);
 
       return {
