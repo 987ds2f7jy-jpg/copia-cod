@@ -11,6 +11,7 @@ const DashboardProfissional = lazy(() => import('./pages/DashboardProfissional')
 const Entrar = lazy(() => import('./pages/Entrar'));
 const Especialidades = lazy(() => import('./pages/Especialidades'));
 const Home = lazy(() => import('./pages/Home'));
+const LaudosMedicos = lazy(() => import('./pages/LaudosMedicos'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
 const PergunteEspecialista = lazy(() => import('./pages/PergunteEspecialista'));
@@ -31,6 +32,7 @@ export const PAGES = {
     "Entrar": Entrar,
     "Especialidades": Especialidades,
     "Home": Home,
+    "LaudosMedicos": LaudosMedicos,
     "Perfil": Perfil,
     "PerfilProfissional": PerfilProfissional,
     "PergunteEspecialista": PergunteEspecialista,
