@@ -24,6 +24,7 @@ const TABLE_MAP = {
   Review: 'reviews',
   Saque: 'saques',
   SolicitacaoExame: 'solicitacoes_exames',
+  ProfessionalOfficeLocation: 'professional_office_locations',
 };
 
 function createEntityProxy(tableName) {
