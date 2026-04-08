@@ -11,7 +11,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Switch } from "@/components/ui/switch";
 import {
   Loader2, Save, Lock, Camera, Plus, X, Globe, MapPin, ExternalLink,
-  AlertCircle, Search
+  AlertCircle, Search, CheckCircle2
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -47,6 +47,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
   const [tagInput, setTagInput] = useState('');
   const [addressSearch, setAddressSearch] = useState('');
   const [searchResults, setSearchResults] = useState([]);
+  const [isMapOpen, setIsMapOpen] = useState(false);
+  const [pendingMarker, setPendingMarker] = useState({ latitude: 0, longitude: 0 });
 
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ['avail-slots', professional?.id],
@@ -101,19 +103,26 @@ export default function MeuPerfil({ professional, publicProfile }) {
         longitude: existingOffice.longitude || 0,
         mapbox_place_id: existingOffice.mapbox_place_id || '',
       });
+      setPendingMarker({
+        latitude: existingOffice.latitude || 0,
+        longitude: existingOffice.longitude || 0,
+      });
     }
   }, [existingOffice]);
 
-  const mapCenter = officeForm.latitude && officeForm.longitude
-    ? [officeForm.longitude, officeForm.latitude]
+  const activeLatitude = pendingMarker.latitude || officeForm.latitude;
+  const activeLongitude = pendingMarker.longitude || officeForm.longitude;
+
+  const mapCenter = activeLatitude && activeLongitude
+    ? [activeLongitude, activeLatitude]
     : [-46.6333, -23.5505];
 
-  const mapMarkers = officeForm.latitude && officeForm.longitude
-    ? [{ lng: officeForm.longitude, lat: officeForm.latitude, popup: `<strong>${professional?.full_name}</strong><br/>${officeForm.formatted_address || officeForm.address_line}` }]
+  const mapMarkers = activeLatitude && activeLongitude
+    ? [{ lng: activeLongitude, lat: activeLatitude, popup: `<strong>${professional?.full_name}</strong><br/>${officeForm.formatted_address || officeForm.address_line}` }]
     : [];
 
   const handleMarkerDrag = useCallback(({ lat, lng }) => {
-    setOfficeForm(prev => ({ ...prev, latitude: lat, longitude: lng }));
+    setPendingMarker({ latitude: lat, longitude: lng });
   }, []);
 
   const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
@@ -135,8 +144,6 @@ export default function MeuPerfil({ professional, publicProfile }) {
     setOfficeForm(prev => ({
       ...prev,
       formatted_address: feature.place_name || '',
-      latitude: lat,
-      longitude: lng,
       mapbox_place_id: feature.id || '',
       address_line: feature.text || prev.address_line,
       number: feature.address || prev.number,
@@ -145,6 +152,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       state: ctx('region') || prev.state,
       postal_code: ctx('postcode') || prev.postal_code,
     }));
+    setPendingMarker({ latitude: lat, longitude: lng });
     setAddressSearch('');
     setSearchResults([]);
   }, []);
@@ -209,9 +217,71 @@ export default function MeuPerfil({ professional, publicProfile }) {
   };
 
   const needsLocation = form.modality === 'presencial' || form.modality === 'ambos';
+  const hasConfirmedCoordinates = Boolean(officeForm.latitude && officeForm.longitude);
+  const hasPendingCoordinates = Boolean(pendingMarker.latitude && pendingMarker.longitude);
+
+  const validateOfficeLocation = useCallback(() => {
+    if (!needsLocation) {
+      return null;
+    }
+
+    if (!officeForm.address_line || !officeForm.city || !officeForm.state) {
+      return 'Preencha rua, cidade e UF do consultorio.';
+    }
+
+    if (!officeForm.latitude || !officeForm.longitude) {
+      return 'Confirme o marcador no mapa antes de salvar o endereco.';
+    }
+
+    return null;
+  }, [needsLocation, officeForm.address_line, officeForm.city, officeForm.state, officeForm.latitude, officeForm.longitude]);
+
+  const officeMutation = useMutation({
+    mutationFn: async () => {
+      if (!publicProfile?.id) {
+        throw new Error('Perfil publico nao encontrado.');
+      }
+
+      const officeError = validateOfficeLocation();
+      if (officeError) {
+        throw new Error(officeError);
+      }
+
+      const publicOfficeUpdates = {
+        modality: form.modality,
+        office_city: needsLocation ? officeForm.city : '',
+        office_state: needsLocation ? officeForm.state : '',
+        office_address: needsLocation ? officeForm.formatted_address || officeForm.address_line : '',
+      };
+
+      await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, publicOfficeUpdates);
+
+      if (needsLocation) {
+        await saveOfficeLocation(publicProfile.id, officeForm);
+      } else {
+        await deleteOfficeLocation(publicProfile.id);
+      }
+
+      set('office_city', publicOfficeUpdates.office_city);
+      set('office_state', publicOfficeUpdates.office_state);
+      set('office_address', publicOfficeUpdates.office_address);
+    },
+    onSuccess: () => {
+      toast.success('Mapa e endereco salvos com sucesso.');
+      queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['professionals'] });
+      queryClient.invalidateQueries({ queryKey: ['office-location'] });
+    },
+    onError: (err) => toast.error(err?.message || 'Erro ao salvar mapa e endereco'),
+  });
 
   const saveMutation = useMutation({
     mutationFn: async () => {
+      const officeError = validateOfficeLocation();
+      if (officeError) {
+        throw new Error(officeError);
+      }
+
       // Validate location for presencial/ambos
       if (needsLocation) {
         if (!officeForm.address_line || !officeForm.city || !officeForm.state) {
@@ -485,7 +555,54 @@ export default function MeuPerfil({ professional, publicProfile }) {
                 </div>
               </div>
 
+              <div className="flex flex-wrap gap-2 pt-1">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsMapOpen((current) => !current)}
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                >
+                  <MapPin className="w-4 h-4 mr-2" />
+                  {isMapOpen ? 'Fechar mapa' : 'Abrir mapa'}
+                </Button>
+
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    if (!hasPendingCoordinates) {
+                      toast.error('Busque um endereco ou abra o mapa para escolher o marcador.');
+                      return;
+                    }
+
+                    setOfficeForm((prev) => ({
+                      ...prev,
+                      latitude: pendingMarker.latitude,
+                      longitude: pendingMarker.longitude,
+                    }));
+
+                    toast.success('Marcador confirmado para o consultorio.');
+                  }}
+                  disabled={!hasPendingCoordinates}
+                  className="border-sky-200 text-sky-700 hover:bg-sky-50"
+                >
+                  <CheckCircle2 className="w-4 h-4 mr-2" />
+                  Confirmar marcador
+                </Button>
+
+                <Button
+                  type="button"
+                  onClick={() => officeMutation.mutate()}
+                  disabled={officeMutation.isPending}
+                  className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                >
+                  {officeMutation.isPending ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                  Salvar mapa e endereco
+                </Button>
+              </div>
+
               {/* Map with draggable marker */}
+              {isMapOpen ? (
               <div className="mt-2">
                 <p className="text-xs text-gray-500 mb-2">Arraste o marcador para ajustar a posição exata do consultório</p>
                 <MapboxMap
@@ -497,14 +614,15 @@ export default function MeuPerfil({ professional, publicProfile }) {
                   onMarkerChange={handleMarkerDrag}
                 />
               </div>
+              ) : null}
 
-              {officeForm.latitude && officeForm.longitude ? (
+              {hasConfirmedCoordinates ? (
                 <p className="text-xs text-emerald-600 flex items-center gap-1">
                   <MapPin className="w-3 h-3" />
-                  Coordenadas: {officeForm.latitude.toFixed(5)}, {officeForm.longitude.toFixed(5)}
+                  Coordenadas confirmadas: {officeForm.latitude.toFixed(5)}, {officeForm.longitude.toFixed(5)}
                 </p>
-              ) : (
-                <p className="text-xs text-amber-600 flex items-center gap-1">
+              ) : hasPendingCoordinates ? (
+                <p className="text-xs text-sky-600 flex items-center gap-1">
                   <AlertCircle className="w-3 h-3" />
                   Busque o endereço acima para definir a localização no mapa
                 </p>
