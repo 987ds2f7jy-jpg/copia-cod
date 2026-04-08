@@ -7,15 +7,11 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Textarea } from "@/components/ui/textarea";
-import { Label } from "@/components/ui/label";
-import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Switch } from "@/components/ui/switch";
 import {
   Loader2, Save, Lock, Camera, Plus, X, Globe, MapPin, ExternalLink,
-  AlertCircle
+  AlertCircle, Search
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
@@ -23,6 +19,7 @@ import { createPageUrl } from '@/utils';
 import DisponibilidadeEditor from '@/components/dashboard/DisponibilidadeEditor';
 import MapboxMap from '@/components/map/MapboxMap';
 import { getOfficeLocation, saveOfficeLocation, deleteOfficeLocation } from '@/lib/officeLocations';
+
 const PATIENT_TYPES = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
 const MODALITIES = [
   { value: 'online', label: 'Online' },
@@ -76,22 +73,92 @@ export default function MeuPerfil({ professional, publicProfile }) {
     prioritario_ativo: publicProfile?.prioritario_ativo || professional?.prioritario_ativo || false,
   });
 
+  // Office location state
+  const [officeForm, setOfficeForm] = useState({
+    address_line: '', number: '', complement: '', neighborhood: '',
+    city: '', state: '', postal_code: '', formatted_address: '',
+    latitude: 0, longitude: 0, mapbox_place_id: '',
+  });
+
+  const { data: existingOffice } = useQuery({
+    queryKey: ['office-location', publicProfile?.id],
+    queryFn: () => getOfficeLocation(publicProfile.id),
+    enabled: !!publicProfile?.id,
+  });
+
+  useEffect(() => {
+    if (existingOffice) {
+      setOfficeForm({
+        address_line: existingOffice.address_line || '',
+        number: existingOffice.number || '',
+        complement: existingOffice.complement || '',
+        neighborhood: existingOffice.neighborhood || '',
+        city: existingOffice.city || '',
+        state: existingOffice.state || '',
+        postal_code: existingOffice.postal_code || '',
+        formatted_address: existingOffice.formatted_address || '',
+        latitude: existingOffice.latitude || 0,
+        longitude: existingOffice.longitude || 0,
+        mapbox_place_id: existingOffice.mapbox_place_id || '',
+      });
+    }
+  }, [existingOffice]);
+
+  const mapCenter = officeForm.latitude && officeForm.longitude
+    ? [officeForm.longitude, officeForm.latitude]
+    : [-46.6333, -23.5505];
+
+  const mapMarkers = officeForm.latitude && officeForm.longitude
+    ? [{ lng: officeForm.longitude, lat: officeForm.latitude, popup: `<strong>${professional?.full_name}</strong><br/>${officeForm.formatted_address || officeForm.address_line}` }]
+    : [];
+
+  const handleMarkerDrag = useCallback(({ lat, lng }) => {
+    setOfficeForm(prev => ({ ...prev, latitude: lat, longitude: lng }));
+  }, []);
+
+  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+
+  const searchAddress = useCallback(async (query) => {
+    if (!query || query.length < 3 || !MAPBOX_TOKEN) return;
+    try {
+      const res = await fetch(
+        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=BR&language=pt&access_token=${MAPBOX_TOKEN}&limit=5`
+      );
+      const data = await res.json();
+      setSearchResults(data.features || []);
+    } catch { setSearchResults([]); }
+  }, [MAPBOX_TOKEN]);
+
+  const selectAddress = useCallback((feature) => {
+    const [lng, lat] = feature.center;
+    const ctx = (type) => feature.context?.find(c => c.id.startsWith(type))?.text || '';
+    setOfficeForm(prev => ({
+      ...prev,
+      formatted_address: feature.place_name || '',
+      latitude: lat,
+      longitude: lng,
+      mapbox_place_id: feature.id || '',
+      address_line: feature.text || prev.address_line,
+      number: feature.address || prev.number,
+      neighborhood: ctx('neighborhood') || ctx('locality') || prev.neighborhood,
+      city: ctx('place') || prev.city,
+      state: ctx('region') || prev.state,
+      postal_code: ctx('postcode') || prev.postal_code,
+    }));
+    setAddressSearch('');
+    setSearchResults([]);
+  }, []);
+
+  const setOffice = (field, value) => setOfficeForm(prev => ({ ...prev, [field]: value }));
+
   const hasGranularAvailability = useMemo(
     () => availabilitySlots.length > 0,
     [availabilitySlots.length],
   );
 
-  // Validação para ativar perfil (só bloqueia na ativação, nunca na desativação)
   const validatePerfilAtivo = () => {
     const hasPrice = parseFloat(form.price_standard) > 0;
     const hasDays = form.available_days?.length > 0 || hasGranularAvailability;
-    console.log('[MeuPerfil] validar ativação:', {
-      price_standard: form.price_standard,
-      hasPrice,
-      available_days: form.available_days,
-      hasDays,
-      availability_slots_count: availabilitySlots.length,
-    });
     if (!hasPrice && !hasDays) return 'E necessario configurar valor da consulta e pelo menos um horario disponivel.';
     if (!hasPrice) return 'Defina o valor da consulta padrao antes de ativar.';
     if (!hasDays) return 'Configure sua disponibilidade antes de ativar.';
@@ -141,8 +208,20 @@ export default function MeuPerfil({ professional, publicProfile }) {
     set('patient_types', curr.includes(type) ? curr.filter(t => t !== type) : [...curr, type]);
   };
 
+  const needsLocation = form.modality === 'presencial' || form.modality === 'ambos';
+
   const saveMutation = useMutation({
     mutationFn: async () => {
+      // Validate location for presencial/ambos
+      if (needsLocation) {
+        if (!officeForm.address_line || !officeForm.city || !officeForm.state) {
+          throw new Error('Preencha rua, cidade e UF do consultório.');
+        }
+        if (!officeForm.latitude || !officeForm.longitude) {
+          throw new Error('Selecione a localização no mapa para definir as coordenadas.');
+        }
+      }
+
       const graduationYear = professional?.graduation_year || publicProfile?.graduation_year || 0;
       const priceStd = parseFloat(form.price_standard) || 0;
       const pricePri = parseFloat(form.price_priority) || 0;
@@ -154,9 +233,9 @@ export default function MeuPerfil({ professional, publicProfile }) {
         patient_types: form.patient_types,
         tags: form.tags,
         modality: form.modality,
-        office_city: form.office_city,
-        office_state: form.office_state,
-        office_address: form.office_address,
+        office_city: needsLocation ? officeForm.city : form.office_city,
+        office_state: needsLocation ? officeForm.state : form.office_state,
+        office_address: needsLocation ? officeForm.formatted_address || officeForm.address_line : form.office_address,
         gallery_urls: form.gallery_urls,
         price_standard: priceStd,
         price_priority: pricePri,
@@ -164,7 +243,6 @@ export default function MeuPerfil({ professional, publicProfile }) {
         available_hours: form.available_hours,
         perfil_ativo: form.perfil_ativo,
         prioritario_ativo: form.prioritario_ativo,
-        // Sync from private profile
         education: professional?.university || publicProfile?.education || '',
         graduation_year: graduationYear,
         rqe: professional?.rqe || publicProfile?.rqe || '',
@@ -185,14 +263,17 @@ export default function MeuPerfil({ professional, publicProfile }) {
         prioritario_ativo: form.prioritario_ativo,
       };
 
-      // Update ProfessionalProfile (private/admin)
-      await base44.entities.ProfessionalProfile.update(professional.id, {
-        ...privateUpdates,
-      });
+      await base44.entities.ProfessionalProfile.update(professional.id, privateUpdates);
 
-      // Update ProfessionalPublicProfile (public/professional autonomy)
       if (publicProfile?.id) {
         await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, publicUpdates);
+
+        // Save or delete office location
+        if (needsLocation) {
+          await saveOfficeLocation(publicProfile.id, officeForm);
+        } else {
+          await deleteOfficeLocation(publicProfile.id);
+        }
       }
     },
     onSuccess: () => {
@@ -200,6 +281,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       queryClient.invalidateQueries({ queryKey: ['myProfessionalProfile'] });
       queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] });
       queryClient.invalidateQueries({ queryKey: ['professionals'] });
+      queryClient.invalidateQueries({ queryKey: ['office-location'] });
     },
     onError: (err) => toast.error(err?.message || 'Erro ao salvar perfil'),
   });
@@ -334,14 +416,99 @@ export default function MeuPerfil({ professional, publicProfile }) {
               ))}
             </div>
           </div>
-          {(form.modality === 'presencial' || form.modality === 'ambos') && (
-            <div className="space-y-2 p-4 bg-gray-50 rounded-xl">
+          {needsLocation && (
+            <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
               <Label className="flex items-center gap-1"><MapPin className="w-3 h-3" />Endereço do consultório</Label>
-              <Input value={form.office_address} onChange={e => set('office_address', e.target.value)} placeholder="Rua, número, bairro" />
-              <div className="grid grid-cols-2 gap-2">
-                <Input value={form.office_city} onChange={e => set('office_city', e.target.value)} placeholder="Cidade" />
-                <Input value={form.office_state} onChange={e => set('office_state', e.target.value.toUpperCase())} placeholder="UF" maxLength={2} />
+
+              {/* Mapbox address search */}
+              <div className="relative">
+                <div className="flex gap-2">
+                  <div className="relative flex-1">
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Input
+                      value={addressSearch}
+                      onChange={e => { setAddressSearch(e.target.value); searchAddress(e.target.value); }}
+                      placeholder="Buscar endereço no mapa..."
+                      className="pl-9"
+                    />
+                  </div>
+                </div>
+                {searchResults.length > 0 && (
+                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                    {searchResults.map((feat) => (
+                      <button
+                        key={feat.id}
+                        onClick={() => selectAddress(feat)}
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                      >
+                        <span className="font-medium">{feat.text}</span>
+                        <span className="text-gray-400 ml-1 text-xs">{feat.place_name}</span>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
+
+              {/* Structured address fields */}
+              <div className="grid grid-cols-2 gap-2">
+                <div className="col-span-2 sm:col-span-1">
+                  <Label className="text-xs text-gray-500">Rua *</Label>
+                  <Input value={officeForm.address_line} onChange={e => setOffice('address_line', e.target.value)} placeholder="Rua / Avenida" />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Número</Label>
+                  <Input value={officeForm.number} onChange={e => setOffice('number', e.target.value)} placeholder="Nº" />
+                </div>
+              </div>
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">Complemento</Label>
+                  <Input value={officeForm.complement} onChange={e => setOffice('complement', e.target.value)} placeholder="Sala, andar..." />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">Bairro</Label>
+                  <Input value={officeForm.neighborhood} onChange={e => setOffice('neighborhood', e.target.value)} placeholder="Bairro" />
+                </div>
+              </div>
+              <div className="grid grid-cols-3 gap-2">
+                <div>
+                  <Label className="text-xs text-gray-500">Cidade *</Label>
+                  <Input value={officeForm.city} onChange={e => setOffice('city', e.target.value)} placeholder="Cidade" />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">UF *</Label>
+                  <Input value={officeForm.state} onChange={e => setOffice('state', e.target.value.toUpperCase())} placeholder="UF" maxLength={2} />
+                </div>
+                <div>
+                  <Label className="text-xs text-gray-500">CEP</Label>
+                  <Input value={officeForm.postal_code} onChange={e => setOffice('postal_code', e.target.value)} placeholder="00000-000" />
+                </div>
+              </div>
+
+              {/* Map with draggable marker */}
+              <div className="mt-2">
+                <p className="text-xs text-gray-500 mb-2">Arraste o marcador para ajustar a posição exata do consultório</p>
+                <MapboxMap
+                  center={mapCenter}
+                  zoom={15}
+                  markers={mapMarkers}
+                  height="250px"
+                  draggableMarker
+                  onMarkerChange={handleMarkerDrag}
+                />
+              </div>
+
+              {officeForm.latitude && officeForm.longitude ? (
+                <p className="text-xs text-emerald-600 flex items-center gap-1">
+                  <MapPin className="w-3 h-3" />
+                  Coordenadas: {officeForm.latitude.toFixed(5)}, {officeForm.longitude.toFixed(5)}
+                </p>
+              ) : (
+                <p className="text-xs text-amber-600 flex items-center gap-1">
+                  <AlertCircle className="w-3 h-3" />
+                  Busque o endereço acima para definir a localização no mapa
+                </p>
+              )}
             </div>
           )}
         </CardContent>
@@ -390,7 +557,6 @@ export default function MeuPerfil({ professional, publicProfile }) {
       <Card className="border-0 shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Controles de Visibilidade</CardTitle></CardHeader>
         <CardContent className="space-y-4">
-          {/* Perfil ativo */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-800">Perfil ativo na busca</p>
@@ -406,25 +572,17 @@ export default function MeuPerfil({ professional, publicProfile }) {
               checked={form.perfil_ativo}
               onCheckedChange={(v) => {
                 if (v) {
-                  // Validar ANTES de ativar
                   const err = validatePerfilAtivo();
-                  console.log('[MeuPerfil] tentando ativar, erro:', err);
-                  if (err) {
-                    setPerfilAtivoError(err);
-                    return; // bloquear
-                  }
+                  if (err) { setPerfilAtivoError(err); return; }
                   setPerfilAtivoError(null);
                 } else {
-                  // Desativar: sem validação
                   setPerfilAtivoError(null);
-                  console.log('[MeuPerfil] desativando perfil');
                 }
                 set('perfil_ativo', v);
               }}
               className="mt-0.5"
             />
           </div>
-          {/* Consulta prioritária */}
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
               <p className="text-sm font-medium text-gray-800">Consulta prioritária disponível</p>
