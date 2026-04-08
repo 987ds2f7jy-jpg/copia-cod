@@ -48,6 +48,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
   const [uploading, setUploading] = useState(false);
   const [uploadingGallery, setUploadingGallery] = useState(false);
   const [tagInput, setTagInput] = useState('');
+  const [addressSearch, setAddressSearch] = useState('');
+  const [searchResults, setSearchResults] = useState([]);
 
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ['avail-slots', professional?.id],
