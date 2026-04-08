@@ -1,20 +1,25 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
 
 const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
+interface MarkerData {
+  lng: number;
+  lat: number;
+  popup?: string;
+}
+
 interface MapboxMapProps {
   center?: [number, number];
   zoom?: number;
-  markers?: Array<{
-    lng: number;
-    lat: number;
-    popup?: string;
-  }>;
+  markers?: MarkerData[];
   height?: string;
   width?: string;
+  interactive?: boolean;
+  draggableMarker?: boolean;
+  onMarkerChange?: (coords: { lat: number; lng: number }) => void;
 }
 
 export default function MapboxMap({
@@ -23,10 +28,17 @@ export default function MapboxMap({
   markers = [],
   height = '400px',
   width = '100%',
+  interactive = true,
+  draggableMarker = false,
+  onMarkerChange,
 }: MapboxMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<mapboxgl.Map | null>(null);
+  const markersRef = useRef<mapboxgl.Marker[]>([]);
+  const onMarkerChangeRef = useRef(onMarkerChange);
+  onMarkerChangeRef.current = onMarkerChange;
 
+  // Initialize map
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
@@ -36,22 +48,50 @@ export default function MapboxMap({
       center,
       zoom,
       attributionControl: false,
-    });
-
-    markers.forEach((marker) => {
-      const m = new mapboxgl.Marker()
-        .setLngLat([marker.lng, marker.lat]);
-      if (marker.popup) {
-        m.setPopup(new mapboxgl.Popup().setHTML(marker.popup));
-      }
-      m.addTo(map.current!);
+      interactive,
     });
 
     return () => {
       map.current?.remove();
       map.current = null;
     };
-  }, [center, zoom, markers]);
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-  return <div ref={mapContainer} style={{ height, width }} />;
+  // Update center
+  useEffect(() => {
+    if (map.current) {
+      map.current.flyTo({ center, zoom, duration: 800 });
+    }
+  }, [center[0], center[1], zoom]);
+
+  // Update markers
+  useEffect(() => {
+    // Clear old markers
+    markersRef.current.forEach(m => m.remove());
+    markersRef.current = [];
+
+    if (!map.current) return;
+
+    markers.forEach((markerData) => {
+      const m = new mapboxgl.Marker({ draggable: draggableMarker })
+        .setLngLat([markerData.lng, markerData.lat]);
+
+      if (markerData.popup) {
+        m.setPopup(new mapboxgl.Popup({ offset: 25 }).setHTML(markerData.popup));
+      }
+
+      if (draggableMarker) {
+        m.on('dragend', () => {
+          const lngLat = m.getLngLat();
+          onMarkerChangeRef.current?.({ lat: lngLat.lat, lng: lngLat.lng });
+        });
+      }
+
+      m.addTo(map.current!);
+      markersRef.current.push(m);
+    });
+  }, [markers, draggableMarker]);
+
+  return <div ref={mapContainer} style={{ height, width, borderRadius: '12px' }} />;
 }

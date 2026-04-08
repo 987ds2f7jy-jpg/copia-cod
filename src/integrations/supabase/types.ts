@@ -398,6 +398,83 @@ export type Database = {
         }
         Relationships: []
       }
+      professional_office_locations: {
+        Row: {
+          address_line: string
+          city: string
+          complement: string | null
+          country: string | null
+          created_date: string
+          formatted_address: string | null
+          geocoded_at: string | null
+          id: string
+          is_primary: boolean | null
+          is_public: boolean | null
+          label: string | null
+          latitude: number
+          longitude: number
+          mapbox_place_id: string | null
+          neighborhood: string | null
+          number: string | null
+          postal_code: string | null
+          professional_public_profile_id: string
+          state: string
+          updated_at: string
+        }
+        Insert: {
+          address_line: string
+          city: string
+          complement?: string | null
+          country?: string | null
+          created_date?: string
+          formatted_address?: string | null
+          geocoded_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_public?: boolean | null
+          label?: string | null
+          latitude: number
+          longitude: number
+          mapbox_place_id?: string | null
+          neighborhood?: string | null
+          number?: string | null
+          postal_code?: string | null
+          professional_public_profile_id: string
+          state: string
+          updated_at?: string
+        }
+        Update: {
+          address_line?: string
+          city?: string
+          complement?: string | null
+          country?: string | null
+          created_date?: string
+          formatted_address?: string | null
+          geocoded_at?: string | null
+          id?: string
+          is_primary?: boolean | null
+          is_public?: boolean | null
+          label?: string | null
+          latitude?: number
+          longitude?: number
+          mapbox_place_id?: string | null
+          neighborhood?: string | null
+          number?: string | null
+          postal_code?: string | null
+          professional_public_profile_id?: string
+          state?: string
+          updated_at?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "professional_office_locations_professional_public_profile__fkey"
+            columns: ["professional_public_profile_id"]
+            isOneToOne: false
+            referencedRelation: "professional_public_profiles"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
       professional_profiles: {
         Row: {
           available_days: string[] | null

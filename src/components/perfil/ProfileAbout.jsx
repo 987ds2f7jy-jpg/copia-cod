@@ -1,9 +1,21 @@
 import React from 'react';
 import { GraduationCap, Award, Briefcase, Users, Tag, MapPin, Building2 } from 'lucide-react';
 import { Badge } from '@/components/ui/badge';
+import { useQuery } from '@tanstack/react-query';
+import { getOfficeLocation } from '@/lib/officeLocations';
+import MapboxMap from '@/components/map/MapboxMap';
 
 export default function ProfileAbout({ professional }) {
   const hasOffice = professional.office_address || professional.office_city;
+  const showMap = professional.modality === 'presencial' || professional.modality === 'ambos';
+
+  const { data: officeLocation } = useQuery({
+    queryKey: ['office-location', professional.id],
+    queryFn: () => getOfficeLocation(professional.id),
+    enabled: !!professional.id && showMap,
+  });
+
+  const hasCoords = officeLocation?.latitude && officeLocation?.longitude;
 
   return (
     <div className="bg-white rounded-2xl shadow-sm p-6">
@@ -90,8 +102,48 @@ export default function ProfileAbout({ professional }) {
         </div>
       )}
 
-      {/* Physical office */}
-      {hasOffice && (
+      {/* Physical office with map */}
+      {hasOffice && showMap && (
+        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+          <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2">
+            <MapPin className="w-4 h-4 text-emerald-600" />
+            Consultório Físico
+          </p>
+          {officeLocation?.formatted_address ? (
+            <p className="text-sm text-gray-700">{officeLocation.formatted_address}</p>
+          ) : (
+            <>
+              {professional.office_address && (
+                <p className="text-sm text-gray-700">{professional.office_address}</p>
+              )}
+              {(professional.office_city || professional.office_state) && (
+                <p className="text-sm text-gray-600 mt-0.5">
+                  {[professional.office_city, professional.office_state].filter(Boolean).join(' – ')}
+                </p>
+              )}
+            </>
+          )}
+
+          {hasCoords && (
+            <div className="mt-3">
+              <MapboxMap
+                center={[officeLocation.longitude, officeLocation.latitude]}
+                zoom={15}
+                markers={[{
+                  lng: officeLocation.longitude,
+                  lat: officeLocation.latitude,
+                  popup: `<strong>${professional.full_name}</strong><br/>${professional.specialty || ''}<br/>${officeLocation.formatted_address || professional.office_address || ''}`,
+                }]}
+                height="200px"
+                interactive={false}
+              />
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* Fallback: office without map (online-only with address set) */}
+      {hasOffice && !showMap && (
         <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
           <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2">
             <MapPin className="w-4 h-4 text-emerald-600" />
