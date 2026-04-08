@@ -37,9 +37,11 @@ export default function MapboxMap({
   const markersRef = useRef<mapboxgl.Marker[]>([]);
   const onMarkerChangeRef = useRef(onMarkerChange);
   onMarkerChangeRef.current = onMarkerChange;
+  const canRenderMap = Boolean(MAPBOX_TOKEN);
 
   // Initialize map
   useEffect(() => {
+    if (!canRenderMap) return;
     if (!mapContainer.current || map.current) return;
 
     map.current = new mapboxgl.Map({
@@ -56,17 +58,19 @@ export default function MapboxMap({
       map.current = null;
     };
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [canRenderMap]);
 
   // Update center
   useEffect(() => {
+    if (!canRenderMap) return;
     if (map.current) {
       map.current.flyTo({ center, zoom, duration: 800 });
     }
-  }, [center[0], center[1], zoom]);
+  }, [canRenderMap, center[0], center[1], zoom]);
 
   // Update markers
   useEffect(() => {
+    if (!canRenderMap) return;
     // Clear old markers
     markersRef.current.forEach(m => m.remove());
     markersRef.current = [];
@@ -91,7 +95,18 @@ export default function MapboxMap({
       m.addTo(map.current!);
       markersRef.current.push(m);
     });
-  }, [markers, draggableMarker]);
+  }, [canRenderMap, markers, draggableMarker]);
+
+  if (!canRenderMap) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-xl border border-dashed border-amber-200 bg-amber-50 px-4 py-6 text-center text-sm text-amber-700"
+        style={{ height, width }}
+      >
+        Configure `VITE_MAPBOX_TOKEN` para habilitar o mapa do consultorio.
+      </div>
+    );
+  }
 
   return <div ref={mapContainer} style={{ height, width, borderRadius: '12px' }} />;
 }
