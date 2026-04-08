@@ -21,6 +21,8 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import DisponibilidadeEditor from '@/components/dashboard/DisponibilidadeEditor';
+import MapboxMap from '@/components/map/MapboxMap';
+import { getOfficeLocation, saveOfficeLocation, deleteOfficeLocation } from '@/lib/officeLocations';
 const PATIENT_TYPES = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
 const MODALITIES = [
   { value: 'online', label: 'Online' },
