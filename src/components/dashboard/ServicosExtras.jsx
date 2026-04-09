@@ -50,20 +50,15 @@ async function loadPatientLookup(pacienteIds) {
 
   const results = await Promise.all(
     uniqueIds.map(async (patientId) => {
-      const [appUsers, latestProntuarios] = await Promise.all([
-        base44.entities.AppUser.filter({ id: patientId }, undefined, 1),
-        base44.entities.Prontuario.filter({ paciente_id: patientId }, '-created_date', 1),
-      ]);
-
-      const appUser = appUsers?.[0] || null;
+      const latestProntuarios = await base44.entities.Prontuario.filter(
+        { paciente_id: patientId },
+        '-created_date',
+        1,
+      );
       const latestProntuario = latestProntuarios?.[0] || null;
 
-      if (!appUser) {
-        return null;
-      }
-
       return {
-        ...appUser,
+        id: patientId,
         doencas_previas: latestProntuario?.historico_risco || '',
       };
     }),

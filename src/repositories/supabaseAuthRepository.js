@@ -10,6 +10,20 @@ export const supabaseAuthRepository = {
     return env.enableSupabaseAuth;
   },
 
+  async getSession() {
+    if (!this.isEnabled()) {
+      return null;
+    }
+
+    const { data, error } = await supabase.auth.getSession();
+
+    if (error) {
+      throw error;
+    }
+
+    return data.session || null;
+  },
+
   async getUser() {
     if (!this.isEnabled()) {
       return null;
@@ -41,17 +55,14 @@ export const supabaseAuthRepository = {
     return data;
   },
 
-  async signUp({ email, password, metadata = {} }) {
+  async setSession({ accessToken, refreshToken }) {
     if (!this.isEnabled()) {
       return null;
     }
 
-    const { data, error } = await supabase.auth.signUp({
-      email: normalizeEmail(email),
-      password,
-      options: {
-        data: metadata,
-      },
+    const { data, error } = await supabase.auth.setSession({
+      access_token: accessToken,
+      refresh_token: refreshToken,
     });
 
     if (error) {

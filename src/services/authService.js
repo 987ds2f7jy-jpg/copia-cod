@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { appUserRepository } from '@/repositories/appUserRepository';
+import accountApi from '@/client-api/account';
 import { supabaseAuthRepository } from '@/repositories/supabaseAuthRepository';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
@@ -13,10 +13,35 @@ const registerSchema = z.object({
   full_name: z.string().trim().min(3, 'Nome completo obrigatorio.'),
   email: z.string().trim().email('Email invalido.'),
   password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres.'),
-  role: z.enum(['patient', 'professional', 'admin']).default('patient'),
+  role: z.enum(['patient', 'professional']).default('patient'),
 }).passthrough();
 
-const VALID_ROLES = new Set(['patient', 'professional', 'admin']);
+function normalizeEmail(email) {
+  return email?.toLowerCase().trim() || '';
+}
+
+function toUiUser(accountUser) {
+  if (!accountUser?.id) {
+    return null;
+  }
+
+  return {
+    id: accountUser.id,
+    auth_user_id: accountUser.authUserId || '',
+    full_name: accountUser.fullName || '',
+    email: normalizeEmail(accountUser.email),
+    role: accountUser.role || 'patient',
+    is_active: accountUser.isActive !== false,
+    phone: accountUser.phone || '',
+    cpf: accountUser.cpf || '',
+    birth_date: accountUser.birthDate || '',
+    sex: accountUser.sex || '',
+    address: accountUser.address || '',
+    city: accountUser.city || '',
+    state: accountUser.state || '',
+    profile_complete: Boolean(accountUser.profileComplete),
+  };
+}
 
 function ensureActiveUser(user) {
   if (!user) {
@@ -40,175 +65,113 @@ function ensureActiveUser(user) {
   return user;
 }
 
-function normalizeRole(value, fallback = 'patient') {
-  return VALID_ROLES.has(value) ? value : fallback;
+function normalizeAccountError(error, fallbackMessage) {
+  return normalizeError(error, fallbackMessage);
 }
 
-function resolveFullName(authUser, existingUser, fallbackData = {}) {
-  const metadata = authUser?.user_metadata || {};
-  const explicitName = fallbackData.full_name?.trim();
-  const metadataName = metadata.full_name?.trim() || metadata.name?.trim();
-
-  return (
-    explicitName ||
-    existingUser?.full_name ||
-    metadataName ||
-    authUser?.email?.split('@')?.[0] ||
-    'Usuario'
-  );
-}
-
-function resolveRole(authUser, existingUser, fallbackData = {}) {
-  if (fallbackData.role) {
-    return normalizeRole(fallbackData.role, 'patient');
-  }
-
-  if (existingUser?.role) {
-    return normalizeRole(existingUser.role, 'patient');
-  }
-
-  return normalizeRole(authUser?.user_metadata?.role, 'patient');
-}
-
-function buildAppUserPayload({ authUser, existingUser = null, fallbackData = {} }) {
-  const normalizedEmail = appUserRepository.normalizeEmail(
-    fallbackData.email || authUser?.email || existingUser?.email,
-  );
-
-  if (!authUser?.id || !normalizedEmail) {
-    throw new AppError({
-      message: 'Usuario autenticado invalido para vinculo com app_users.',
-      userMessage: 'Nao foi possivel identificar a conta autenticada.',
-      status: 401,
-      code: 'AUTH_USER_INVALID',
-    });
-  }
-
+function mapRegisterPayload(registrationData) {
   return {
-    full_name: resolveFullName(authUser, existingUser, fallbackData),
-    email: normalizedEmail,
-    role: resolveRole(authUser, existingUser, fallbackData),
-    is_active: existingUser?.is_active ?? true,
-    phone: fallbackData.phone ?? existingUser?.phone ?? '',
-    cpf: fallbackData.cpf ?? existingUser?.cpf ?? '',
-    birth_date: fallbackData.birth_date ?? existingUser?.birth_date ?? '',
-    sex: fallbackData.sex ?? existingUser?.sex ?? '',
-    address: fallbackData.address ?? existingUser?.address ?? '',
-    city: fallbackData.city ?? existingUser?.city ?? '',
-    state: fallbackData.state ?? existingUser?.state ?? '',
-    auth_user_id: authUser.id,
+    fullName: registrationData.full_name.trim(),
+    email: normalizeEmail(registrationData.email),
+    password: registrationData.password,
+    role: registrationData.role,
+    phone: registrationData.phone?.trim() || '',
+    cpf: registrationData.cpf?.trim() || '',
+    birthDate: registrationData.birth_date?.trim() || '',
+    sex: registrationData.sex?.trim() || '',
+    address: registrationData.address?.trim() || '',
+    city: registrationData.city?.trim() || '',
+    state: registrationData.state?.trim().toUpperCase() || '',
   };
 }
 
-async function ensureAppUserLinked(authUser, fallbackData = {}) {
-  const normalizedEmail = appUserRepository.normalizeEmail(
-    fallbackData.email || authUser?.email,
-  );
+function sanitizeProfilePayload(data = {}) {
+  const payload = {};
+  const hasOwn = (key) => Object.prototype.hasOwnProperty.call(data, key);
 
-  const existingUser = await appUserRepository.findBySupabaseIdentity({
-    authUserId: authUser?.id,
-    email: normalizedEmail,
-  });
-  const payload = buildAppUserPayload({
-    authUser,
-    existingUser,
-    fallbackData: {
-      ...fallbackData,
-      email: normalizedEmail,
-    },
-  });
+  if (hasOwn('full_name')) {
+    const fullName = String(data.full_name ?? '').trim();
 
-  if (existingUser?.id) {
-    const updatedUser = await appUserRepository.update(existingUser.id, payload);
-    const linkedUser = updatedUser || { ...existingUser, ...payload };
-
-    if (linkedUser.auth_user_id !== authUser.id) {
+    if (fullName && fullName.length < 3) {
       throw new AppError({
-        message: 'Falha ao sincronizar auth_user_id com app_users.',
-        userMessage: 'Nao foi possivel vincular a conta autenticada ao perfil da aplicacao.',
-        status: 500,
-        code: 'AUTH_USER_LINK_FAILED',
+        message: 'Nome completo invalido.',
+        userMessage: 'Informe um nome completo valido.',
+        status: 400,
+        code: 'FULL_NAME_INVALID',
       });
     }
 
-    return ensureActiveUser(linkedUser);
+    payload.fullName = fullName;
   }
 
-  const createdUser = await appUserRepository.create(payload);
-
-  if (!createdUser?.id || createdUser.auth_user_id !== authUser.id) {
-    throw new AppError({
-      message: 'Falha ao criar app_users vinculado ao usuario autenticado.',
-      userMessage: 'Nao foi possivel concluir a criacao do perfil da aplicacao.',
-      status: 500,
-      code: 'APP_USER_CREATE_FAILED',
-    });
+  if (hasOwn('phone')) {
+    payload.phone = String(data.phone ?? '').trim();
   }
 
-  return ensureActiveUser(createdUser);
+  if (hasOwn('cpf')) {
+    payload.cpf = String(data.cpf ?? '').trim();
+  }
+
+  if (hasOwn('birth_date')) {
+    payload.birthDate = String(data.birth_date ?? '').trim();
+  }
+
+  if (hasOwn('sex')) {
+    payload.sex = String(data.sex ?? '').trim();
+  }
+
+  if (hasOwn('address')) {
+    payload.address = String(data.address ?? '').trim();
+  }
+
+  if (hasOwn('city')) {
+    payload.city = String(data.city ?? '').trim();
+  }
+
+  if (hasOwn('state')) {
+    payload.state = String(data.state ?? '').trim().toUpperCase();
+  }
+
+  return payload;
 }
 
-async function restoreFromSupabaseSession() {
-  if (!supabaseAuthRepository.isEnabled()) {
-    return null;
-  }
-
-  const authUser = await supabaseAuthRepository.getUser();
-
-  if (!authUser) {
-    return null;
-  }
-
-  return ensureAppUserLinked(authUser);
+async function syncAccountFromSession(payload = undefined) {
+  const result = await accountApi.bootstrapAppUserRequest(payload || {});
+  return ensureActiveUser(toUiUser(result?.appUser || null));
 }
 
-function buildAuthMetadata(registrationData) {
-  return {
-    full_name: registrationData.full_name.trim(),
-    role: registrationData.role,
-  };
-}
-
-async function ensureAuthenticatedSignupSession({ authData, registrationData }) {
-  if (authData?.session) {
-    return authData;
+async function clearInactiveSession(error, stage) {
+  if (error?.code !== 'ACCOUNT_INACTIVE') {
+    return;
   }
 
   try {
-    return await supabaseAuthRepository.signIn({
-      email: registrationData.email,
-      password: registrationData.password,
-    });
-  } catch (error) {
-    throw new AppError({
-      message: 'Cadastro criado sem sessao autenticada.',
-      userMessage: 'Conta criada, mas a sessao nao foi iniciada automaticamente. Tente entrar para continuar.',
-      status: 409,
-      code: 'AUTH_SESSION_NOT_CREATED',
-      cause: error,
+    await supabaseAuthRepository.signOut();
+  } catch (signOutError) {
+    logUiWarning('auth', {
+      stage,
+      error: serializeError(signOutError),
     });
   }
 }
 
 export const authService = {
   async restoreSession() {
-    try {
-      return await restoreFromSupabaseSession();
-    } catch (error) {
-      if (error?.code === 'ACCOUNT_INACTIVE') {
-        try {
-          await supabaseAuthRepository.signOut();
-        } catch (signOutError) {
-          logUiWarning('auth', {
-            stage: 'restore-signout-inactive',
-            error: serializeError(signOutError),
-          });
-        }
+    if (!supabaseAuthRepository.isEnabled()) {
+      return null;
+    }
 
+    try {
+      const session = await supabaseAuthRepository.getSession();
+
+      if (!session?.access_token) {
         return null;
       }
 
-      throw normalizeError(error, 'Nao foi possivel restaurar a sessao.');
+      return await syncAccountFromSession();
+    } catch (error) {
+      await clearInactiveSession(error, 'restore-signout-inactive');
+      throw normalizeAccountError(error, 'Nao foi possivel restaurar a sessao.');
     }
   },
 
@@ -216,32 +179,11 @@ export const authService = {
     const credentials = loginSchema.parse({ email, password });
 
     try {
-      const authData = await supabaseAuthRepository.signIn(credentials);
-      const authUser = authData?.user || await supabaseAuthRepository.getUser();
-
-      if (!authUser) {
-        throw new AppError({
-          message: 'Usuario autenticado nao retornado pelo Supabase.',
-          userMessage: 'Nao foi possivel concluir o login.',
-          status: 401,
-          code: 'AUTH_USER_MISSING',
-        });
-      }
-
-      return await ensureAppUserLinked(authUser);
+      await supabaseAuthRepository.signIn(credentials);
+      return await syncAccountFromSession();
     } catch (error) {
-      if (error?.code === 'ACCOUNT_INACTIVE') {
-        try {
-          await supabaseAuthRepository.signOut();
-        } catch (signOutError) {
-          logUiWarning('auth', {
-            stage: 'login-signout-inactive',
-            error: serializeError(signOutError),
-          });
-        }
-      }
-
-      throw normalizeError(error, 'Nao foi possivel realizar o login.');
+      await clearInactiveSession(error, 'login-signout-inactive');
+      throw normalizeAccountError(error, 'Nao foi possivel realizar o login.');
     }
   },
 
@@ -249,45 +191,27 @@ export const authService = {
     const registrationData = registerSchema.parse(payload);
 
     try {
-      const existingUser = await appUserRepository.findByEmail(registrationData.email);
+      const result = await accountApi.bootstrapAppUserRequest(
+        mapRegisterPayload(registrationData),
+      );
 
-      if (existingUser?.auth_user_id) {
+      if (!result?.session?.accessToken || !result?.session?.refreshToken) {
         throw new AppError({
-          message: 'Este email ja esta cadastrado.',
-          userMessage: 'Este email ja esta cadastrado.',
+          message: 'Cadastro criado sem sessao autenticada.',
+          userMessage: 'Conta criada, mas a sessao nao foi iniciada automaticamente. Tente entrar para continuar.',
           status: 409,
-          code: 'EMAIL_ALREADY_IN_USE',
+          code: 'AUTH_SESSION_NOT_CREATED',
         });
       }
 
-      const signUpData = await supabaseAuthRepository.signUp({
-        email: registrationData.email,
-        password: registrationData.password,
-        metadata: buildAuthMetadata(registrationData),
+      await supabaseAuthRepository.setSession({
+        accessToken: result.session.accessToken,
+        refreshToken: result.session.refreshToken,
       });
-      const authData = await ensureAuthenticatedSignupSession({
-        authData: signUpData,
-        registrationData,
-      });
-      const authUser = authData?.user || signUpData?.user;
 
-      if (!authUser?.id) {
-        throw new AppError({
-          message: 'Supabase Auth nao retornou o usuario criado.',
-          userMessage: 'Nao foi possivel concluir o cadastro.',
-          status: 500,
-          code: 'AUTH_SIGNUP_INCOMPLETE',
-        });
-      }
-
-      return await ensureAppUserLinked(authUser, {
-        ...registrationData,
-        full_name: registrationData.full_name.trim(),
-        email: registrationData.email,
-        role: registrationData.role,
-      });
+      return ensureActiveUser(toUiUser(result.appUser || null));
     } catch (error) {
-      throw normalizeError(error, 'Nao foi possivel concluir o cadastro.');
+      throw normalizeAccountError(error, 'Nao foi possivel concluir o cadastro.');
     }
   },
 
@@ -304,25 +228,55 @@ export const authService = {
         error: serializeError(error),
       });
 
-      throw normalizeError(error, 'Nao foi possivel encerrar a sessao.');
+      throw normalizeAccountError(error, 'Nao foi possivel encerrar a sessao.');
     }
   },
 
-  async refreshUser(userId) {
-    if (!userId) {
-      return null;
-    }
+  async refreshUser() {
+    try {
+      const session = await supabaseAuthRepository.getSession();
 
-    const user = await appUserRepository.findById(userId);
-    return ensureActiveUser(user);
+      if (!session?.access_token) {
+        return null;
+      }
+
+      return await syncAccountFromSession();
+    } catch (error) {
+      await clearInactiveSession(error, 'refresh-signout-inactive');
+      throw normalizeAccountError(error, 'Nao foi possivel atualizar o usuario.');
+    }
   },
 
-  async updateUser(userId, data) {
-    if (!userId) {
-      return null;
+  async updateUser(data) {
+    try {
+      const payload = sanitizeProfilePayload(data);
+
+      if (Object.keys(payload).length === 0) {
+        return await this.refreshUser();
+      }
+
+      const result = await accountApi.updateMyProfileRequest(payload);
+      return ensureActiveUser(toUiUser(result?.appUser || null));
+    } catch (error) {
+      throw normalizeAccountError(error, 'Nao foi possivel atualizar os dados do usuario.');
+    }
+  },
+
+  async deactivateAccount() {
+    try {
+      await accountApi.deactivateAccountRequest();
+    } catch (error) {
+      throw normalizeAccountError(error, 'Nao foi possivel desativar a conta.');
     }
 
-    return appUserRepository.update(userId, data);
+    try {
+      await supabaseAuthRepository.signOut();
+    } catch (error) {
+      logUiWarning('auth', {
+        stage: 'deactivate-local-signout',
+        error: serializeError(error),
+      });
+    }
   },
 
   subscribeToAuthChanges(listener) {

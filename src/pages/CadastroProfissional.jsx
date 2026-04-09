@@ -181,13 +181,14 @@ export default function CadastroProfissional() {
             sex: data.sex,
           });
         } else {
-          await base44.entities.AppUser.update(currentUser.id, {
+          currentUser = {
+            ...currentUser,
             role: 'professional',
             full_name: data.full_name,
             phone: data.phone,
             cpf: data.cpf,
             sex: data.sex,
-          });
+          };
         }
 
       const graduationYear = parseInt(data.graduation_year) || 0;

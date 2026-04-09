@@ -11,6 +11,11 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
+  const clearClientState = useCallback(() => {
+    setUser(null);
+    queryClient.clear();
+  }, [queryClient]);
+
   useEffect(() => {
     let isMounted = true;
 
@@ -86,32 +91,28 @@ export function AuthProvider({ children }) {
     }
 
     await authService.logout();
-    setUser(null);
-    queryClient.clear();
+    clearClientState();
     window.location.href = '/';
-  }, [queryClient, user]);
+  }, [clearClientState, user]);
 
-  const refreshUser = useCallback(async (targetUserId = user?.id) => {
-    if (!targetUserId) {
-      return null;
-    }
-
-    const updatedUser = await authService.refreshUser(targetUserId);
+  const refreshUser = useCallback(async () => {
+    const updatedUser = await authService.refreshUser();
 
     if (updatedUser) {
       setUser(updatedUser);
       return updatedUser;
     }
 
-    return user;
-  }, [user]);
+    setUser(null);
+    return null;
+  }, []);
 
   const updateUser = useCallback(async (data) => {
-    if (!user?.id) {
+    if (!user) {
       return null;
     }
 
-    const updatedUser = await authService.updateUser(user.id, data);
+    const updatedUser = await authService.updateUser(data);
 
     if (updatedUser) {
       setUser(updatedUser);
@@ -120,6 +121,20 @@ export function AuthProvider({ children }) {
 
     return null;
   }, [user]);
+
+  const deactivateAccount = useCallback(async () => {
+    if (user?.role === 'professional' && user?.id) {
+      try {
+        await resetProfessionalDutyForUser(user.id);
+      } catch {
+        // Best effort only. Deactivation must still complete.
+      }
+    }
+
+    await authService.deactivateAccount();
+    clearClientState();
+    window.location.href = '/';
+  }, [clearClientState, user]);
 
   const redirectToLogin = useCallback((next) => {
     if (next) {
@@ -140,6 +155,7 @@ export function AuthProvider({ children }) {
         logout,
         refreshUser,
         updateUser,
+        deactivateAccount,
         redirectToLogin,
       }}
     >

@@ -1,10 +1,7 @@
-import { base44 } from '@/api/base44Client';
+import { AppError } from '@/lib/errors';
 
 const APP_USER_ALLOWED_FIELDS = new Set([
   'full_name',
-  'email',
-  'role',
-  'is_active',
   'phone',
   'cpf',
   'birth_date',
@@ -12,15 +9,42 @@ const APP_USER_ALLOWED_FIELDS = new Set([
   'address',
   'city',
   'state',
-  'auth_user_id',
 ]);
 
-function firstOrNull(items) {
-  return Array.isArray(items) && items.length > 0 ? items[0] : null;
+function createDeprecatedRepositoryError(methodName) {
+  return new AppError({
+    message: `appUserRepository.${methodName} is deprecated.`,
+    userMessage: 'Acesso direto a app_users no frontend foi removido. Use src/client-api/account.js.',
+    code: 'APP_USER_REPOSITORY_DEPRECATED',
+    status: 500,
+  });
 }
 
-function normalizeEmail(email) {
-  return email?.toLowerCase().trim() || '';
+function normalizeOptionalString(value) {
+  return value == null ? '' : String(value).trim();
+}
+
+function mapAccountUser(accountUser) {
+  if (!accountUser?.id) {
+    return null;
+  }
+
+  return {
+    id: accountUser.id,
+    auth_user_id: accountUser.authUserId || '',
+    full_name: accountUser.fullName || '',
+    email: normalizeEmail(accountUser.email),
+    role: accountUser.role || 'patient',
+    is_active: accountUser.isActive !== false,
+    phone: accountUser.phone || '',
+    cpf: accountUser.cpf || '',
+    birth_date: accountUser.birthDate || '',
+    sex: accountUser.sex || '',
+    address: accountUser.address || '',
+    city: accountUser.city || '',
+    state: accountUser.state || '',
+    profile_complete: Boolean(accountUser.profileComplete),
+  };
 }
 
 function sanitizeAppUserPayload(data = {}) {
@@ -29,73 +53,47 @@ function sanitizeAppUserPayload(data = {}) {
       return payload;
     }
 
-    payload[key] = key === 'email' ? normalizeEmail(value) : value;
+    payload[key] = normalizeOptionalString(value);
     return payload;
   }, {});
 }
 
+async function throwDeprecatedRepositoryError(methodName) {
+  throw createDeprecatedRepositoryError(methodName);
+}
+
 export const appUserRepository = {
   normalizeEmail,
+  sanitizeAppUserPayload,
+  mapAccountUser,
 
-  async findById(id) {
-    if (!id) {
-      return null;
-    }
-
-    try {
-      return await base44.entities.AppUser.get(id);
-    } catch (error) {
-      if (error?.status === 406) {
-        return null;
-      }
-
-      throw error;
-    }
+  async findById() {
+    return throwDeprecatedRepositoryError('findById');
   },
 
-  async findByEmail(email) {
-    const normalizedEmail = normalizeEmail(email);
-
-    if (!normalizedEmail) {
-      return null;
-    }
-
-    const results = await base44.entities.AppUser.filter({ email: normalizedEmail }, undefined, 1);
-    return firstOrNull(results);
+  async findByEmail() {
+    return throwDeprecatedRepositoryError('findByEmail');
   },
 
-  async findByAuthUserId(authUserId) {
-    if (!authUserId) {
-      return null;
-    }
-
-    const results = await base44.entities.AppUser.filter({ auth_user_id: authUserId }, undefined, 1);
-    return firstOrNull(results);
+  async findByAuthUserId() {
+    return throwDeprecatedRepositoryError('findByAuthUserId');
   },
 
-  async findBySupabaseIdentity({ authUserId, email }) {
-    if (authUserId) {
-      const user = await this.findByAuthUserId(authUserId);
-
-      if (user) {
-        return user;
-      }
-    }
-
-    return this.findByEmail(email);
+  async findBySupabaseIdentity() {
+    return throwDeprecatedRepositoryError('findBySupabaseIdentity');
   },
 
-  async create(data) {
-    return base44.entities.AppUser.create(sanitizeAppUserPayload(data));
+  async create() {
+    return throwDeprecatedRepositoryError('create');
   },
 
-  async update(id, data) {
-    if (!id) {
-      return null;
-    }
-
-    const payload = sanitizeAppUserPayload(data);
-
-    return base44.entities.AppUser.update(id, payload);
+  async update() {
+    return throwDeprecatedRepositoryError('update');
   },
 };
+
+export default appUserRepository;
+
+function normalizeEmail(email) {
+  return email?.toLowerCase().trim() || '';
+}

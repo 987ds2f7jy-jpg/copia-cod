@@ -1,61 +1,75 @@
-import React, { useState, useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { Loader2, Eye, EyeOff, Stethoscope } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/components/AuthContext';
-import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Card, CardContent } from "@/components/ui/card";
-import { Loader2, Eye, EyeOff, Stethoscope } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent } from '@/components/ui/card';
 
-const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699cf7ff429d9e728fec4557/63297c12a_logo.png";
+const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699cf7ff429d9e728fec4557/63297c12a_logo.png';
+
+function resolveRedirectPath(user) {
+  if (user?.role === 'professional') {
+    return createPageUrl('DashboardProfissional');
+  }
+
+  return createPageUrl('DashboardPaciente');
+}
 
 export default function Entrar() {
-  const { login, isAuthenticated } = useAuth();
+  const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  const [showPass, setShowPass] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
   useEffect(() => {
-    if (isAuthenticated) {
-      const next = sessionStorage.getItem('rd_login_next') || createPageUrl('DashboardPaciente');
-      sessionStorage.removeItem('rd_login_next');
-      navigate(next, { replace: true });
+    if (authLoading || !user) {
+      return;
     }
-  }, [isAuthenticated, navigate]);
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
+    const nextPath = sessionStorage.getItem('rd_login_next') || resolveRedirectPath(user);
+    sessionStorage.removeItem('rd_login_next');
+    navigate(nextPath, { replace: true });
+  }, [authLoading, navigate, user]);
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
     setError('');
-    if (!email || !password) { setError('Preencha email e senha.'); return; }
+
+    if (!email.trim() || !password) {
+      setError('Preencha email e senha.');
+      return;
+    }
+
     setLoading(true);
+
     try {
-      const user = await login(email, password);
-      const next = sessionStorage.getItem('rd_login_next') || (
-        user.role === 'professional' ? createPageUrl('DashboardProfissional') : createPageUrl('DashboardPaciente')
-      );
+      const authenticatedUser = await login(email, password);
+      const nextPath = sessionStorage.getItem('rd_login_next') || resolveRedirectPath(authenticatedUser);
       sessionStorage.removeItem('rd_login_next');
-      navigate(next, { replace: true });
-    } catch (err) {
-      setError(err.message || 'Erro ao fazer login.');
+      navigate(nextPath, { replace: true });
+    } catch (loginError) {
+      setError(loginError.message || 'Erro ao fazer login.');
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex items-center justify-center px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 py-12">
       <div className="w-full max-w-md">
-        <div className="text-center mb-8">
-          <Link to={createPageUrl('Home')} className="inline-flex items-center gap-2 mb-6">
-            <img src={LOGO_URL} alt="Rápido Doutor" className="h-10 w-auto" />
-            <span className="text-2xl font-bold text-gray-900">Rápido Doutor</span>
+        <div className="mb-8 text-center">
+          <Link to={createPageUrl('Home')} className="mb-6 inline-flex items-center gap-2">
+            <img src={LOGO_URL} alt="Rapido Doutor" className="h-10 w-auto" />
+            <span className="text-2xl font-bold text-gray-900">Rapido Doutor</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Entrar na sua conta</h1>
-          <p className="text-gray-600 mt-1">Bem-vindo de volta!</p>
+          <p className="mt-1 text-gray-600">Bem-vindo de volta.</p>
         </div>
 
         <Card className="border-0 shadow-xl">
@@ -63,42 +77,73 @@ export default function Entrar() {
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
                 <Label htmlFor="email">Email</Label>
-                <Input id="email" type="email" autoComplete="email" value={email}
-                  onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="mt-1" />
+                <Input
+                  id="email"
+                  type="email"
+                  autoComplete="email"
+                  value={email}
+                  onChange={(event) => setEmail(event.target.value)}
+                  placeholder="seu@email.com"
+                  className="mt-1"
+                />
               </div>
+
               <div>
                 <Label htmlFor="password">Senha</Label>
                 <div className="relative mt-1">
-                  <Input id="password" type={showPass ? 'text' : 'password'} autoComplete="current-password"
-                    value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="pr-10" />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                    onClick={() => setShowPass(v => !v)}>
-                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <Input
+                    id="password"
+                    type={showPassword ? 'text' : 'password'}
+                    autoComplete="current-password"
+                    value={password}
+                    onChange={(event) => setPassword(event.target.value)}
+                    placeholder="Digite sua senha"
+                    className="pr-10"
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
               </div>
 
-              {error && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">{error}</div>
-              )}
+              {error ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {error}
+                </div>
+              ) : null}
 
-              <Button type="submit" disabled={loading} className="w-full h-11 bg-emerald-600 hover:bg-emerald-700 text-white">
-                {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-11 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
                 Entrar
               </Button>
             </form>
 
             <div className="mt-6 text-center text-sm text-gray-600">
-              Não tem conta?{' '}
-              <Link to={createPageUrl('CadastroPaciente')} className="text-emerald-600 font-medium hover:underline">
-                Criar conta de Paciente
+              Nao tem conta?{' '}
+              <Link
+                to={createPageUrl('CadastroPaciente')}
+                className="font-medium text-emerald-600 hover:underline"
+              >
+                Criar conta de paciente
               </Link>
             </div>
+
             <div className="mt-3 text-center text-sm text-gray-600">
-              É profissional de saúde?{' '}
-              <Link to={createPageUrl('CadastroProfissional')} className="text-emerald-600 font-medium hover:underline">
-                <Stethoscope className="w-3 h-3 inline mr-1" />
-                Cadastrar-se como Profissional
+              E profissional de saude?{' '}
+              <Link
+                to={createPageUrl('CadastroProfissional')}
+                className="font-medium text-emerald-600 hover:underline"
+              >
+                <Stethoscope className="mr-1 inline h-3 w-3" />
+                Cadastrar-se como profissional
               </Link>
             </div>
           </CardContent>

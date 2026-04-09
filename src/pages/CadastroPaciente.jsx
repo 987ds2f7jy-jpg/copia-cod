@@ -1,57 +1,126 @@
 import React, { useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
+import { motion } from 'framer-motion';
+import { Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/components/AuthContext';
-import { motion } from 'framer-motion';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { Loader2, UserPlus, Eye, EyeOff } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 
 function isValidCPF(cpf) {
-  cpf = cpf.replace(/\D/g, '');
-  if (cpf.length !== 11 || /^(\d)\1+$/.test(cpf)) return false;
+  const normalizedCpf = String(cpf || '').replace(/\D/g, '');
+
+  if (normalizedCpf.length !== 11 || /^(\d)\1+$/.test(normalizedCpf)) {
+    return false;
+  }
+
   let sum = 0;
-  for (let i = 0; i < 9; i++) sum += parseInt(cpf[i]) * (10 - i);
-  let r = (sum * 10) % 11;
-  if (r === 10 || r === 11) r = 0;
-  if (r !== parseInt(cpf[9])) return false;
+
+  for (let index = 0; index < 9; index += 1) {
+    sum += Number(normalizedCpf[index]) * (10 - index);
+  }
+
+  let remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) {
+    remainder = 0;
+  }
+
+  if (remainder !== Number(normalizedCpf[9])) {
+    return false;
+  }
+
   sum = 0;
-  for (let i = 0; i < 10; i++) sum += parseInt(cpf[i]) * (11 - i);
-  r = (sum * 10) % 11;
-  if (r === 10 || r === 11) r = 0;
-  return r === parseInt(cpf[10]);
+
+  for (let index = 0; index < 10; index += 1) {
+    sum += Number(normalizedCpf[index]) * (11 - index);
+  }
+
+  remainder = (sum * 10) % 11;
+
+  if (remainder === 10 || remainder === 11) {
+    remainder = 0;
+  }
+
+  return remainder === Number(normalizedCpf[10]);
 }
 
 export default function CadastroPaciente() {
   const navigate = useNavigate();
   const { register } = useAuth();
   const [loading, setLoading] = useState(false);
-  const [showPass, setShowPass] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
   const [formData, setFormData] = useState({
-    full_name: '', email: '', password: '', cpf: '', phone: '', birth_date: '', sex: '',
+    full_name: '',
+    email: '',
+    password: '',
+    cpf: '',
+    phone: '',
+    birth_date: '',
+    sex: '',
   });
 
-  const validate = () => {
-    const e = {};
-    if (!formData.full_name.trim()) e.full_name = 'Nome obrigatório';
-    if (!formData.email.match(/^[^\s@]+@[^\s@]+\.[^\s@]+$/)) e.email = 'Email inválido';
-    if (!formData.password || formData.password.length < 6) e.password = 'Senha deve ter ao menos 6 caracteres';
-    if (!isValidCPF(formData.cpf)) e.cpf = 'CPF inválido';
-    if (!formData.phone.trim()) e.phone = 'Telefone obrigatório';
-    if (!formData.birth_date) e.birth_date = 'Data obrigatória';
-    if (!formData.sex) e.sex = 'Sexo obrigatório';
-    setErrors(e);
-    return Object.keys(e).length === 0;
+  const setField = (field, value) => {
+    setFormData((current) => ({
+      ...current,
+      [field]: value,
+    }));
+
+    setErrors((current) => ({
+      ...current,
+      [field]: '',
+      submit: '',
+    }));
   };
 
-  const handleSubmit = async (e) => {
-    e.preventDefault();
-    if (!validate()) return;
+  const validate = () => {
+    const nextErrors = {};
+
+    if (!formData.full_name.trim()) {
+      nextErrors.full_name = 'Nome obrigatorio.';
+    }
+
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(formData.email)) {
+      nextErrors.email = 'Email invalido.';
+    }
+
+    if (!formData.password || formData.password.length < 6) {
+      nextErrors.password = 'Senha deve ter ao menos 6 caracteres.';
+    }
+
+    if (!isValidCPF(formData.cpf)) {
+      nextErrors.cpf = 'CPF invalido.';
+    }
+
+    if (!formData.phone.trim()) {
+      nextErrors.phone = 'Telefone obrigatorio.';
+    }
+
+    if (!formData.birth_date) {
+      nextErrors.birth_date = 'Data obrigatoria.';
+    }
+
+    if (!formData.sex) {
+      nextErrors.sex = 'Sexo obrigatorio.';
+    }
+
+    setErrors(nextErrors);
+    return Object.keys(nextErrors).length === 0;
+  };
+
+  const handleSubmit = async (event) => {
+    event.preventDefault();
+
+    if (!validate()) {
+      return;
+    }
+
     setLoading(true);
+
     try {
       await register({
         full_name: formData.full_name,
@@ -63,86 +132,132 @@ export default function CadastroPaciente() {
         birth_date: formData.birth_date,
         sex: formData.sex,
       });
+
       navigate(createPageUrl('DashboardPaciente'), { replace: true });
-    } catch (err) {
-      setErrors({ submit: err.message });
+    } catch (error) {
+      setErrors((current) => ({
+        ...current,
+        submit: error.message || 'Nao foi possivel concluir o cadastro.',
+      }));
     } finally {
       setLoading(false);
     }
   };
 
-  const field = (key, label, extra = {}) => (
+  const renderField = (field, label, extraProps = {}) => (
     <div>
       <Label className="mb-1 block">{label}</Label>
-      <Input value={formData[key]} onChange={(e) => setFormData({ ...formData, [key]: e.target.value })}
-        className={`mt-1 ${errors[key] ? 'border-red-400' : ''}`} {...extra} />
-      {errors[key] && <p className="text-xs text-red-500 mt-1">{errors[key]}</p>}
+      <Input
+        {...extraProps}
+        value={formData[field]}
+        onChange={(event) => setField(field, event.target.value)}
+        className={`mt-1 ${errors[field] ? 'border-red-400' : ''}`}
+      />
+      {errors[field] ? (
+        <p className="mt-1 text-xs text-red-500">{errors[field]}</p>
+      ) : null}
     </div>
   );
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-12">
-      <div className="max-w-lg mx-auto px-4">
-        <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 mb-4">
-            <UserPlus className="w-8 h-8 text-white" />
+      <div className="mx-auto max-w-lg px-4">
+        <motion.div
+          initial={{ opacity: 0, y: 12 }}
+          animate={{ opacity: 1, y: 0 }}
+          className="mb-8 text-center"
+        >
+          <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600">
+            <UserPlus className="h-8 w-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Criar Conta de Paciente</h1>
+          <h1 className="mb-2 text-3xl font-bold text-gray-900">Criar Conta de Paciente</h1>
           <p className="text-gray-600">
-            Já tem conta?{' '}
-            <Link to={createPageUrl('Entrar')} className="text-emerald-600 underline">Entrar</Link>
+            Ja tem conta?{' '}
+            <Link to={createPageUrl('Entrar')} className="text-emerald-600 underline">
+              Entrar
+            </Link>
           </p>
-        </div>
+        </motion.div>
 
         <Card className="border-0 shadow-md">
-          <CardHeader><CardTitle>Dados Pessoais</CardTitle></CardHeader>
+          <CardHeader>
+            <CardTitle>Dados pessoais</CardTitle>
+          </CardHeader>
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              {field('full_name', 'Nome completo', { placeholder: 'Seu nome completo' })}
-              {field('email', 'Email', { type: 'email', placeholder: 'seu@email.com' })}
+              {renderField('full_name', 'Nome completo', {
+                placeholder: 'Seu nome completo',
+              })}
+              {renderField('email', 'Email', {
+                type: 'email',
+                placeholder: 'seu@email.com',
+                autoComplete: 'email',
+              })}
 
               <div>
                 <Label className="mb-1 block">Senha</Label>
                 <div className="relative mt-1">
-                  <Input type={showPass ? 'text' : 'password'} value={formData.password}
-                    onChange={e => setFormData({ ...formData, password: e.target.value })}
-                    placeholder="Mínimo 6 caracteres" className={`pr-10 ${errors.password ? 'border-red-400' : ''}`} />
-                  <button type="button" className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
-                    onClick={() => setShowPass(v => !v)}>
-                    {showPass ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                  <Input
+                    type={showPassword ? 'text' : 'password'}
+                    value={formData.password}
+                    onChange={(event) => setField('password', event.target.value)}
+                    placeholder="Minimo de 6 caracteres"
+                    autoComplete="new-password"
+                    className={`pr-10 ${errors.password ? 'border-red-400' : ''}`}
+                  />
+                  <button
+                    type="button"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
                 </div>
-                {errors.password && <p className="text-xs text-red-500 mt-1">{errors.password}</p>}
+                {errors.password ? (
+                  <p className="mt-1 text-xs text-red-500">{errors.password}</p>
+                ) : null}
               </div>
 
-              {field('cpf', 'CPF', { placeholder: '000.000.000-00' })}
-              {field('phone', 'Telefone', { placeholder: '(11) 99999-9999' })}
-              {field('birth_date', 'Data de nascimento', { type: 'date' })}
+              {renderField('cpf', 'CPF', {
+                placeholder: '000.000.000-00',
+              })}
+              {renderField('phone', 'Telefone', {
+                placeholder: '(11) 99999-9999',
+              })}
+              {renderField('birth_date', 'Data de nascimento', {
+                type: 'date',
+              })}
 
               <div>
                 <Label className="mb-1 block">Sexo</Label>
-                <Select value={formData.sex} onValueChange={(v) => setFormData({ ...formData, sex: v })}>
+                <Select value={formData.sex} onValueChange={(value) => setField('sex', value)}>
                   <SelectTrigger className={errors.sex ? 'border-red-400' : ''}>
                     <SelectValue placeholder="Selecione" />
                   </SelectTrigger>
                   <SelectContent>
                     <SelectItem value="masculino">Masculino</SelectItem>
                     <SelectItem value="feminino">Feminino</SelectItem>
-                    <SelectItem value="outro">Outro / Prefiro não informar</SelectItem>
+                    <SelectItem value="outro">Outro / Prefiro nao informar</SelectItem>
                   </SelectContent>
                 </Select>
-                {errors.sex && <p className="text-xs text-red-500 mt-1">{errors.sex}</p>}
+                {errors.sex ? (
+                  <p className="mt-1 text-xs text-red-500">{errors.sex}</p>
+                ) : null}
               </div>
 
-              {errors.submit && (
-                <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+              {errors.submit ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
                   {errors.submit}
                 </div>
-              )}
+              ) : null}
 
-              <Button type="submit" disabled={loading} className="w-full h-12 bg-emerald-600 hover:bg-emerald-700 text-white">
-                {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                Criar Conta
+              <Button
+                type="submit"
+                disabled={loading}
+                className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+              >
+                {loading ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : null}
+                Criar conta
               </Button>
             </form>
           </CardContent>

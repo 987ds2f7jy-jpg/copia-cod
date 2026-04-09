@@ -1,12 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
+import React, { useEffect, useState } from 'react';
+import { useMutation } from '@tanstack/react-query';
+import {
+  User,
+  Phone,
+  MapPin,
+  Calendar,
+  Save,
+  Loader2,
+  CheckCircle,
+  Trash2,
+} from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
-import { useMutation } from '@tanstack/react-query';
-import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { Label } from "@/components/ui/label";
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -17,14 +26,10 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
   AlertDialogTrigger,
-} from "@/components/ui/alert-dialog";
-import { 
-  User, Phone, MapPin, Calendar,
-  Save, Loader2, CheckCircle, Trash2
-} from 'lucide-react';
+} from '@/components/ui/alert-dialog';
 
 function PerfilInner() {
-  const { user } = useAuth();
+  const { user, updateUser, deactivateAccount } = useAuth();
   const [formData, setFormData] = useState({
     phone: '',
     cpf: '',
@@ -34,9 +39,14 @@ function PerfilInner() {
     state: '',
   });
   const [saved, setSaved] = useState(false);
+  const [submitError, setSubmitError] = useState('');
+  const [deactivateError, setDeactivateError] = useState('');
 
   useEffect(() => {
-    if (!user) return;
+    if (!user) {
+      return;
+    }
+
     setFormData({
       phone: user.phone || '',
       cpf: user.cpf || '',
@@ -47,43 +57,62 @@ function PerfilInner() {
     });
   }, [user]);
 
-  const { updateUser, logout } = useAuth();
-
   const updateProfile = useMutation({
     mutationFn: (data) => updateUser(data),
+    onMutate: () => {
+      setSubmitError('');
+      setSaved(false);
+    },
     onSuccess: () => {
       setSaved(true);
-      setTimeout(() => setSaved(false), 3000);
+      window.setTimeout(() => setSaved(false), 3000);
+    },
+    onError: (error) => {
+      setSubmitError(error?.message || 'Nao foi possivel salvar as alteracoes.');
     },
   });
 
-  const handleSubmit = (e) => {
-    e.preventDefault();
+  const handleChange = (field, value) => {
+    setFormData((current) => ({
+      ...current,
+      [field]: value,
+    }));
+    setSaved(false);
+    setSubmitError('');
+  };
+
+  const handleSubmit = (event) => {
+    event.preventDefault();
     updateProfile.mutate(formData);
   };
 
-  const handleDeleteAccount = async () => {
-    if (user?.id) {
-      await base44.entities.AppUser.update(user.id, { is_active: false });
+  const handleDeactivateAccount = async () => {
+    setDeactivateError('');
+
+    try {
+      await deactivateAccount();
+    } catch (error) {
+      setDeactivateError(error?.message || 'Nao foi possivel desativar a conta.');
     }
-    logout();
   };
 
-  if (!user) return null;
+  if (!user) {
+    return null;
+  }
 
   return (
     <div className="min-h-screen bg-gray-50 py-8">
-      <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Meu Perfil</h1>
-          <p className="text-gray-600">Gerencie suas informações pessoais</p>
+          <h1 className="text-2xl font-bold text-gray-900">Meu perfil</h1>
+          <p className="text-gray-600">Gerencie suas informacoes pessoais.</p>
         </div>
 
         <Card className="border-0 shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-4">
-              <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center">
-                <User className="w-8 h-8 text-emerald-600" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
+                <User className="h-8 w-8 text-emerald-600" />
               </div>
               <div>
                 <CardTitle>{user.full_name}</CardTitle>
@@ -91,28 +120,30 @@ function PerfilInner() {
               </div>
             </div>
           </CardHeader>
+
           <CardContent>
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="phone" className="flex items-center gap-2">
-                    <Phone className="w-4 h-4" />
+                    <Phone className="h-4 w-4" />
                     Telefone
                   </Label>
                   <Input
                     id="phone"
                     value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                    onChange={(event) => handleChange('phone', event.target.value)}
                     placeholder="(11) 99999-9999"
                     className="mt-1"
                   />
                 </div>
+
                 <div>
                   <Label htmlFor="cpf">CPF</Label>
                   <Input
                     id="cpf"
                     value={formData.cpf}
-                    onChange={(e) => setFormData({ ...formData, cpf: e.target.value })}
+                    onChange={(event) => handleChange('cpf', event.target.value)}
                     placeholder="000.000.000-00"
                     className="mt-1"
                   />
@@ -121,101 +152,117 @@ function PerfilInner() {
 
               <div>
                 <Label htmlFor="birth_date" className="flex items-center gap-2">
-                  <Calendar className="w-4 h-4" />
-                  Data de Nascimento
+                  <Calendar className="h-4 w-4" />
+                  Data de nascimento
                 </Label>
                 <Input
                   id="birth_date"
                   type="date"
                   value={formData.birth_date}
-                  onChange={(e) => setFormData({ ...formData, birth_date: e.target.value })}
+                  onChange={(event) => handleChange('birth_date', event.target.value)}
                   className="mt-1"
                 />
               </div>
 
               <div>
                 <Label htmlFor="address" className="flex items-center gap-2">
-                  <MapPin className="w-4 h-4" />
-                  Endereço
+                  <MapPin className="h-4 w-4" />
+                  Endereco
                 </Label>
                 <Input
                   id="address"
                   value={formData.address}
-                  onChange={(e) => setFormData({ ...formData, address: e.target.value })}
-                  placeholder="Rua, número, complemento"
+                  onChange={(event) => handleChange('address', event.target.value)}
+                  placeholder="Rua, numero, complemento"
                   className="mt-1"
                 />
               </div>
 
-              <div className="grid sm:grid-cols-2 gap-4">
+              <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <Label htmlFor="city">Cidade</Label>
                   <Input
                     id="city"
                     value={formData.city}
-                    onChange={(e) => setFormData({ ...formData, city: e.target.value })}
-                    placeholder="São Paulo"
+                    onChange={(event) => handleChange('city', event.target.value)}
+                    placeholder="Sao Paulo"
                     className="mt-1"
                   />
                 </div>
+
                 <div>
                   <Label htmlFor="state">Estado</Label>
                   <Input
                     id="state"
                     value={formData.state}
-                    onChange={(e) => setFormData({ ...formData, state: e.target.value })}
+                    onChange={(event) => handleChange('state', event.target.value.toUpperCase())}
                     placeholder="SP"
                     className="mt-1"
                   />
                 </div>
               </div>
 
+              {submitError ? (
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {submitError}
+                </div>
+              ) : null}
+
               <div className="pt-4">
-                <Button 
-                  type="submit" 
+                <Button
+                  type="submit"
                   disabled={updateProfile.isPending}
-                  className="w-full gradient-primary border-0 text-white h-12"
+                  className="gradient-primary h-12 w-full border-0 text-white"
                 >
                   {updateProfile.isPending ? (
-                    <Loader2 className="w-4 h-4 animate-spin mr-2" />
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                   ) : saved ? (
-                    <CheckCircle className="w-4 h-4 mr-2" />
+                    <CheckCircle className="mr-2 h-4 w-4" />
                   ) : (
-                    <Save className="w-4 h-4 mr-2" />
+                    <Save className="mr-2 h-4 w-4" />
                   )}
-                  {saved ? 'Salvo!' : 'Salvar Alterações'}
+                  {saved ? 'Salvo!' : 'Salvar alteracoes'}
                 </Button>
               </div>
             </form>
 
-            {/* Danger Zone */}
-            <div className="mt-8 pt-6 border-t border-gray-200">
-              <h3 className="text-sm font-medium text-gray-500 mb-3">Zona de Perigo</h3>
+            <div className="mt-8 border-t border-gray-200 pt-6">
+              <h3 className="mb-3 text-sm font-medium text-gray-500">Zona de cuidado</h3>
+              <p className="mb-4 text-sm text-gray-600">
+                A desativacao faz soft-delete da conta e encerra suas sessoes atuais.
+              </p>
+
+              {deactivateError ? (
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                  {deactivateError}
+                </div>
+              ) : null}
+
               <AlertDialog>
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="outline"
-                    className="w-full h-12 border-red-200 text-red-600 hover:bg-red-50 hover:border-red-300"
+                    className="h-12 w-full border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
                   >
-                    <Trash2 className="w-4 h-4 mr-2" />
-                    Excluir Conta
+                    <Trash2 className="mr-2 h-4 w-4" />
+                    Desativar conta
                   </Button>
                 </AlertDialogTrigger>
                 <AlertDialogContent>
                   <AlertDialogHeader>
-                    <AlertDialogTitle>Excluir conta permanentemente?</AlertDialogTitle>
+                    <AlertDialogTitle>Desativar sua conta?</AlertDialogTitle>
                     <AlertDialogDescription>
-                      Esta ação não pode ser desfeita. Todos os seus dados, consultas e histórico
-                      serão removidos permanentemente da nossa plataforma.
+                      Sua conta sera marcada como inativa e as sessoes abertas serao encerradas.
+                      Depois disso, sera necessario suporte interno para reativacao.
                     </AlertDialogDescription>
                   </AlertDialogHeader>
                   <AlertDialogFooter>
                     <AlertDialogCancel>Cancelar</AlertDialogCancel>
                     <AlertDialogAction
-                      className="bg-red-600 hover:bg-red-700 text-white"
-                      onClick={handleDeleteAccount}
+                      className="bg-red-600 text-white hover:bg-red-700"
+                      onClick={handleDeactivateAccount}
                     >
-                      Sim, excluir minha conta
+                      Sim, desativar minha conta
                     </AlertDialogAction>
                   </AlertDialogFooter>
                 </AlertDialogContent>
