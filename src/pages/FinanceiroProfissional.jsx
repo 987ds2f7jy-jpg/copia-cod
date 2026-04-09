@@ -40,6 +40,7 @@ const TIPO_LABELS = {
 const STATUS_PAYMENT = {
   completed: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700' },
   CONCLUIDO: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700' },
+  accepted: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
   confirmed: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
   CONFIRMADO: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
   in_progress: { label: 'Retido', cls: 'bg-blue-100 text-blue-700' },
@@ -95,7 +96,7 @@ function FinanceiroProfissionalInner() {
     [appointments, monthStart, monthEnd]
   );
   const completed = thisMonth.filter((appointment) => ['completed', 'CONCLUIDO'].includes(appointment.status));
-  const pending = thisMonth.filter((appointment) => ['confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'].includes(appointment.status));
+  const pending = thisMonth.filter((appointment) => ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'].includes(appointment.status));
 
   const revenueMonth = completed.reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);
   const revenuePending = pending.reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);

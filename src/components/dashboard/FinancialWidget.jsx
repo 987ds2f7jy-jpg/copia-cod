@@ -17,7 +17,7 @@ export default function FinancialWidget({ appointments, professionalId }) {
 
   const thisMonthAll = appointments.filter(a => a.date >= monthStart && a.date <= monthEnd);
   const completed = thisMonthAll.filter(a => a.status === 'completed');
-  const pending = thisMonthAll.filter(a => ['pending', 'confirmed', 'in_progress'].includes(a.status));
+  const pending = thisMonthAll.filter(a => ['pending', 'accepted', 'confirmed', 'in_progress'].includes(a.status));
 
   const revenueCompleted = completed.reduce((s, a) => s + (a.price || 0), 0);
   const revenuePending = pending.reduce((s, a) => s + (a.price || 0), 0);

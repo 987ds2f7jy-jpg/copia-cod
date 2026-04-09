@@ -33,9 +33,8 @@ import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
 import ServicosExtras from '@/components/dashboard/ServicosExtras';
-import { buildConsultaFromAppointment, buildConsultaFromQueueEntry, createConsultaRecord } from '@/lib/consultas';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
-import { attachLaudoContextToQueue, markLaudoSolicitacaoInProgress } from '@/lib/solicitacoesExames';
+import { attachLaudoContextToQueue } from '@/lib/solicitacoesExames';
 import {
   canWorkOnDuty,
   isProfessionalApprovedStatus,
@@ -279,11 +278,6 @@ function DashboardProfissionalInner() {
     };
   }, []);
 
-  const updateAppointment = useMutation({
-    mutationFn: ({ id, data }) => base44.entities.Appointment.update(id, data),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['profAppts'] }),
-  });
-
   const answerQuestion = useMutation({
     mutationFn: async ({ id, answer }) => {
       // Guard: prevent answering already-answered question
@@ -306,24 +300,19 @@ function DashboardProfissionalInner() {
       queryClient.invalidateQueries({ queryKey: ['perfil-questions'] });
     },
   });
+
   const acceptQueuePatient = useMutation({
-    mutationFn: async (queueEntry) => {
-      const consulta = await createConsultaRecord(buildConsultaFromQueueEntry(queueEntry, professional));
-      await Promise.all([
-        base44.entities.Queue.update(queueEntry.id, {
-          status: 'in_progress',
-          assigned_professional_id: professional.id,
-        }),
-        queueEntry.laudo_medico || queueEntry.solicitacao_exame_id
-          ? markLaudoSolicitacaoInProgress(queueEntry, professional.id)
-          : Promise.resolve(null),
-      ]);
-      return consulta;
+    mutationFn: async () => {
+      throw new Error(
+        'TODO: implementar Edge Function accept-queue-entry para atender pacientes da fila sem criar consulta no frontend.',
+      );
     },
-    onSuccess: (consulta) => {
-      queryClient.invalidateQueries({ queryKey: ['queueWaiting', professional?.id] });
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes-exames', professional?.id, professional?.specialty] });
-      navigate(`/consulta/${consulta.id}`);
+    onError: (error) => {
+      toast({
+        title: 'Fluxo pendente de backend',
+        description: error.message || 'Implementar accept-queue-entry no backend antes de atender a fila.',
+        variant: 'destructive',
+      });
     },
   });
 
@@ -523,14 +512,14 @@ function DashboardProfissionalInner() {
           />
           <UpcomingAppointments
             appointments={appointments}
-            onConfirm={(id) => updateAppointment.mutate({ id, data: { status: 'confirmed' } })}
             onStart={(a) => {
               if (a.consulta_id) {
                 navigate(`/consulta/${a.consulta_id}`);
               } else {
-                createConsultaRecord(buildConsultaFromAppointment(a, professional)).then(c => {
-                  base44.entities.Appointment.update(a.id, { status: 'CONFIRMADO', consulta_id: c.id });
-                  navigate(`/consulta/${c.id}`);
+                toast({
+                  title: 'Fluxo pendente de backend',
+                  description: 'Este agendamento ainda nao possui consulta vinculada. TODO: garantir criacao via accept-appointment no backend antes de iniciar.',
+                  variant: 'destructive',
                 });
               }
             }}
@@ -540,7 +529,7 @@ function DashboardProfissionalInner() {
         {/* Solicitações de Agendamento + Serviços Extras */}
         <div className="grid lg:grid-cols-3 gap-4">
           <SolicitacoesAgendamento professional={professional} />
-          <MinhasConsultasHoje appointments={appointments} professional={professional} />
+          <MinhasConsultasHoje appointments={appointments} />
           <ServicosExtras
             professional={professional}
             onAtender={(s) => {

@@ -50,7 +50,7 @@ function PerfilInner() {
   const { updateUser, logout } = useAuth();
 
   const updateProfile = useMutation({
-    mutationFn: (data) => updateUser({ ...data, profile_complete: true }),
+    mutationFn: (data) => updateUser(data),
     onSuccess: () => {
       setSaved(true);
       setTimeout(() => setSaved(false), 3000);

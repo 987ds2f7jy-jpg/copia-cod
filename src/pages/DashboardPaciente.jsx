@@ -112,13 +112,13 @@ function DashboardPacienteInner() {
   const todayStr = new Date().toISOString().slice(0, 10);
   const upcomingAppointments = appointments.filter(a => {
     const dateStr = a.scheduled_datetime?.slice(0, 10) || a.date;
-    const activeStatuses = ['pending', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO'];
+    const activeStatuses = ['pending', 'accepted', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO'];
     return activeStatuses.includes(a.status) && (dateStr >= todayStr || a.status === 'in_progress');
   });
   const pastAppointments = appointments.filter(a => {
     const dateStr = a.scheduled_datetime?.slice(0, 10) || a.date;
     return ['completed', 'CONCLUIDO', 'EXPIRADO'].includes(a.status) || 
-      (dateStr < todayStr && !['in_progress', 'cancelled', 'CANCELADO', 'SOLICITADO', 'CONFIRMADO'].includes(a.status));
+      (dateStr < todayStr && !['accepted', 'in_progress', 'cancelled', 'CANCELADO', 'SOLICITADO', 'CONFIRMADO'].includes(a.status));
   });
   const cancelledAppointments = appointments.filter(a => ['cancelled', 'CANCELADO'].includes(a.status));
 
@@ -129,6 +129,7 @@ function DashboardPacienteInner() {
       CANCELADO: 'bg-red-100 text-red-700',
       CONCLUIDO: 'bg-gray-100 text-gray-700',
       EXPIRADO: 'bg-gray-100 text-gray-500',
+      accepted: 'bg-emerald-100 text-emerald-700',
       pending: 'bg-amber-100 text-amber-700',
       confirmed: 'bg-emerald-100 text-emerald-700',
       in_progress: 'bg-blue-100 text-blue-700',
@@ -138,6 +139,7 @@ function DashboardPacienteInner() {
     const labels = {
       SOLICITADO: 'Aguardando especialista',
       CONFIRMADO: 'Confirmada',
+      accepted: 'Confirmada',
       CANCELADO: 'Cancelada',
       CONCLUIDO: 'Concluída',
       EXPIRADO: 'Expirada',
@@ -167,7 +169,7 @@ function DashboardPacienteInner() {
   };
 
   const canEnterConsult = (appt) => {
-    const isActive = ['CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
+    const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
     if (!isActive) return false;
     const dtStr = appt.scheduled_datetime || appt.datetime;
     if (!dtStr) return true; // sem horário: permitir entrar
@@ -234,7 +236,7 @@ function DashboardPacienteInner() {
                 Aguardando aceite de um especialista
               </div>
             )}
-            {(appointment.status === 'CONFIRMADO' || appointment.status === 'confirmed') && appointment.professional_name && (
+            {(['accepted', 'CONFIRMADO', 'confirmed'].includes(appointment.status)) && appointment.professional_name && (
               <p className="mt-1 text-xs text-emerald-700">
                 ✓ Confirmado com {appointment.professional_name}
               </p>
@@ -245,7 +247,7 @@ function DashboardPacienteInner() {
 
             {showActions && !['cancelled', 'CANCELADO', 'CONCLUIDO', 'EXPIRADO', 'completed'].includes(appointment.status) && (
               <div className="flex gap-2 mt-4">
-                {(['SOLICITADO', 'CONFIRMADO', 'confirmed', 'pending', 'em_atendimento', 'in_progress'].includes(appointment.status)) && (
+                {(['SOLICITADO', 'accepted', 'CONFIRMADO', 'confirmed', 'pending', 'em_atendimento', 'in_progress'].includes(appointment.status)) && (
                   <>
                     {canEnterConsult(appointment) && (
                       <Button

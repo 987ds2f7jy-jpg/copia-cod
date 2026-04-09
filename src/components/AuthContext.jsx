@@ -85,7 +85,7 @@ export function AuthProvider({ children }) {
       }
     }
 
-    await authService.logout(user);
+    await authService.logout();
     setUser(null);
     queryClient.clear();
     window.location.href = '/';

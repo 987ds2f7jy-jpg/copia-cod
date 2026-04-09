@@ -1,21 +1,36 @@
 import React, { useState } from 'react';
 import { base44 } from '@/api/base44Client';
+import { supabase } from '@/integrations/supabase/client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardHeader } from "@/components/ui/card";
-import { CalendarDays, Clock, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
-import { format, parseISO } from 'date-fns';
+import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
+import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-import { validateSchedulingWindowByType, buildDatetime } from '@/lib/scheduling';
-import { buildConsultaFromAppointment, createConsultaRecord } from '@/lib/consultas';
+
+async function resolveFunctionErrorMessage(error, fallbackMessage) {
+  const response = error?.context;
+
+  if (response && typeof response.clone === 'function') {
+    try {
+      const payload = await response.clone().json();
+
+      if (payload?.error?.message) {
+        return payload.error.message;
+      }
+    } catch {
+      // Ignore non-JSON error responses and keep the fallback message.
+    }
+  }
+
+  return error?.message || fallbackMessage;
+}
 
 export default function SolicitacoesAgendamento({ professional }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  // Solicitações: (1) por especialidade (ESPECIALIDADE) + (2) diretas prioritárias (priority) para este profissional
   const { data: solBySpecialty = [] } = useQuery({
     queryKey: ['solicitacoes-esp', professional?.id, professional?.specialty],
     queryFn: () => base44.entities.Appointment.filter({
@@ -39,92 +54,88 @@ export default function SolicitacoesAgendamento({ professional }) {
   });
 
   const isLoading = false;
-  // Merge and deduplicate
-  const solicitacoes = [...solBySpecialty, ...solPriority].filter(
-    (item, idx, arr) => arr.findIndex(x => x.id === item.id) === idx
-  ).sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''));
-
-  // Consultas já confirmadas do profissional (para verificar conflito)
-  const { data: myConfirmed = [] } = useQuery({
-    queryKey: ['my-confirmed', professional?.id],
-    queryFn: () => base44.entities.Appointment.filter({
-      professional_id: professional.id,
-      status: 'CONFIRMADO',
-    }),
-    enabled: !!professional?.id,
-  });
-
-  // Slots de disponibilidade do profissional
-  const { data: mySlots = [] } = useQuery({
-    queryKey: ['my-slots', professional?.id],
-    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
-    enabled: !!professional?.id,
-  });
+  const solicitacoes = [...solBySpecialty, ...solPriority]
+    .filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx)
+    .sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''));
 
   const acceptMutation = useMutation({
     mutationFn: async (solicitacao) => {
       setErrorMsg(null);
-      const { scheduled_datetime } = solicitacao;
-      const tipoConsulta = solicitacao.appointment_type || solicitacao.tipo_consulta;
-      const isPriorityOrPlantao = ['prioritario', 'plantao', 'priority', 'instant', 'IMEDIATO'].includes(tipoConsulta);
 
-      // 1. Verificar janela de agendamento (36h apenas para padrão/especialidade)
-      const validation = validateSchedulingWindowByType(scheduled_datetime, tipoConsulta);
-      if (!validation.valid) throw new Error(`Horário inválido: ${validation.reason}`);
-
-      // 2. Verificar disponibilidade — apenas para tipos não-prioritários
-      if (!isPriorityOrPlantao) {
-        const dt = new Date(scheduled_datetime);
-        const weekday = dt.getDay();
-        const timeSlot = `${String(dt.getHours()).padStart(2, '0')}:${String(dt.getMinutes()).padStart(2, '0')}`;
-        const hasSlot = mySlots.some(s => s.weekday === weekday && s.time_slot === timeSlot);
-        if (!hasSlot) throw new Error('Você não tem disponibilidade configurada neste horário.');
-      }
-
-      // 3. Verificar conflito de horário
-      const conflict = myConfirmed.some(a => a.scheduled_datetime === scheduled_datetime);
-      if (conflict) throw new Error('Você já tem outra consulta confirmada neste horário.');
-
-      // 4. Aceite atômico: re-verificar status antes de salvar
-      const fresh = await base44.entities.Appointment.filter({ id: solicitacao.id });
-      const current = fresh?.[0];
-      if (!current || current.status !== 'SOLICITADO') {
-        throw new Error('Esta solicitação já foi aceita por outro profissional.');
-      }
-
-      // 5. Criar Consulta (entidade central) e confirmar Appointment
-      const consulta = await createConsultaRecord(buildConsultaFromAppointment(solicitacao, professional, {
-        status: 'aguardando',
-        datetime: scheduled_datetime,
-      }));
-
-      await base44.entities.Appointment.update(solicitacao.id, {
-        professional_id: professional.id,
-        professional_name: professional.full_name,
-        status: 'CONFIRMADO',
-        accepted_at: new Date().toISOString(),
-        consulta_id: consulta.id,
+      const { data, error } = await supabase.functions.invoke('accept-appointment', {
+        body: {
+          appointmentId: solicitacao.id,
+        },
       });
-      console.log('[Aceitar] consulta_id:', consulta.id, 'tipo:', consulta.tipo_consulta, 'status:', consulta.status);
-      return consulta;
+
+      if (error) {
+        throw new Error(
+          await resolveFunctionErrorMessage(error, 'Erro ao aceitar solicitacao.'),
+        );
+      }
+
+      if (!data?.data?.appointment?.id || !data?.data?.consulta?.id) {
+        throw new Error('Resposta invalida ao aceitar a solicitacao.');
+      }
+
+      return data.data;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes'] });
-      queryClient.invalidateQueries({ queryKey: ['my-confirmed', professional?.id] });
-      queryClient.invalidateQueries({ queryKey: ['profAppts', professional?.id] });
+    onSuccess: (result, solicitacao) => {
+      const removeAcceptedRequest = (items) => (
+        Array.isArray(items)
+          ? items.filter((item) => item.id !== solicitacao.id)
+          : []
+      );
+
+      queryClient.setQueryData(
+        ['solicitacoes-esp', professional?.id, professional?.specialty],
+        removeAcceptedRequest,
+      );
+      queryClient.setQueryData(
+        ['solicitacoes-pri', professional?.id],
+        removeAcceptedRequest,
+      );
+      queryClient.setQueryData(['profAppts', professional?.id], (items) => {
+        if (!Array.isArray(items)) {
+          return items;
+        }
+
+        const nextAppointment = {
+          ...solicitacao,
+          professional_id: result.appointment.professionalId || professional?.id,
+          professional_name: result.appointment.professionalName || professional?.full_name,
+          status: result.appointment.status,
+          accepted_at: result.appointment.acceptedAt,
+          consulta_id: result.consulta.id,
+          scheduled_datetime: result.appointment.scheduledAt || solicitacao.scheduled_datetime,
+        };
+
+        return [
+          nextAppointment,
+          ...items.filter((item) => item.id !== solicitacao.id),
+        ];
+      });
+
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes-esp'] });
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes-pri'] });
+      queryClient.invalidateQueries({ queryKey: ['profAppts'] });
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setAcceptingId(null);
     },
     onError: (err) => {
-      setErrorMsg(err.message || 'Erro ao aceitar solicitação.');
+      setErrorMsg(err.message || 'Erro ao aceitar solicitacao.');
       setAcceptingId(null);
     },
   });
 
   const formatDt = (dt) => {
-    if (!dt) return '—';
+    if (!dt) return '-';
+
     try {
-      return format(new Date(dt), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR });
-    } catch { return dt; }
+      return format(new Date(dt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR });
+    } catch {
+      return dt;
+    }
   };
 
   if (isLoading) {
@@ -140,7 +151,7 @@ export default function SolicitacoesAgendamento({ professional }) {
       <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
         <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-500" />
-          Solicitações de Agendamento
+          Solicitacoes de Agendamento
         </h3>
         <Badge className="bg-blue-100 text-blue-700">{solicitacoes.length}</Badge>
       </div>
@@ -149,16 +160,16 @@ export default function SolicitacoesAgendamento({ professional }) {
         <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           {errorMsg}
-          <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">✕</button>
+          <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">x</button>
         </div>
       )}
 
       <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
         {solicitacoes.length === 0 ? (
           <p className="px-5 py-8 text-sm text-gray-400 text-center">
-            Nenhuma solicitação pendente para {professional.specialty}
+            Nenhuma solicitacao pendente para {professional.specialty}
           </p>
-        ) : solicitacoes.map(sol => (
+        ) : solicitacoes.map((sol) => (
           <div key={sol.id} className="px-5 py-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-xs text-gray-400">{sol.patient_name}</p>

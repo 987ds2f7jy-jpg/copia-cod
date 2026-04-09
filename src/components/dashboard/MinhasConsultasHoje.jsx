@@ -8,17 +8,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Video, XCircle, Loader2, Clock, Play } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 
 const STATUS_CONFIG = {
   CONFIRMADO: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
   SOLICITADO: { label: 'Aguardando', className: 'bg-amber-100 text-amber-700' },
   CANCELADO: { label: 'Cancelado', className: 'bg-red-100 text-red-700' },
-  CONCLUIDO: { label: 'Concluído', className: 'bg-gray-100 text-gray-700' },
+  CONCLUIDO: { label: 'Concluido', className: 'bg-gray-100 text-gray-700' },
+  accepted: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
   confirmed: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
   pending: { label: 'Pendente', className: 'bg-amber-100 text-amber-700' },
-  completed: { label: 'Concluído', className: 'bg-gray-100 text-gray-700' },
+  completed: { label: 'Concluido', className: 'bg-gray-100 text-gray-700' },
   cancelled: { label: 'Cancelado', className: 'bg-red-100 text-red-700' },
   in_progress: { label: 'Em andamento', className: 'bg-blue-100 text-blue-700' },
 };
@@ -26,29 +25,34 @@ const STATUS_CONFIG = {
 const TYPE_LABELS = {
   PERFIL: 'Por Especialidade',
   ESPECIALIDADE: 'Por Especialidade',
-  IMEDIATO: 'Plantão',
+  IMEDIATO: 'Plantao',
   standard: 'Por Especialidade',
-  priority: 'Prioritária',
-  instant: 'Plantão',
+  priority: 'Prioritaria',
+  instant: 'Plantao',
   padrao: 'Por Especialidade',
-  prioritario: 'Prioritária',
+  prioritario: 'Prioritaria',
   especialidade: 'Por Especialidade',
-  plantao: 'Plantão',
+  plantao: 'Plantao',
 };
 
 function canEnterConsult(appt) {
-  const isActive = ['CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
+  const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
+
   if (!isActive) return false;
+
   const dtStr = appt.scheduled_datetime || appt.datetime;
+
   if (!dtStr) return true;
+
   const now = new Date();
   const dt = new Date(dtStr);
   const from = new Date(dt.getTime() - 5 * 60 * 1000);
   const to = new Date(dt.getTime() + 30 * 60 * 1000);
+
   return now >= from && now <= to;
 }
 
-export default function MinhasConsultasHoje({ appointments, professional }) {
+export default function MinhasConsultasHoje({ appointments }) {
   const queryClient = useQueryClient();
   const navigate = useNavigate();
   const [cancelModal, setCancelModal] = useState({ open: false, appointment: null });
@@ -56,7 +60,7 @@ export default function MinhasConsultasHoje({ appointments, professional }) {
 
   const todayStr = new Date().toISOString().slice(0, 10);
   const todayAppts = appointments
-    .filter(a => {
+    .filter((a) => {
       const dateStr = a.scheduled_datetime?.slice(0, 10) || a.date;
       return dateStr === todayStr;
     })
@@ -83,7 +87,8 @@ export default function MinhasConsultasHoje({ appointments, professional }) {
     if (appt.scheduled_datetime) {
       return appt.scheduled_datetime.substring(11, 16);
     }
-    return appt.time || '—';
+
+    return appt.time || '-';
   };
 
   return (
@@ -102,10 +107,10 @@ export default function MinhasConsultasHoje({ appointments, professional }) {
             <p className="px-5 py-8 text-sm text-gray-400 text-center">
               Nenhuma consulta agendada para hoje.
             </p>
-          ) : todayAppts.map(appt => {
+          ) : todayAppts.map((appt) => {
             const cfg = statusCfg(appt.status);
             const canEnter = canEnterConsult(appt);
-            const isActive = ['CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
+            const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
 
             return (
               <div key={appt.id} className="px-5 py-4">
@@ -129,8 +134,11 @@ export default function MinhasConsultasHoje({ appointments, professional }) {
                   <div className="flex flex-col gap-1.5 shrink-0">
                     {canEnter && (
                       appt.consulta_id ? (
-                        <Button size="sm" className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2 gap-1"
-                          onClick={() => navigate(`/consulta/${appt.consulta_id}`)}>
+                        <Button
+                          size="sm"
+                          className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs h-7 px-2 gap-1"
+                          onClick={() => navigate(`/consulta/${appt.consulta_id}`)}
+                        >
                           <Play className="w-3.5 h-3.5" /> Iniciar
                         </Button>
                       ) : appt.meeting_link ? (
@@ -159,26 +167,27 @@ export default function MinhasConsultasHoje({ appointments, professional }) {
         </div>
       </div>
 
-      {/* Cancel Modal */}
-      <Dialog open={cancelModal.open} onOpenChange={(open) => setCancelModal(m => ({ ...m, open }))}>
+      <Dialog open={cancelModal.open} onOpenChange={(open) => setCancelModal((modal) => ({ ...modal, open }))}>
         <DialogContent>
           <DialogHeader>
             <DialogTitle>Cancelar Consulta</DialogTitle>
             <DialogDescription>
-              Por favor, informe o motivo do cancelamento. O paciente será notificado.
+              Por favor, informe o motivo do cancelamento. O paciente sera notificado.
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
             <div className="p-3 bg-gray-50 rounded-xl text-sm">
               <p className="font-medium">{cancelModal.appointment?.patient_name}</p>
-              <p className="text-gray-500">{cancelModal.appointment?.specialty} · {cancelModal.appointment?.scheduled_datetime?.substring(11, 16) || cancelModal.appointment?.time}</p>
+              <p className="text-gray-500">
+                {cancelModal.appointment?.specialty} · {cancelModal.appointment?.scheduled_datetime?.substring(11, 16) || cancelModal.appointment?.time}
+              </p>
             </div>
             <div>
               <Label>Motivo do cancelamento *</Label>
               <Textarea
                 value={cancelReason}
-                onChange={e => setCancelReason(e.target.value)}
-                placeholder="Ex: Emergência médica, reagendamento necessário..."
+                onChange={(e) => setCancelReason(e.target.value)}
+                placeholder="Ex: Emergencia medica, reagendamento necessario..."
                 className="mt-1 min-h-[80px]"
               />
             </div>

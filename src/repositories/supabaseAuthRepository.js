@@ -10,18 +10,18 @@ export const supabaseAuthRepository = {
     return env.enableSupabaseAuth;
   },
 
-  async getSession() {
+  async getUser() {
     if (!this.isEnabled()) {
       return null;
     }
 
-    const { data, error } = await supabase.auth.getSession();
+    const { data, error } = await supabase.auth.getUser();
 
     if (error) {
       throw error;
     }
 
-    return data.session || null;
+    return data.user || null;
   },
 
   async signIn({ email, password }) {

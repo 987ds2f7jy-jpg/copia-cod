@@ -1,6 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import {
@@ -21,6 +21,7 @@ import { useAuth } from '@/components/AuthContext';
 import { base44 } from '@/api/base44Client';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
 import ProntuariosAnteriores from '@/components/teleconsulta/ProntuariosAnteriores';
@@ -29,15 +30,15 @@ import ZoomChatPanel from '@/components/teleconsulta/ZoomChatPanel';
 import ZoomVideoStage from '@/components/teleconsulta/ZoomVideoStage';
 import { getConsultaParticipantIds, isConsultaParticipant } from '@/lib/consultas';
 import { logUiWarning } from '@/lib/observability';
-import { buildConsultaRoomPayload, buildZoomDisplayName } from '@/lib/zoom';
+import { buildZoomDisplayName } from '@/lib/zoom';
 import { useZoomSession } from '@/hooks/useZoomSession';
 
 function TeleconsultaInner({ consultaId }) {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const queryClient = useQueryClient();
   const [showProntuariosAnt, setShowProntuariosAnt] = useState(false);
   const [showAvaliacao, setShowAvaliacao] = useState(false);
+  const [isLeavingSession, setIsLeavingSession] = useState(false);
   const autoJoinAttemptRef = useRef(false);
   const evaluationPromptedRef = useRef(false);
   const lastConsultaStatusRef = useRef(null);
@@ -92,46 +93,6 @@ function TeleconsultaInner({ consultaId }) {
     userName: zoomDisplayName,
   });
 
-  const initializeConsulta = useMutation({
-    mutationFn: () => {
-      const roomPayload = buildConsultaRoomPayload(consultaId, consulta);
-
-      return base44.entities.Consulta.update(consultaId, {
-        ...roomPayload,
-        status: consulta?.status === 'aguardando' ? 'em_atendimento' : consulta?.status,
-        inicio_at: consulta?.inicio_at || new Date().toISOString(),
-      });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consulta', consultaId] });
-    },
-  });
-
-  const encerrar = useMutation({
-    mutationFn: async () => {
-      autoJoinAttemptRef.current = true;
-
-      const updatedConsulta = await base44.entities.Consulta.update(consultaId, {
-        status: 'finalizada',
-        fim_at: new Date().toISOString(),
-      });
-
-      await zoomSession.leave();
-      return updatedConsulta;
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['consulta', consultaId] });
-
-      if (isPaciente) {
-        evaluationPromptedRef.current = true;
-        setShowAvaliacao(true);
-        return;
-      }
-
-      navigate('/DashboardProfissional');
-    },
-  });
-
   useEffect(() => {
     autoJoinAttemptRef.current = false;
     evaluationPromptedRef.current = false;
@@ -183,14 +144,6 @@ function TeleconsultaInner({ consultaId }) {
   );
 
   useEffect(() => {
-    if (!needsSessionInitialization || initializeConsulta.isPending) {
-      return;
-    }
-
-    initializeConsulta.mutate();
-  }, [initializeConsulta, needsSessionInitialization]);
-
-  useEffect(() => {
     if (
       !consulta ||
       !user?.id ||
@@ -225,8 +178,7 @@ function TeleconsultaInner({ consultaId }) {
     isParticipant &&
     consulta.status !== 'finalizada' &&
     consulta.status !== 'cancelada' &&
-    !encerrar.isPending &&
-    !needsSessionInitialization
+    !isLeavingSession
   );
 
   useEffect(() => {
@@ -242,6 +194,23 @@ function TeleconsultaInner({ consultaId }) {
     autoJoinAttemptRef.current = false;
     await zoomSession.leave();
     await zoomSession.join();
+  };
+
+  const leaveConsultaWithoutWrite = async () => {
+    autoJoinAttemptRef.current = true;
+    setIsLeavingSession(true);
+
+    try {
+      await zoomSession.leave();
+      toast({
+        title: 'Fluxo pendente de backend',
+        description: 'TODO: implementar Edge Function finish-consulta para encerrar a consulta sem escrita direta no frontend.',
+        variant: 'destructive',
+      });
+      navigate(isPaciente ? '/DashboardPaciente' : '/DashboardProfissional');
+    } finally {
+      setIsLeavingSession(false);
+    }
   };
 
   if (isLoading || (user?.role === 'professional' && isLoadingProfessionalIdentity)) {
@@ -357,6 +326,12 @@ function TeleconsultaInner({ consultaId }) {
 
       <div className="flex-1 flex flex-col lg:flex-row overflow-hidden">
         <div className="flex-1 flex flex-col gap-3 p-4 min-h-[320px] lg:min-h-0">
+          {needsSessionInitialization && (
+            <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              TODO backend: implementar `start-consulta-session` para iniciar a consulta e persistir o estado sem escrita direta no frontend.
+            </div>
+          )}
+
           {zoomSession.error && (
             <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
               <div className="flex items-start justify-between gap-3">
@@ -380,7 +355,7 @@ function TeleconsultaInner({ consultaId }) {
             <ZoomVideoStage
               participants={zoomSession.participants}
               currentUserId={zoomSession.currentUserId}
-              isConnecting={zoomSession.isConnecting || initializeConsulta.isPending}
+              isConnecting={zoomSession.isConnecting}
               isConnected={zoomSession.isConnected}
               registerVideoContainer={zoomSession.registerVideoContainer}
               selfLabel="Voce"
@@ -414,10 +389,10 @@ function TeleconsultaInner({ consultaId }) {
             <Button
               size="icon"
               className="h-14 w-14 rounded-full bg-red-600 text-white hover:bg-red-700"
-              onClick={() => encerrar.mutate()}
-              disabled={encerrar.isPending}
+              onClick={() => void leaveConsultaWithoutWrite()}
+              disabled={isLeavingSession}
             >
-              {encerrar.isPending ? <Loader2 className="h-5 w-5 animate-spin" /> : <PhoneOff className="h-6 w-6" />}
+              {isLeavingSession ? <Loader2 className="h-5 w-5 animate-spin" /> : <PhoneOff className="h-6 w-6" />}
             </Button>
           </div>
         </div>

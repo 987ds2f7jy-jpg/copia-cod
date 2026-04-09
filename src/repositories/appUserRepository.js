@@ -1,17 +1,9 @@
 import { base44 } from '@/api/base44Client';
-import { supabase } from '@/integrations/supabase/client';
-import { hasColumnMissingError } from '@/lib/errors';
-import { logUiWarning } from '@/lib/observability';
-
-let authUserIdSupportedPromise;
 
 const APP_USER_ALLOWED_FIELDS = new Set([
   'full_name',
   'email',
-  'password_hash',
   'role',
-  'session_token',
-  'token_expires_at',
   'is_active',
   'phone',
   'cpf',
@@ -20,7 +12,6 @@ const APP_USER_ALLOWED_FIELDS = new Set([
   'address',
   'city',
   'state',
-  'profile_complete',
   'auth_user_id',
 ]);
 
@@ -41,35 +32,6 @@ function sanitizeAppUserPayload(data = {}) {
     payload[key] = key === 'email' ? normalizeEmail(value) : value;
     return payload;
   }, {});
-}
-
-async function supportsAuthUserIdColumn() {
-  if (authUserIdSupportedPromise) {
-    return authUserIdSupportedPromise;
-  }
-
-  authUserIdSupportedPromise = (async () => {
-    const { error } = await supabase
-      .from('app_users')
-      .select('id, auth_user_id')
-      .limit(1);
-
-    if (!error) {
-      return true;
-    }
-
-    if (hasColumnMissingError(error, 'auth_user_id')) {
-      logUiWarning('auth', {
-        stage: 'schema-probe',
-        message: 'A coluna app_users.auth_user_id ainda nao esta disponivel.',
-      });
-      return false;
-    }
-
-    throw error;
-  })();
-
-  return authUserIdSupportedPromise;
 }
 
 export const appUserRepository = {
@@ -102,42 +64,21 @@ export const appUserRepository = {
     return firstOrNull(results);
   },
 
-  async findActiveByEmailAndPasswordHash(email, passwordHash) {
-    const normalizedEmail = normalizeEmail(email);
-
-    const results = await base44.entities.AppUser.filter({
-      email: normalizedEmail,
-      password_hash: passwordHash,
-      is_active: true,
-    }, undefined, 1);
-
-    return firstOrNull(results);
-  },
-
-  async findBySessionToken(sessionToken) {
-    if (!sessionToken) {
+  async findByAuthUserId(authUserId) {
+    if (!authUserId) {
       return null;
     }
 
-    const results = await base44.entities.AppUser.filter({ session_token: sessionToken }, undefined, 1);
+    const results = await base44.entities.AppUser.filter({ auth_user_id: authUserId }, undefined, 1);
     return firstOrNull(results);
   },
 
   async findBySupabaseIdentity({ authUserId, email }) {
-    if (authUserId && await supportsAuthUserIdColumn()) {
-      try {
-        const results = await base44.entities.AppUser.filter({ auth_user_id: authUserId }, undefined, 1);
-        const user = firstOrNull(results);
+    if (authUserId) {
+      const user = await this.findByAuthUserId(authUserId);
 
-        if (user) {
-          return user;
-        }
-      } catch (error) {
-        if (!hasColumnMissingError(error, 'auth_user_id')) {
-          throw error;
-        }
-
-        authUserIdSupportedPromise = Promise.resolve(false);
+      if (user) {
+        return user;
       }
     }
 
@@ -156,40 +97,5 @@ export const appUserRepository = {
     const payload = sanitizeAppUserPayload(data);
 
     return base44.entities.AppUser.update(id, payload);
-  },
-
-  async setLegacySession(id, { token, expiresAt }) {
-    return this.update(id, {
-      session_token: token,
-      token_expires_at: expiresAt,
-    });
-  },
-
-  async clearLegacySession(id) {
-    return this.update(id, {
-      session_token: '',
-      token_expires_at: '',
-    });
-  },
-
-  async syncAuthUserId(id, authUserId) {
-    if (!id || !authUserId) {
-      return null;
-    }
-
-    if (!await supportsAuthUserIdColumn()) {
-      return null;
-    }
-
-    try {
-      return await this.update(id, { auth_user_id: authUserId });
-    } catch (error) {
-      if (hasColumnMissingError(error, 'auth_user_id')) {
-        authUserIdSupportedPromise = Promise.resolve(false);
-        return null;
-      }
-
-      throw error;
-    }
   },
 };

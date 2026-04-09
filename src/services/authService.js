@@ -1,6 +1,5 @@
 import { z } from 'zod';
 import { appUserRepository } from '@/repositories/appUserRepository';
-import { legacySessionRepository } from '@/repositories/legacySessionRepository';
 import { supabaseAuthRepository } from '@/repositories/supabaseAuthRepository';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
@@ -17,24 +16,7 @@ const registerSchema = z.object({
   role: z.enum(['patient', 'professional', 'admin']).default('patient'),
 }).passthrough();
 
-async function hashPassword(password) {
-  const msgBuffer = new TextEncoder().encode(password + 'rd_salt_2026');
-  const hashBuffer = await crypto.subtle.digest('SHA-256', msgBuffer);
-
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((byte) => byte.toString(16).padStart(2, '0'))
-    .join('');
-}
-
-function generateToken() {
-  const tokenBytes = new Uint8Array(32);
-  crypto.getRandomValues(tokenBytes);
-  return Array.from(tokenBytes).map((byte) => byte.toString(16).padStart(2, '0')).join('');
-}
-
-function newExpiry() {
-  return new Date(Date.now() + 7 * 24 * 60 * 60 * 1000).toISOString();
-}
+const VALID_ROLES = new Set(['patient', 'professional', 'admin']);
 
 function ensureActiveUser(user) {
   if (!user) {
@@ -58,27 +40,112 @@ function ensureActiveUser(user) {
   return user;
 }
 
-async function startLegacySession(user) {
-  const token = generateToken();
-  const expiresAt = newExpiry();
-  const updatedUser = await appUserRepository.setLegacySession(user.id, { token, expiresAt });
-  legacySessionRepository.setSession(token, expiresAt);
-  return updatedUser || { ...user, session_token: token, token_expires_at: expiresAt };
+function normalizeRole(value, fallback = 'patient') {
+  return VALID_ROLES.has(value) ? value : fallback;
 }
 
-async function clearLegacySession(userId) {
-  if (userId) {
-    try {
-      await appUserRepository.clearLegacySession(userId);
-    } catch (error) {
-      logUiWarning('auth', {
-        stage: 'clear-legacy-session',
-        error: serializeError(error),
-      });
-    }
+function resolveFullName(authUser, existingUser, fallbackData = {}) {
+  const metadata = authUser?.user_metadata || {};
+  const explicitName = fallbackData.full_name?.trim();
+  const metadataName = metadata.full_name?.trim() || metadata.name?.trim();
+
+  return (
+    explicitName ||
+    existingUser?.full_name ||
+    metadataName ||
+    authUser?.email?.split('@')?.[0] ||
+    'Usuario'
+  );
+}
+
+function resolveRole(authUser, existingUser, fallbackData = {}) {
+  if (fallbackData.role) {
+    return normalizeRole(fallbackData.role, 'patient');
   }
 
-  legacySessionRepository.clearSession();
+  if (existingUser?.role) {
+    return normalizeRole(existingUser.role, 'patient');
+  }
+
+  return normalizeRole(authUser?.user_metadata?.role, 'patient');
+}
+
+function buildAppUserPayload({ authUser, existingUser = null, fallbackData = {} }) {
+  const normalizedEmail = appUserRepository.normalizeEmail(
+    fallbackData.email || authUser?.email || existingUser?.email,
+  );
+
+  if (!authUser?.id || !normalizedEmail) {
+    throw new AppError({
+      message: 'Usuario autenticado invalido para vinculo com app_users.',
+      userMessage: 'Nao foi possivel identificar a conta autenticada.',
+      status: 401,
+      code: 'AUTH_USER_INVALID',
+    });
+  }
+
+  return {
+    full_name: resolveFullName(authUser, existingUser, fallbackData),
+    email: normalizedEmail,
+    role: resolveRole(authUser, existingUser, fallbackData),
+    is_active: existingUser?.is_active ?? true,
+    phone: fallbackData.phone ?? existingUser?.phone ?? '',
+    cpf: fallbackData.cpf ?? existingUser?.cpf ?? '',
+    birth_date: fallbackData.birth_date ?? existingUser?.birth_date ?? '',
+    sex: fallbackData.sex ?? existingUser?.sex ?? '',
+    address: fallbackData.address ?? existingUser?.address ?? '',
+    city: fallbackData.city ?? existingUser?.city ?? '',
+    state: fallbackData.state ?? existingUser?.state ?? '',
+    auth_user_id: authUser.id,
+  };
+}
+
+async function ensureAppUserLinked(authUser, fallbackData = {}) {
+  const normalizedEmail = appUserRepository.normalizeEmail(
+    fallbackData.email || authUser?.email,
+  );
+
+  const existingUser = await appUserRepository.findBySupabaseIdentity({
+    authUserId: authUser?.id,
+    email: normalizedEmail,
+  });
+  const payload = buildAppUserPayload({
+    authUser,
+    existingUser,
+    fallbackData: {
+      ...fallbackData,
+      email: normalizedEmail,
+    },
+  });
+
+  if (existingUser?.id) {
+    const updatedUser = await appUserRepository.update(existingUser.id, payload);
+    const linkedUser = updatedUser || { ...existingUser, ...payload };
+
+    if (linkedUser.auth_user_id !== authUser.id) {
+      throw new AppError({
+        message: 'Falha ao sincronizar auth_user_id com app_users.',
+        userMessage: 'Nao foi possivel vincular a conta autenticada ao perfil da aplicacao.',
+        status: 500,
+        code: 'AUTH_USER_LINK_FAILED',
+      });
+    }
+
+    return ensureActiveUser(linkedUser);
+  }
+
+  const createdUser = await appUserRepository.create(payload);
+
+  if (!createdUser?.id || createdUser.auth_user_id !== authUser.id) {
+    throw new AppError({
+      message: 'Falha ao criar app_users vinculado ao usuario autenticado.',
+      userMessage: 'Nao foi possivel concluir a criacao do perfil da aplicacao.',
+      status: 500,
+      code: 'APP_USER_CREATE_FAILED',
+    });
+  }
+
+  return ensureActiveUser(createdUser);
 }
 
 async function restoreFromSupabaseSession() {
@@ -86,101 +153,40 @@ async function restoreFromSupabaseSession() {
     return null;
   }
 
-  const session = await supabaseAuthRepository.getSession();
+  const authUser = await supabaseAuthRepository.getUser();
 
-  if (!session?.user) {
+  if (!authUser) {
     return null;
   }
 
-  const appUser = await appUserRepository.findBySupabaseIdentity({
-    authUserId: session.user.id,
-    email: session.user.email,
-  });
-
-  if (!appUser || appUser.is_active === false) {
-    await supabaseAuthRepository.signOut();
-    legacySessionRepository.clearSession();
-    return null;
-  }
-
-  const syncedUser = await appUserRepository.syncAuthUserId(appUser.id, session.user.id);
-  return syncedUser || appUser;
+  return ensureAppUserLinked(authUser);
 }
 
-async function ensureSupabaseAccount(registrationData, appUser) {
-  if (!supabaseAuthRepository.isEnabled()) {
-    return appUser;
-  }
-
-  try {
-    const result = await supabaseAuthRepository.signUp({
-      email: registrationData.email,
-      password: registrationData.password,
-      metadata: {
-        app_user_id: appUser.id,
-        full_name: appUser.full_name,
-        role: appUser.role,
-      },
-    });
-
-    if (result?.user?.id) {
-      const syncedUser = await appUserRepository.syncAuthUserId(appUser.id, result.user.id);
-      return syncedUser || appUser;
-    }
-  } catch (error) {
-    logUiWarning('auth', {
-      stage: 'register-supabase',
-      email: registrationData.email,
-      error: serializeError(error),
-    });
-  }
-
-  return appUser;
-}
-
-async function restoreFromLegacySession() {
-  if (!legacySessionRepository.isTokenValid()) {
-    legacySessionRepository.clearSession();
-    return null;
-  }
-
-  const token = legacySessionRepository.getToken();
-  const appUser = await appUserRepository.findBySessionToken(token);
-
-  if (!appUser) {
-    legacySessionRepository.clearSession();
-    return null;
-  }
-
-  if (appUser.token_expires_at && new Date(appUser.token_expires_at) <= new Date()) {
-    await clearLegacySession(appUser.id);
-    return null;
-  }
-
-  return ensureActiveUser(appUser);
+function buildAuthMetadata(registrationData) {
+  return {
+    full_name: registrationData.full_name.trim(),
+    role: registrationData.role,
+  };
 }
 
 export const authService = {
   async restoreSession() {
-    let supabaseUser = null;
-
     try {
-      supabaseUser = await restoreFromSupabaseSession();
+      return await restoreFromSupabaseSession();
     } catch (error) {
-      logUiWarning('auth', {
-        stage: 'restore-supabase-session',
-        error: serializeError(error),
-      });
-    }
+      if (error?.code === 'ACCOUNT_INACTIVE') {
+        try {
+          await supabaseAuthRepository.signOut();
+        } catch (signOutError) {
+          logUiWarning('auth', {
+            stage: 'restore-signout-inactive',
+            error: serializeError(signOutError),
+          });
+        }
 
-    if (supabaseUser) {
-      return supabaseUser;
-    }
+        return null;
+      }
 
-    try {
-      return await restoreFromLegacySession();
-    } catch (error) {
-      legacySessionRepository.clearSession();
       throw normalizeError(error, 'Nao foi possivel restaurar a sessao.');
     }
   },
@@ -188,53 +194,32 @@ export const authService = {
   async login(email, password) {
     const credentials = loginSchema.parse({ email, password });
 
-    if (supabaseAuthRepository.isEnabled()) {
-      try {
-        const authData = await supabaseAuthRepository.signIn(credentials);
-        const appUser = authData?.user
-          ? await appUserRepository.findBySupabaseIdentity({
-            authUserId: authData.user.id,
-            email: authData.user.email,
-          })
-          : null;
-
-        if (appUser?.is_active !== false) {
-          const syncedUser = appUser?.id
-            ? await appUserRepository.syncAuthUserId(appUser.id, authData?.user?.id)
-            : null;
-
-          if (appUser) {
-            return startLegacySession(syncedUser || appUser);
-          }
-        }
-
-        if (authData?.user) {
-          await supabaseAuthRepository.signOut();
-        }
-      } catch (error) {
-        logUiWarning('auth', {
-          stage: 'login-supabase',
-          email: credentials.email,
-          error: serializeError(error),
-        });
-      }
-    }
-
     try {
-      const passwordHash = await hashPassword(credentials.password);
-      const appUser = await appUserRepository.findActiveByEmailAndPasswordHash(credentials.email, passwordHash);
+      const authData = await supabaseAuthRepository.signIn(credentials);
+      const authUser = authData?.user || await supabaseAuthRepository.getUser();
 
-      if (!appUser) {
+      if (!authUser) {
         throw new AppError({
-          message: 'Email ou senha invalidos.',
-          userMessage: 'Email ou senha invalidos.',
+          message: 'Usuario autenticado nao retornado pelo Supabase.',
+          userMessage: 'Nao foi possivel concluir o login.',
           status: 401,
-          code: 'INVALID_CREDENTIALS',
+          code: 'AUTH_USER_MISSING',
         });
       }
 
-      return await startLegacySession(appUser);
+      return await ensureAppUserLinked(authUser);
     } catch (error) {
+      if (error?.code === 'ACCOUNT_INACTIVE') {
+        try {
+          await supabaseAuthRepository.signOut();
+        } catch (signOutError) {
+          logUiWarning('auth', {
+            stage: 'login-signout-inactive',
+            error: serializeError(signOutError),
+          });
+        }
+      }
+
       throw normalizeError(error, 'Nao foi possivel realizar o login.');
     }
   },
@@ -245,7 +230,7 @@ export const authService = {
     try {
       const existingUser = await appUserRepository.findByEmail(registrationData.email);
 
-      if (existingUser) {
+      if (existingUser?.auth_user_id) {
         throw new AppError({
           message: 'Este email ja esta cadastrado.',
           userMessage: 'Este email ja esta cadastrado.',
@@ -254,49 +239,47 @@ export const authService = {
         });
       }
 
-      const passwordHash = await hashPassword(registrationData.password);
-      const token = generateToken();
-      const expiresAt = newExpiry();
-      const appUserPayload = {
+      const authData = await supabaseAuthRepository.signUp({
+        email: registrationData.email,
+        password: registrationData.password,
+        metadata: buildAuthMetadata(registrationData),
+      });
+      const authUser = authData?.user;
+
+      if (!authUser?.id) {
+        throw new AppError({
+          message: 'Supabase Auth nao retornou o usuario criado.',
+          userMessage: 'Nao foi possivel concluir o cadastro.',
+          status: 500,
+          code: 'AUTH_SIGNUP_INCOMPLETE',
+        });
+      }
+
+      return await ensureAppUserLinked(authUser, {
+        ...payload,
         full_name: registrationData.full_name.trim(),
         email: registrationData.email,
-        password_hash: passwordHash,
         role: registrationData.role,
-        session_token: token,
-        token_expires_at: expiresAt,
-        is_active: true,
-        phone: payload.phone || '',
-        cpf: payload.cpf || '',
-        birth_date: payload.birth_date || '',
-        sex: payload.sex || '',
-        address: payload.address || '',
-        city: payload.city || '',
-        state: payload.state || '',
-        profile_complete: Boolean(payload.profile_complete),
-      };
-
-      const newUser = await appUserRepository.create(appUserPayload);
-
-      legacySessionRepository.setSession(token, expiresAt);
-
-      return await ensureSupabaseAccount(registrationData, newUser);
+      });
     } catch (error) {
       throw normalizeError(error, 'Nao foi possivel concluir o cadastro.');
     }
   },
 
-  async logout(user) {
-    await clearLegacySession(user?.id);
+  async logout() {
+    if (!supabaseAuthRepository.isEnabled()) {
+      return;
+    }
 
-    if (supabaseAuthRepository.isEnabled()) {
-      try {
-        await supabaseAuthRepository.signOut();
-      } catch (error) {
-        logUiWarning('auth', {
-          stage: 'logout-supabase',
-          error: serializeError(error),
-        });
-      }
+    try {
+      await supabaseAuthRepository.signOut();
+    } catch (error) {
+      logUiWarning('auth', {
+        stage: 'logout-supabase',
+        error: serializeError(error),
+      });
+
+      throw normalizeError(error, 'Nao foi possivel encerrar a sessao.');
     }
   },
 

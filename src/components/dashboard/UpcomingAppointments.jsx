@@ -10,6 +10,7 @@ import { ptBR } from 'date-fns/locale';
 const STATUS_MAP = {
   pending:       { label: 'Pendente',     cls: 'bg-amber-100 text-amber-700' },
   SOLICITADO:    { label: 'Solicitado',   cls: 'bg-amber-100 text-amber-700' },
+  accepted:      { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
   confirmed:     { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
   CONFIRMADO:    { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
   in_progress:   { label: 'Em andamento', cls: 'bg-blue-100 text-blue-700' },
@@ -21,7 +22,7 @@ const STATUS_MAP = {
 const VALID_TYPES = ['padrao', 'prioritario', 'especialidade', 'standard', 'priority', 'PERFIL', 'ESPECIALIDADE', 'IMEDIATO', undefined, null];
 
 function canStart(a) {
-  const isActive = ['CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(a.status);
+  const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(a.status);
   if (!isActive) return false;
   const dtStr = a.scheduled_datetime || a.datetime;
   if (!dtStr) return isActive; // sem datetime: mostrar se ativo
@@ -50,7 +51,7 @@ const TIPO_LABELS = {
 
 export default function UpcomingAppointments({ appointments, onStart }) {
   const navigate = useNavigate();
-  const ACTIVE = ['pending', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO', 'aguardando', 'em_atendimento'];
+  const ACTIVE = ['pending', 'accepted', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO', 'aguardando', 'em_atendimento'];
 
   const upcoming = [...appointments]
     .filter(a =>

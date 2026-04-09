@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ZoomVideo, { VideoQuality } from '@zoom/videosdk';
 import { supabase } from '@/integrations/supabase/client';
-import { legacySessionRepository } from '@/repositories/legacySessionRepository';
 import { buildZoomUserIdentity, getZoomSdkRole } from '@/lib/zoom';
 import { logUiWarning, serializeError } from '@/lib/observability';
 
@@ -132,7 +131,6 @@ export function useZoomSession({
   }, []);
 
   const fetchToken = useCallback(async () => {
-    const legacySessionToken = legacySessionRepository.getToken();
     const requestBody = {
       consultationId,
       participantRole,
@@ -143,9 +141,6 @@ export function useZoomSession({
 
     const { data, error } = await supabase.functions.invoke('zoom-token', {
       body: requestBody,
-      headers: legacySessionToken
-        ? { 'x-legacy-session-token': legacySessionToken }
-        : undefined,
     });
 
     if (error) {
