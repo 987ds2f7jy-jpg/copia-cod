@@ -1,5 +1,10 @@
 import { base44 } from '@/api/base44Client';
 import { joinQueueEntry } from '@/client-api/queues';
+import {
+  createSolicitacaoExameRequest,
+  deleteSolicitacaoExameRequest,
+  updateSolicitacaoExameRequest,
+} from '@/client-api/solicitacoesExames';
 import { canWorkOnDuty, normalizePlantaoSpecialty, normalizeSpecialty } from '@/lib/professionals';
 
 const OPTIONAL_COLUMNS = [
@@ -16,7 +21,6 @@ const OPTIONAL_COLUMNS = [
 const PLANTAO_STORAGE_KEY = 'rd.solicitacaoExames.plantao';
 const LAUDO_WIZARD_STORAGE_KEY = 'rd.laudosMedicos.wizard';
 const CLINICO_GERAL = 'clinico_geral';
-let optionalSolicitacaoFieldsSupported = null;
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_UPLOAD_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
@@ -34,24 +38,6 @@ function hasMissingColumnError(error, columnName) {
   return message.includes(columnName) && message.includes('column');
 }
 
-function hasTipoConstraintError(error) {
-  const message = getErrorMessage(error);
-  return (
-    message.includes('solicitacoes_exames_tipo_check') ||
-    (message.includes('check constraint') && message.includes('tipo'))
-  );
-}
-
-function stripOptionalSolicitacaoFields(payload) {
-  const nextPayload = { ...payload };
-
-  OPTIONAL_COLUMNS.forEach((columnName) => {
-    delete nextPayload[columnName];
-  });
-
-  return nextPayload;
-}
-
 function ensureAuthenticatedUser(user) {
   if (!user?.id) {
     throw new Error('E necessario estar logado para enviar a solicitacao.');
@@ -60,47 +46,8 @@ function ensureAuthenticatedUser(user) {
   return user;
 }
 
-function buildPacienteSnapshot(user) {
-  return {
-    paciente_id: user.id,
-    paciente_nome: user.full_name || user.email || 'Paciente',
-    paciente_email: user.email || '',
-    paciente_telefone: user.phone || '',
-  };
-}
-
 async function createSolicitacaoExameWithFallback(payload) {
-  let nextPayload = optionalSolicitacaoFieldsSupported === false
-    ? stripOptionalSolicitacaoFields(payload)
-    : { ...payload };
-  let retriedWithoutOptionalFields = optionalSolicitacaoFieldsSupported === false;
-
-  while (true) {
-    try {
-      const result = await base44.entities.SolicitacaoExame.create(nextPayload);
-
-      if (optionalSolicitacaoFieldsSupported === null) {
-        optionalSolicitacaoFieldsSupported = true;
-      }
-
-      return result;
-    } catch (error) {
-      const missingOptionalColumn = OPTIONAL_COLUMNS.some((columnName) => hasMissingColumnError(error, columnName));
-
-      if (missingOptionalColumn && !retriedWithoutOptionalFields) {
-        optionalSolicitacaoFieldsSupported = false;
-        retriedWithoutOptionalFields = true;
-        nextPayload = stripOptionalSolicitacaoFields(payload);
-        continue;
-      }
-
-      if (hasTipoConstraintError(error) && payload.tipo === 'renovacao_receitas') {
-        throw new Error('O banco ainda nao aceita o tipo renovacao_receitas. Aplique a migration da tabela solicitacoes_exames.');
-      }
-
-      throw error;
-    }
-  }
+  return createSolicitacaoExameRequest(payload);
 }
 
 export function buildSpecificExamSymptoms({ exame, motivo, sintomas }) {
@@ -114,34 +61,30 @@ export function buildSpecificExamSymptoms({ exame, motivo, sintomas }) {
 }
 
 export async function createCheckupRequest(user) {
-  const authenticatedUser = ensureAuthenticatedUser(user);
+  ensureAuthenticatedUser(user);
 
   return createSolicitacaoExameWithFallback({
-    ...buildPacienteSnapshot(authenticatedUser),
     tipo: 'checkup',
-    exame_solicitado: 'Check-Up Completo',
+    exameSolicitado: 'Check-Up Completo',
     motivo: 'Exames de rotina / check-up preventivo',
     sintomas: '',
-    status: 'pending',
-    assintomatico_confirmado: true,
-    fluxo_destino: 'dashboard',
-    especialidade_destino: CLINICO_GERAL,
+    assintomaticoConfirmado: true,
+    fluxoDestino: 'dashboard',
+    especialidadeDestino: CLINICO_GERAL,
   });
 }
 
 export async function createSpecificExamRequest(user, { exame, motivo, sintomas }) {
-  const authenticatedUser = ensureAuthenticatedUser(user);
+  ensureAuthenticatedUser(user);
 
   return createSolicitacaoExameWithFallback({
-    ...buildPacienteSnapshot(authenticatedUser),
     tipo: 'especificos',
-    exame_solicitado: exame,
+    exameSolicitado: exame,
     motivo: motivo || '',
     sintomas: sintomas || '',
-    status: 'pending',
-    assintomatico_confirmado: false,
-    fluxo_destino: 'plantao',
-    especialidade_destino: CLINICO_GERAL,
+    assintomaticoConfirmado: false,
+    fluxoDestino: 'plantao',
+    especialidadeDestino: CLINICO_GERAL,
   });
 }
 
@@ -151,22 +94,20 @@ export async function createPrescriptionRenewalRequest(user, {
   frequencia,
   arquivoReceitaUrl,
 }) {
-  const authenticatedUser = ensureAuthenticatedUser(user);
+  ensureAuthenticatedUser(user);
 
   return createSolicitacaoExameWithFallback({
-    ...buildPacienteSnapshot(authenticatedUser),
     tipo: 'renovacao_receitas',
-    exame_solicitado: '',
+    exameSolicitado: '',
     motivo: '',
     sintomas: '',
-    status: 'pending',
-    assintomatico_confirmado: false,
-    nome_medicamento: nomeMedicamento,
+    assintomaticoConfirmado: false,
+    nomeMedicamento,
     dosagem,
     frequencia,
-    arquivo_receita_url: arquivoReceitaUrl,
-    fluxo_destino: 'dashboard',
-    especialidade_destino: CLINICO_GERAL,
+    arquivoReceitaUrl,
+    fluxoDestino: 'dashboard',
+    especialidadeDestino: CLINICO_GERAL,
   });
 }
 
@@ -331,25 +272,21 @@ export async function createLaudoMedicoRequest(user, {
   arquivos,
   queueId = '',
 }) {
-  const authenticatedUser = ensureAuthenticatedUser(user);
+  ensureAuthenticatedUser(user);
 
   return createSolicitacaoExameWithFallback({
-    ...buildPacienteSnapshot(authenticatedUser),
     tipo: 'laudo_medico',
-    exame_solicitado: '',
+    exameSolicitado: '',
     motivo: especificacaoLaudo?.finalidade || '',
     sintomas: informacoesSaude?.diagnostico || '',
-    status: 'pending',
-    assintomatico_confirmado: false,
-    dados_identificacao: dadosIdentificacao || {},
-    informacoes_saude: informacoesSaude || {},
-    dados_saude: informacoesSaude || {},
-    especificacao_laudo: especificacaoLaudo || {},
+    assintomaticoConfirmado: false,
+    dadosIdentificacao: dadosIdentificacao || {},
+    informacoesSaude: informacoesSaude || {},
+    especificacaoLaudo: especificacaoLaudo || {},
     arquivos: arquivos || [],
-    arquivos_urls: arquivos || [],
-    fluxo_destino: 'plantao',
-    especialidade_destino: CLINICO_GERAL,
-    queue_id: queueId || '',
+    fluxoDestino: 'plantao',
+    especialidadeDestino: CLINICO_GERAL,
+    queueId: queueId || '',
   });
 }
 
@@ -358,18 +295,10 @@ export async function linkSolicitacaoExameToQueue(solicitacaoId, queueId) {
     return null;
   }
 
-  try {
-    return await base44.entities.SolicitacaoExame.update(solicitacaoId, {
-      queue_id: queueId,
-    });
-  } catch (error) {
-    if (hasMissingColumnError(error, 'queue_id')) {
-      optionalSolicitacaoFieldsSupported = false;
-      return null;
-    }
-
-    throw error;
-  }
+  return updateSolicitacaoExameRequest({
+    solicitacaoId,
+    queueId,
+  });
 }
 
 export function persistSpecificExamRedirect(data) {
@@ -562,9 +491,20 @@ export async function markLaudoSolicitacaoInProgress(queueEntry, professionalId)
     return null;
   }
 
-  return base44.entities.SolicitacaoExame.update(laudoSolicitacao.id, {
+  return updateSolicitacaoExameRequest({
+    solicitacaoId: laudoSolicitacao.id,
     status: 'in_progress',
-    medico_id: professionalId,
+    medicoId: professionalId,
+  });
+}
+
+export async function deleteSolicitacaoExame(solicitacaoId) {
+  if (!solicitacaoId) {
+    return null;
+  }
+
+  return deleteSolicitacaoExameRequest({
+    solicitacaoId,
   });
 }
 

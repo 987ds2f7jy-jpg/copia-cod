@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { supabase } from '@/integrations/supabase/client';
-import { base44 } from '@/api/base44Client';
 import { leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -33,6 +32,7 @@ import {
 import { toast } from '@/components/ui/use-toast';
 import {
   clearLaudoWizardState,
+  deleteSolicitacaoExame,
   createLaudoMedicoRequest,
   createLaudoQueueEntry,
   linkSolicitacaoExameToQueue,
@@ -416,7 +416,7 @@ function LaudosMedicosInner() {
 
       if (createdSolicitacao?.id) {
         try {
-          await base44.entities.SolicitacaoExame.delete(createdSolicitacao.id);
+          await deleteSolicitacaoExame(createdSolicitacao.id);
         } catch (cleanupError) {
           console.error('[laudos-medicos] cleanup solicitacao failed', cleanupError);
         }
