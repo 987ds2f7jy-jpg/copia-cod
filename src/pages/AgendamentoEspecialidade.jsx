@@ -3,8 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
-import { useMutation } from '@tanstack/react-query';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +20,7 @@ import { ptBR } from 'date-fns/locale';
 import {
   validateSchedulingWindow, buildDatetime, ALL_TIME_SLOTS
 } from '@/lib/scheduling';
+import { createAppointmentRequest } from '@/client-api/appointments';
 
 const PROFESSIONS = [
   {
@@ -40,6 +40,7 @@ const PROFESSIONS = [
 function AgendamentoEspecialidadeInner() {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
 
   // All hooks before any conditional return
   const [selectedProfession, setSelectedProfession] = useState(null);
@@ -66,22 +67,18 @@ function AgendamentoEspecialidadeInner() {
       const validation = validateSchedulingWindow(scheduledDatetime);
       if (!validation.valid) throw new Error(validation.reason);
 
-      return base44.entities.Appointment.create({
-        patient_id: user.id,
-        patient_name: user.full_name,
-        patient_email: user.email,
-        professional_id: null,
+      return createAppointmentRequest({
+        professionalProfileId: null,
         specialty: selectedSpecialty,
-        appointment_type: 'ESPECIALIDADE',
-        scheduled_datetime: scheduledDatetime,
         date: dateStr,
         time: selectedTime,
-        status: 'SOLICITADO',
         symptoms,
+        priority: false,
       });
     },
     onSuccess: () => {
       setSubmitError(null);
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setStep(5);
     },
     onError: (err) => {

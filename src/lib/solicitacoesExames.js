@@ -1,4 +1,5 @@
 import { base44 } from '@/api/base44Client';
+import { joinQueueEntry } from '@/client-api/queues';
 import { canWorkOnDuty, normalizePlantaoSpecialty, normalizeSpecialty } from '@/lib/professionals';
 
 const OPTIONAL_COLUMNS = [
@@ -16,8 +17,6 @@ const PLANTAO_STORAGE_KEY = 'rd.solicitacaoExames.plantao';
 const LAUDO_WIZARD_STORAGE_KEY = 'rd.laudosMedicos.wizard';
 const CLINICO_GERAL = 'clinico_geral';
 let optionalSolicitacaoFieldsSupported = null;
-const OPTIONAL_QUEUE_COLUMNS = ['solicitacao_exame_id'];
-let optionalQueueFieldsSupported = null;
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_UPLOAD_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
 
@@ -47,16 +46,6 @@ function stripOptionalSolicitacaoFields(payload) {
   const nextPayload = { ...payload };
 
   OPTIONAL_COLUMNS.forEach((columnName) => {
-    delete nextPayload[columnName];
-  });
-
-  return nextPayload;
-}
-
-function stripOptionalQueueFields(payload) {
-  const nextPayload = { ...payload };
-
-  OPTIONAL_QUEUE_COLUMNS.forEach((columnName) => {
     delete nextPayload[columnName];
   });
 
@@ -281,33 +270,14 @@ export function isLaudoQueueEntry(queueEntry) {
 }
 
 export async function createQueueEntryWithFallback(payload) {
-  let nextPayload = optionalQueueFieldsSupported === false
-    ? stripOptionalQueueFields(payload)
-    : { ...payload };
-  let retriedWithoutOptionalFields = optionalQueueFieldsSupported === false;
+  const result = await joinQueueEntry({
+    specialty: payload.specialty,
+    symptoms: payload.symptoms || '',
+    priorityLevel: payload.priority_level || 'normal',
+    solicitacaoExameId: payload.solicitacao_exame_id || '',
+  });
 
-  while (true) {
-    try {
-      const result = await base44.entities.Queue.create(nextPayload);
-
-      if (optionalQueueFieldsSupported === null) {
-        optionalQueueFieldsSupported = true;
-      }
-
-      return result;
-    } catch (error) {
-      const missingOptionalColumn = OPTIONAL_QUEUE_COLUMNS.some((columnName) => hasMissingColumnError(error, columnName));
-
-      if (missingOptionalColumn && !retriedWithoutOptionalFields) {
-        optionalQueueFieldsSupported = false;
-        retriedWithoutOptionalFields = true;
-        nextPayload = stripOptionalQueueFields(payload);
-        continue;
-      }
-
-      throw error;
-    }
-  }
+  return result.queueEntry;
 }
 
 export async function findCurrentQueueEntry(patientId, specialty = CLINICO_GERAL) {
@@ -341,20 +311,16 @@ export async function createLaudoQueueEntry({
     };
   }
 
-  const createdEntry = await createQueueEntryWithFallback({
-    patient_id: patientId,
-    patient_name: patientName,
-    patient_email: patientEmail || '',
+  const result = await joinQueueEntry({
     specialty: CLINICO_GERAL,
     symptoms: buildLaudoQueueSymptoms({ tipoLaudo, diagnostico, finalidade }),
-    priority_level: 'normal',
-    status: 'waiting',
-    solicitacao_exame_id: solicitacaoExameId || '',
+    priorityLevel: 'normal',
+    solicitacaoExameId: solicitacaoExameId || '',
   });
 
   return {
-    entry: createdEntry,
-    reusedExisting: false,
+    entry: result.queueEntry,
+    reusedExisting: Boolean(result.reusedExisting),
   };
 }
 

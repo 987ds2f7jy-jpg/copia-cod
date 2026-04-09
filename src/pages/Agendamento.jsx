@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -19,11 +19,13 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { createAppointmentRequest } from '@/client-api/appointments';
 
 function AgendamentoInner() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const professionalId = searchParams.get('professional');
 
   const [step, setStep] = useState(1);
@@ -48,9 +50,17 @@ function AgendamentoInner() {
   const [submitError, setSubmitError] = useState(null);
 
   const createAppointment = useMutation({
-    mutationFn: (data) => base44.entities.Appointment.create(data),
+    mutationFn: ({ professionalProfileId, date, time, symptoms, priority }) => createAppointmentRequest({
+      professionalProfileId,
+      specialty: professional?.specialty || '',
+      date,
+      time,
+      symptoms,
+      priority,
+    }),
     onSuccess: () => {
       setSubmitError(null);
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setStep(4); // Only advance AFTER server confirms
     },
     onError: (err) => {
@@ -68,18 +78,11 @@ function AgendamentoInner() {
     if (!user || !professional || !selectedDate || !selectedTime) return;
     setSubmitError(null);
     createAppointment.mutate({
-      patient_id: user.id,
-      patient_name: user.full_name,
-      patient_email: user.email,
-      professional_id: professional.id,
-      professional_name: professional.full_name,
-      specialty: professional.specialty,
-      appointment_type: appointmentType,
+      professionalProfileId: professional.id,
       date: format(selectedDate, 'yyyy-MM-dd'),
       time: selectedTime,
-      status: 'pending',
-      price: appointmentType === 'standard' ? professional.price_standard : professional.price_priority,
-      symptoms: symptoms,
+      symptoms,
+      priority: appointmentType === 'priority',
     });
   };
 

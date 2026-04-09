@@ -4,7 +4,7 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
-import { useQuery, useMutation } from '@tanstack/react-query';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -22,11 +22,13 @@ import {
   validateSchedulingWindow, computeAvailableSlots,
   buildDatetime
 } from '@/lib/scheduling';
+import { createAppointmentRequest } from '@/client-api/appointments';
 
 function AgendamentoPerfilInner() {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const queryClient = useQueryClient();
   const professionalId = searchParams.get('professional');
 
   // All hooks before any conditional return
@@ -125,10 +127,19 @@ function AgendamentoPerfilInner() {
         throw new Error('Este horário acabou de ser ocupado. Por favor, escolha outro.');
       }
 
-      return base44.entities.Appointment.create(data);
+      return createAppointmentRequest({
+        professionalProfileId: privateProfileId,
+        specialty: publicProfile?.specialty || '',
+        date: dateStr,
+        time: selectedTime,
+        symptoms: data.symptoms || '',
+        priority: data.appointment_type === 'priority',
+      });
     },
     onSuccess: () => {
       setSubmitError(null);
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
+      queryClient.invalidateQueries({ queryKey: ['booked-appts', privateProfileId] });
       setStep(3);
     },
     onError: (err) => {
@@ -196,18 +207,9 @@ function AgendamentoPerfilInner() {
     const isPriority = appointmentType === 'priority';
 
     createAppointment.mutate({
-      patient_id: user.id,
-      patient_name: user.full_name,
-      patient_email: user.email,
-      professional_id: privateProfileId,
-      professional_name: publicProfile.full_name,
-      specialty: publicProfile.specialty,
       appointment_type: isPriority ? 'priority' : 'PERFIL',
-      scheduled_datetime: scheduledDatetime,
       date: dateStr,
       time: selectedTime,
-      status: isPriority ? 'SOLICITADO' : 'CONFIRMADO',
-      price: isPriority ? (publicProfile.price_priority || 0) : (publicProfile.price_standard || 0),
       symptoms,
     });
   };

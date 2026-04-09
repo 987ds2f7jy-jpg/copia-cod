@@ -6,6 +6,7 @@ import { AlertCircle, Clock, Loader2, Stethoscope, Users, Video } from 'lucide-r
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { base44 } from '@/api/base44Client';
+import { joinQueueEntry, leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -210,12 +211,13 @@ function ConsultaAgoraInner() {
         return currentQueue;
       }
 
-      const position = (queueStats?.count || 0) + 1;
-      return base44.entities.Queue.create({
-        ...payload,
-        position,
-        estimated_wait_time: position * 10,
+      const result = await joinQueueEntry({
+        specialty: payload.specialty,
+        symptoms: payload.symptoms || '',
+        priorityLevel: payload.priority_level || 'normal',
       });
+
+      return result.queueEntry;
     },
     onSuccess: (nextQueueEntry) => {
       setQueueEntry(nextQueueEntry);
@@ -226,7 +228,7 @@ function ConsultaAgoraInner() {
   });
 
   const leaveQueue = useMutation({
-    mutationFn: (id) => base44.entities.Queue.update(id, { status: 'cancelled' }),
+    mutationFn: (id) => leaveQueueEntry({ queueId: id }),
     onSuccess: () => {
       setQueueEntry(null);
       setStep('form');

@@ -4,6 +4,7 @@ import { useAuth } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { supabase } from '@/integrations/supabase/client';
 import { base44 } from '@/api/base44Client';
+import { leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -423,7 +424,7 @@ function LaudosMedicosInner() {
 
       if (createdQueueEntry?.id && !reusedExistingQueue) {
         try {
-          await base44.entities.Queue.delete(createdQueueEntry.id);
+          await leaveQueueEntry({ queueId: createdQueueEntry.id });
         } catch (cleanupError) {
           console.error('[laudos-medicos] cleanup queue failed', cleanupError);
         }
