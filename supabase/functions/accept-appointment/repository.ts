@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
 import type {
