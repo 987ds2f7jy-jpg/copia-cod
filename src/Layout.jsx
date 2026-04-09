@@ -15,7 +15,7 @@ import {
   ArrowLeft, UserPlus, Shield
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
-import { AuthProvider, useAuth } from '@/components/AuthContext';
+import { useAuth } from '@/components/AuthContext';
 
 const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699cf7ff429d9e728fec4557/63297c12a_logo.png";
 
@@ -313,9 +313,5 @@ function LayoutInner({ children, currentPageName }) {
 }
 
 export default function Layout({ children, currentPageName }) {
-  return (
-    <AuthProvider>
-      <LayoutInner currentPageName={currentPageName}>{children}</LayoutInner>
-    </AuthProvider>
-  );
+  return <LayoutInner currentPageName={currentPageName}>{children}</LayoutInner>;
 }

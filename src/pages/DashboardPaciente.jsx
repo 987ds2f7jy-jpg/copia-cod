@@ -4,6 +4,10 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import {
+  cancelAppointmentRequest,
+  submitAppointmentReviewRequest,
+} from '@/client-api/appointments';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -55,7 +59,7 @@ function DashboardPacienteInner() {
   };
 
   const cancelAppointment = useMutation({
-    mutationFn: (id) => base44.entities.Appointment.update(id, { status: 'CANCELADO' }),
+    mutationFn: (id) => cancelAppointmentRequest({ appointmentId: id }),
     onMutate: (id) => setCancellingId(id),
     onSettled: () => {
       setCancellingId(null);
@@ -63,12 +67,12 @@ function DashboardPacienteInner() {
     },
   });
 
-  const submitReview = useMutation({
+  const _submitReviewLegacy = useMutation({
     mutationFn: async (data) => {
       // Guard: prevent duplicate review per appointment
       const existing = await base44.entities.Review.filter({ appointment_id: data.appointment_id, patient_id: data.patient_id });
       if (existing.length > 0) throw new Error('Você já avaliou esta consulta.');
-      return base44.entities.Review.create(data);
+      return Promise.resolve(data);
     },
     onSuccess: async (_, vars) => {
       // Recalculate and update professional's rating
@@ -95,13 +99,28 @@ function DashboardPacienteInner() {
     },
   });
 
+  const submitReview = useMutation({
+    mutationFn: ({ appointment_id, rating, comment }) => submitAppointmentReviewRequest({
+      appointmentId: appointment_id,
+      rating,
+      comment,
+    }),
+    onSuccess: async () => {
+      setReviewModal({ open: false, appointment: null });
+      setReviewData({ rating: 5, comment: '' });
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['patientReviews', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['profReviews'] });
+      queryClient.invalidateQueries({ queryKey: ['myProfessionalProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] });
+      queryClient.invalidateQueries({ queryKey: ['professionals'] });
+    },
+  });
+
   const handleReviewSubmit = () => {
     if (!reviewModal.appointment || !user) return;
     
     submitReview.mutate({
-      patient_id: user.id,
-      patient_name: user.full_name,
-      professional_id: reviewModal.appointment.professional_id,
       appointment_id: reviewModal.appointment.id,
       rating: reviewData.rating,
       comment: reviewData.comment,
@@ -461,6 +480,7 @@ function DashboardPacienteInner() {
                   {[1, 2, 3, 4, 5].map((star) => (
                     <button
                       key={star}
+                      type="button"
                       onClick={() => setReviewData({ ...reviewData, rating: star })}
                       className="p-1"
                     >

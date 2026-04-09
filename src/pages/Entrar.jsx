@@ -25,7 +25,7 @@ export default function Entrar() {
       sessionStorage.removeItem('rd_login_next');
       navigate(next, { replace: true });
     }
-  }, [isAuthenticated]);
+  }, [isAuthenticated, navigate]);
 
   const handleSubmit = async (e) => {
     e.preventDefault();

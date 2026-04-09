@@ -33,6 +33,7 @@ import FinancialWidget from '@/components/dashboard/FinancialWidget';
 import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
 import ServicosExtras from '@/components/dashboard/ServicosExtras';
+import { answerQuestionRequest } from '@/client-api/questions';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import { attachLaudoContextToQueue } from '@/lib/solicitacoesExames';
 import {
@@ -278,19 +279,34 @@ function DashboardProfissionalInner() {
     };
   }, []);
 
-  const answerQuestion = useMutation({
+  const _answerQuestionLegacy = useMutation({
     mutationFn: async ({ id, answer }) => {
       // Guard: prevent answering already-answered question
       const current = await base44.entities.Question.get(id);
       if (current?.status === 'RESPONDIDA') {
         throw new Error('Esta pergunta já foi respondida.');
       }
-      return base44.entities.Question.update(id, buildQuestionAnswerPayload({
+      return Promise.resolve(buildQuestionAnswerPayload({
         professional,
         publicProfileId: publicProfile?.id,
         answer,
       }));
     },
+    onSuccess: () => {
+      setAnswerModal({ open: false, question: null });
+      setAnswerText('');
+      queryClient.invalidateQueries({ queryKey: ['pendingQuestions'] });
+      queryClient.invalidateQueries({ queryKey: ['answeredQuestions'] });
+      queryClient.invalidateQueries({ queryKey: ['forumPublic'] });
+      queryClient.invalidateQueries({ queryKey: ['perfil-questions'] });
+    },
+  });
+
+  const answerQuestion = useMutation({
+    mutationFn: ({ id, answer }) => answerQuestionRequest({
+      questionId: id,
+      answerText: answer,
+    }),
     onSuccess: () => {
       setAnswerModal({ open: false, question: null });
       setAnswerText('');

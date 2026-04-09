@@ -91,12 +91,12 @@ export function AuthProvider({ children }) {
     window.location.href = '/';
   }, [queryClient, user]);
 
-  const refreshUser = useCallback(async () => {
-    if (!user?.id) {
+  const refreshUser = useCallback(async (targetUserId = user?.id) => {
+    if (!targetUserId) {
       return null;
     }
 
-    const updatedUser = await authService.refreshUser(user.id);
+    const updatedUser = await authService.refreshUser(targetUserId);
 
     if (updatedUser) {
       setUser(updatedUser);

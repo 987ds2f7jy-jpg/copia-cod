@@ -182,7 +182,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/photos' });
       set('photo_url', file_url);
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a foto.');
@@ -196,7 +196,9 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!files.length) return;
     setUploadingGallery(true);
     try {
-      const uploads = await Promise.all(files.map((file) => base44.integrations.Core.UploadFile({ file })));
+      const uploads = await Promise.all(
+        files.map((file) => base44.integrations.Core.UploadFile({ file, folder: 'professionals/gallery' })),
+      );
       set('gallery_urls', [...form.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a galeria.');

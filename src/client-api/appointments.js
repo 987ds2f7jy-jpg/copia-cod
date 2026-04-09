@@ -20,3 +20,33 @@ export async function createAppointmentRequest({
     fallbackMessage: 'Nao foi possivel criar o agendamento.',
   });
 }
+
+export async function cancelAppointmentRequest({
+  appointmentId,
+  reason = '',
+}) {
+  const result = await invokeEdgeFunction('cancel-appointment', {
+    body: {
+      appointmentId,
+      reason,
+    },
+    fallbackMessage: 'Nao foi possivel cancelar a consulta.',
+  });
+
+  return result?.appointment ?? null;
+}
+
+export async function submitAppointmentReviewRequest({
+  appointmentId,
+  rating,
+  comment = '',
+}) {
+  return invokeEdgeFunction('submit-appointment-review', {
+    body: {
+      appointmentId,
+      rating,
+      comment,
+    },
+    fallbackMessage: 'Nao foi possivel enviar a avaliacao da consulta.',
+  });
+}

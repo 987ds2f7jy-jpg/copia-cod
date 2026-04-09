@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/components/AuthContext';
-import { supabase } from '@/integrations/supabase/client';
+import { deleteUploadedFiles, uploadPublicFile } from '@/client-api/uploads';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -85,28 +85,17 @@ export default function RenovacaoReceitas() {
     let uploadedFilePath = '';
 
     try {
-      const fileExt = arquivo.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-      const filePath = `public/${fileName}`;
-      uploadedFilePath = filePath;
-
-      const { error: uploadError } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, arquivo);
-
-      if (uploadError) {
-        throw uploadError;
-      }
-
-      const { data: publicFile } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(filePath);
+      const uploadedFile = await uploadPublicFile({
+        file: arquivo,
+        folder: 'renovacao_receitas',
+      });
+      uploadedFilePath = uploadedFile?.path || '';
 
       await createPrescriptionRenewalRequest(user, {
         nomeMedicamento: medicamento.trim(),
         dosagem: dosagem.trim(),
         frequencia,
-        arquivoReceitaUrl: publicFile.publicUrl,
+        arquivoReceitaUrl: uploadedFile?.publicUrl || '',
       });
 
       setSuccess(true);
@@ -118,7 +107,7 @@ export default function RenovacaoReceitas() {
       console.error('[RenovacaoReceitas] Falha ao enviar solicitacao', error);
 
       if (uploadedFilePath) {
-        await supabase.storage.from('uploads').remove([uploadedFilePath]).catch(() => {});
+        await deleteUploadedFiles({ paths: [uploadedFilePath] }).catch(() => {});
       }
 
       toast({

@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { supabase } from '@/integrations/supabase/client';
+import { deleteUploadedFiles, uploadPublicFile } from '@/client-api/uploads';
 import { leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -297,18 +297,19 @@ function LaudosMedicosInner() {
   }
 
   async function uploadFile(file, folderName) {
-    const storagePath = buildUploadPath(user.id, folderName, file);
-    const { error } = await supabase.storage.from('uploads').upload(storagePath, file);
-
-    if (error) {
-      throw error;
-    }
-
-    const { data } = supabase.storage.from('uploads').getPublicUrl(storagePath);
+    const folderMap = {
+      documento_identidade: 'laudos/documento_identidade',
+      exames: 'laudos/exames',
+      relatorios: 'laudos/relatorios',
+    };
+    const uploadedFile = await uploadPublicFile({
+      file,
+      folder: folderMap[folderName] || 'laudos/documento_identidade',
+    });
 
     return {
-      path: storagePath,
-      publicUrl: data.publicUrl,
+      path: uploadedFile?.path || buildUploadPath(user.id, folderName, file),
+      publicUrl: uploadedFile?.publicUrl || '',
       fileName: file.name,
     };
   }
@@ -322,9 +323,9 @@ function LaudosMedicosInner() {
       return;
     }
 
-    const { error } = await supabase.storage.from('uploads').remove(uniquePaths);
-
-    if (error) {
+    try {
+      await deleteUploadedFiles({ paths: uniquePaths });
+    } catch (error) {
       console.error('[laudos-medicos] cleanup upload failed', error);
     }
   }

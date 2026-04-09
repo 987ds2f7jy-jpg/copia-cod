@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { cancelAppointmentRequest } from '@/client-api/appointments';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -71,9 +71,9 @@ export default function MinhasConsultasHoje({ appointments }) {
     });
 
   const cancelMutation = useMutation({
-    mutationFn: ({ id, reason }) => base44.entities.Appointment.update(id, {
-      status: 'CANCELADO',
-      cancellation_reason: reason,
+    mutationFn: ({ id, reason }) => cancelAppointmentRequest({
+      appointmentId: id,
+      reason,
     }),
     onSuccess: () => {
       setCancelModal({ open: false, appointment: null });

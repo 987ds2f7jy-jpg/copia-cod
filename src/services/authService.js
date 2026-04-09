@@ -169,6 +169,27 @@ function buildAuthMetadata(registrationData) {
   };
 }
 
+async function ensureAuthenticatedSignupSession({ authData, registrationData }) {
+  if (authData?.session) {
+    return authData;
+  }
+
+  try {
+    return await supabaseAuthRepository.signIn({
+      email: registrationData.email,
+      password: registrationData.password,
+    });
+  } catch (error) {
+    throw new AppError({
+      message: 'Cadastro criado sem sessao autenticada.',
+      userMessage: 'Conta criada, mas a sessao nao foi iniciada automaticamente. Tente entrar para continuar.',
+      status: 409,
+      code: 'AUTH_SESSION_NOT_CREATED',
+      cause: error,
+    });
+  }
+}
+
 export const authService = {
   async restoreSession() {
     try {
@@ -239,12 +260,16 @@ export const authService = {
         });
       }
 
-      const authData = await supabaseAuthRepository.signUp({
+      const signUpData = await supabaseAuthRepository.signUp({
         email: registrationData.email,
         password: registrationData.password,
         metadata: buildAuthMetadata(registrationData),
       });
-      const authUser = authData?.user;
+      const authData = await ensureAuthenticatedSignupSession({
+        authData: signUpData,
+        registrationData,
+      });
+      const authUser = authData?.user || signUpData?.user;
 
       if (!authUser?.id) {
         throw new AppError({
@@ -256,7 +281,7 @@ export const authService = {
       }
 
       return await ensureAppUserLinked(authUser, {
-        ...payload,
+        ...registrationData,
         full_name: registrationData.full_name.trim(),
         email: registrationData.email,
         role: registrationData.role,

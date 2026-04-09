@@ -4,6 +4,7 @@
  */
 import { supabase } from '@/integrations/supabase/client';
 import { logApiError, logApiRequest, logApiResponse, serializeError } from '@/lib/observability';
+import { uploadPublicFile } from '@/client-api/uploads';
 
 // Table name mapping (entity name -> PostgreSQL table name)
 const TABLE_MAP = {
@@ -190,22 +191,13 @@ for (const [entityName, tableName] of Object.entries(TABLE_MAP)) {
 // File upload via Supabase Storage
 const integrations = {
   Core: {
-    async UploadFile({ file }) {
-      const fileExt = file.name.split('.').pop();
-      const fileName = `${Date.now()}_${Math.random().toString(36).slice(2)}.${fileExt}`;
-      const filePath = `public/${fileName}`;
+    async UploadFile({ file, folder = 'public' }) {
+      const uploadedFile = await uploadPublicFile({ file, folder });
 
-      const { error } = await supabase.storage
-        .from('uploads')
-        .upload(filePath, file);
-
-      if (error) throw error;
-
-      const { data: { publicUrl } } = supabase.storage
-        .from('uploads')
-        .getPublicUrl(filePath);
-
-      return { file_url: publicUrl };
+      return {
+        file_url: uploadedFile?.publicUrl || '',
+        file_path: uploadedFile?.path || '',
+      };
     },
   },
 };

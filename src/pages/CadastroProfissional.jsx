@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { base44 } from '@/api/base44Client';
+import { registerProfessionalRequest } from '@/client-api/professionals';
 import { useAuth } from '@/components/AuthContext';
 import { useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -57,7 +58,7 @@ function generateSlug(name, specialty) {
 
 export default function CadastroProfissional() {
   const navigate = useNavigate();
-  const { user: appUser, register } = useAuth();
+  const { user: appUser, register, refreshUser } = useAuth();
   const [step, setStep] = useState(1);
   const [uploading, setUploading] = useState(false);
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
@@ -109,7 +110,7 @@ export default function CadastroProfissional() {
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/diplomas' });
       set('diploma_url', file_url);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar o diploma.');
@@ -123,7 +124,7 @@ export default function CadastroProfissional() {
     if (!file) return;
     setUploadingPhoto(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file });
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/photos' });
       set('photo_url', file_url);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar a foto.');
@@ -137,7 +138,9 @@ export default function CadastroProfissional() {
     if (!files.length) return;
     setUploadingGallery(true);
     try {
-      const uploads = await Promise.all(files.map((file) => base44.integrations.Core.UploadFile({ file })));
+      const uploads = await Promise.all(
+        files.map((file) => base44.integrations.Core.UploadFile({ file, folder: 'professionals/gallery' })),
+      );
       set('gallery_urls', [...formData.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar a galeria.');
@@ -161,30 +164,36 @@ export default function CadastroProfissional() {
     set('patient_types', curr.includes(type) ? curr.filter(t => t !== type) : [...curr, type]);
   };
 
-  const createProfessional = useMutation({
+  const _createProfessionalLegacy = useMutation({
     mutationFn: async (data) => {
       let currentUser = appUser;
 
       // 1. Create or update user account
-      if (!currentUser) {
-        if (!email || !password) throw new Error('Informe email e senha para criar sua conta.');
-        currentUser = await register({
-          full_name: data.full_name,
-          email,
+        if (!currentUser) {
+          if (!email || !password) throw new Error('Informe email e senha para criar sua conta.');
+          currentUser = await register({
+            full_name: data.full_name,
+            email,
           password,
           role: 'professional',
           phone: data.phone,
           cpf: data.cpf,
-          sex: data.sex,
-        });
-      } else {
-        await base44.entities.AppUser.update(currentUser.id, { role: 'professional' });
-      }
+            sex: data.sex,
+          });
+        } else {
+          await base44.entities.AppUser.update(currentUser.id, {
+            role: 'professional',
+            full_name: data.full_name,
+            phone: data.phone,
+            cpf: data.cpf,
+            sex: data.sex,
+          });
+        }
 
       const graduationYear = parseInt(data.graduation_year) || 0;
 
       // 2. Create ProfessionalProfile (private — contains CPF, diploma, etc.)
-      const privateProfile = await base44.entities.ProfessionalProfile.create({
+      const privateProfile = await Promise.resolve({
         user_id: currentUser.id,
         full_name: data.full_name,
         profession: data.profession,
@@ -210,7 +219,7 @@ export default function CadastroProfissional() {
       });
 
       // 3. Create ProfessionalPublicProfile (public portfolio — NO sensitive data)
-      await base44.entities.ProfessionalPublicProfile.create({
+      await Promise.resolve({
         professional_profile_id: privateProfile.id,
         user_id: currentUser.id,
         full_name: data.full_name,
@@ -241,6 +250,57 @@ export default function CadastroProfissional() {
       });
 
       return privateProfile;
+    },
+    onSuccess: () => setStep(99),
+  });
+
+  const createProfessional = useMutation({
+    mutationFn: async (data) => {
+      let currentUser = appUser;
+
+      if (!currentUser) {
+        if (!email || !password) {
+          throw new Error('Informe email e senha para criar sua conta.');
+        }
+
+        currentUser = await register({
+          full_name: data.full_name,
+          email,
+          password,
+          role: 'professional',
+          phone: data.phone,
+          cpf: data.cpf,
+          sex: data.sex,
+        });
+      }
+
+      const result = await registerProfessionalRequest({
+        fullName: data.full_name,
+        profession: data.profession,
+        specialty: data.specialty,
+        registerNumber: data.register_number,
+        registerState: data.register_state,
+        rqe: data.rqe || '',
+        university: data.university,
+        graduationYear: parseInt(data.graduation_year) || 0,
+        diplomaUrl: data.diploma_url,
+        sex: data.sex,
+        phone: data.phone,
+        cpf: data.cpf,
+        photoUrl: data.photo_url,
+        bio: data.bio,
+        instagramUrl: data.instagram_url,
+        patientTypes: data.patient_types,
+        tags: data.tags,
+        modality: data.modality,
+        officeCity: data.office_city,
+        officeState: data.office_state,
+        officeAddress: data.office_address,
+        galleryUrls: data.gallery_urls,
+      });
+
+      await refreshUser(currentUser?.id);
+      return result;
     },
     onSuccess: () => setStep(99),
   });
@@ -371,7 +431,37 @@ export default function CadastroProfissional() {
                 <div className="flex justify-between">
                   {!appUser && <Button variant="outline" onClick={prevStep}><ArrowLeft className="w-4 h-4 mr-2" />Voltar</Button>}
                   <div className={appUser ? 'ml-auto' : ''}>
-                    <Button onClick={nextStep} disabled={!formData.full_name || !formData.profession || !formData.specialty} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                    <Button
+                      onClick={async () => {
+                        if (!formData.full_name || !formData.profession || !formData.specialty) {
+                          return;
+                        }
+
+                        if (!appUser) {
+                          try {
+                            await register({
+                              full_name: formData.full_name,
+                              email,
+                              password,
+                              role: 'professional',
+                              phone: formData.phone,
+                              cpf: formData.cpf,
+                              sex: formData.sex,
+                            });
+                          } catch (error) {
+                            toast.error(error?.message || 'Nao foi possivel criar sua conta profissional.');
+                            return;
+                          }
+
+                          setStep(2);
+                          return;
+                        }
+
+                        nextStep();
+                      }}
+                      disabled={!formData.full_name || !formData.profession || !formData.specialty}
+                      className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                    >
                       Continuar <ArrowRight className="w-4 h-4 ml-2" />
                     </Button>
                   </div>

@@ -1,6 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { base44 } from '@/api/base44Client';
+import {
+  createQuestionRequest,
+  deleteQuestionRequest,
+} from '@/client-api/questions';
 import { useAuth } from '@/components/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -151,19 +155,26 @@ export default function PergunteEspecialista() {
   });
 
   const submitQuestion = useMutation({
-    mutationFn: (data) => base44.entities.Question.create(data),
+    mutationFn: ({ specialty, questionText }) => createQuestionRequest({
+      specialty,
+      questionText,
+    }),
     onSuccess: () => {
       setQuestionText('');
       setSelectedSpecialty('');
       setSubmitted(true);
       queryClient.invalidateQueries({ queryKey: ['myQuestions', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pendingQuestions'] });
       setTimeout(() => setSubmitted(false), 4000);
     },
   });
 
   const deleteQuestion = useMutation({
-    mutationFn: (id) => base44.entities.Question.delete(id),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ['myQuestions', user?.id] }),
+    mutationFn: (id) => deleteQuestionRequest({ questionId: id }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['myQuestions', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['pendingQuestions'] });
+    },
   });
 
   const publicProfilesById = useMemo(
@@ -187,11 +198,16 @@ export default function PergunteEspecialista() {
     if (user.role !== 'patient') return; // só pacientes
     if (!selectedSpecialty || !questionText.trim()) return;
 
-    submitQuestion.mutate(buildQuestionCreatePayload({
+    const payload = buildQuestionCreatePayload({
       user,
       specialty: selectedSpecialty,
       questionText,
-    }));
+    });
+
+    submitQuestion.mutate({
+      specialty: payload.specialty,
+      questionText: payload.pergunta,
+    });
   };
 
   // Filtrar fórum por especialidade no frontend
