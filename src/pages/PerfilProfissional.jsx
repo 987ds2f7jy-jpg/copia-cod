@@ -1,11 +1,11 @@
 import React, { useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Stethoscope, ArrowLeft, Loader2 } from 'lucide-react';
 import { motion } from 'framer-motion';
+import { getBookingDataRequest } from '@/client-api/booking';
 
 import ProfileHero from '@/components/perfil/ProfileHero';
 import ProfileMetrics from '@/components/perfil/ProfileMetrics';
@@ -21,52 +21,17 @@ export default function PerfilProfissional() {
   const [searchParams] = useSearchParams();
   const professionalId = searchParams.get('id');
 
-  // Public profile: only approved professionals are visible
-  const { data: professional, isLoading: loadingProf } = useQuery({
+  const { data: bookingData, isLoading: loadingProf } = useQuery({
     queryKey: ['perfil-professional', professionalId],
-    queryFn: async () => {
-      if (!professionalId) return null;
-      // Primary: ProfessionalPublicProfile with approved status
-      let list = await base44.entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
-      if (list && list.length > 0) return list[0];
-      // Fallback for profiles linked via professional_profile_id
-      list = await base44.entities.ProfessionalPublicProfile.filter({ professional_profile_id: professionalId, status: 'approved' });
-      if (list && list.length > 0) return list[0];
-      return null;
-    },
+    queryFn: () => getBookingDataRequest({ professionalId }),
     enabled: !!professionalId,
     staleTime: 60_000,
   });
 
-  const { data: appointments = [] } = useQuery({
-    queryKey: ['perfil-appts', professionalId],
-    queryFn: () => base44.entities.Appointment.filter(
-      { professional_id: professional?.professional_profile_id || professionalId, status: 'CONCLUIDO' },
-      '-scheduled_datetime', 200
-    ),
-    enabled: !!professional,
-    staleTime: 60_000,
-  });
-
-  const { data: reviews = [] } = useQuery({
-    queryKey: ['perfil-reviews', professionalId],
-    queryFn: () => base44.entities.Review.filter(
-      { professional_id: professional?.professional_profile_id || professionalId },
-      '-created_date', 100
-    ),
-    enabled: !!professional,
-    staleTime: 30_000,
-  });
-
-  const { data: questions = [] } = useQuery({
-    queryKey: ['perfil-questions', professionalId],
-    queryFn: () => base44.entities.Question.filter({
-      public_profile_id: professionalId,
-      status: 'RESPONDIDA',
-    }, '-answered_at', 50),
-    enabled: !!professionalId,
-    staleTime: 60_000,
-  });
+  const professional = bookingData?.publicProfile || null;
+  const appointments = bookingData?.appointments || [];
+  const reviews = bookingData?.reviews || [];
+  const questions = bookingData?.questions || [];
 
   const normalizedQuestions = useMemo(
     () => normalizeQuestions(questions, professional ? { [professional.id]: professional } : {}),

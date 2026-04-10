@@ -1,5 +1,9 @@
-import { base44 } from '@/api/base44Client';
 import { joinQueueEntry } from '@/client-api/queues';
+import {
+  getCurrentQueueEntryRequest,
+  listDirectSolicitacoesForProfessionalRequest,
+  resolveLaudoSolicitacaoFromQueueRequest,
+} from '@/client-api/queuesRead';
 import {
   createSolicitacaoExameRequest,
   deleteSolicitacaoExameRequest,
@@ -226,12 +230,10 @@ export async function findCurrentQueueEntry(patientId, specialty = CLINICO_GERAL
     return null;
   }
 
-  const statuses = ['waiting', 'in_progress', 'em_atendimento'];
-  const matches = await Promise.all(
-    statuses.map((status) => base44.entities.Queue.filter({ patient_id: patientId, specialty, status }, '-created_date', 5)),
-  );
-
-  return matches.flat()[0] || null;
+  return getCurrentQueueEntryRequest({
+    patientId,
+    specialty,
+  });
 }
 
 export async function createLaudoQueueEntry({
@@ -380,28 +382,9 @@ export function shouldShowSolicitacaoForProfessional(solicitacao, professional) 
 }
 
 export async function listDirectSolicitacoesForProfessional(professional) {
-  const professionalSpecialty = normalizePlantaoSpecialty(professional?.specialty);
-
-  if (professionalSpecialty !== CLINICO_GERAL) {
-    return [];
-  }
-
-  try {
-    return await base44.entities.SolicitacaoExame.filter({
-      status: 'pending',
-      fluxo_destino: 'dashboard',
-      especialidade_destino: CLINICO_GERAL,
-    }, '-created_date');
-  } catch (error) {
-    const hasSchemaMismatch = OPTIONAL_COLUMNS.some((columnName) => hasMissingColumnError(error, columnName));
-
-    if (!hasSchemaMismatch) {
-      throw error;
-    }
-
-    const pendingSolicitacoes = await base44.entities.SolicitacaoExame.filter({ status: 'pending' }, '-created_date');
-    return pendingSolicitacoes.filter((solicitacao) => shouldShowSolicitacaoForProfessional(solicitacao, professional));
-  }
+  return listDirectSolicitacoesForProfessionalRequest({
+    professionalSpecialty: professional?.specialty || '',
+  });
 }
 
 export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
@@ -409,47 +392,7 @@ export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
     return null;
   }
 
-  if (queueEntry.solicitacao_exame_id) {
-    const directMatch = await base44.entities.SolicitacaoExame.filter({ id: queueEntry.solicitacao_exame_id }, undefined, 1);
-    if (directMatch?.[0]) {
-      return directMatch[0];
-    }
-  }
-
-  if (queueEntry.id) {
-    try {
-      const queueLinkedMatches = await base44.entities.SolicitacaoExame.filter({
-        queue_id: queueEntry.id,
-        tipo: 'laudo_medico',
-      }, '-created_date', 5);
-
-      if (queueLinkedMatches?.[0]) {
-        return queueLinkedMatches[0];
-      }
-    } catch (error) {
-      if (!hasMissingColumnError(error, 'queue_id')) {
-        throw error;
-      }
-    }
-  }
-
-  const pendingMatches = await base44.entities.SolicitacaoExame.filter({
-    paciente_id: queueEntry.patient_id,
-    tipo: 'laudo_medico',
-    status: 'pending',
-  }, '-created_date', 5);
-
-  if (pendingMatches?.[0]) {
-    return pendingMatches[0];
-  }
-
-  const inProgressMatches = await base44.entities.SolicitacaoExame.filter({
-    paciente_id: queueEntry.patient_id,
-    tipo: 'laudo_medico',
-    status: 'in_progress',
-  }, '-created_date', 5);
-
-  return inProgressMatches?.[0] || null;
+  return resolveLaudoSolicitacaoFromQueueRequest({ queueEntry });
 }
 
 export async function attachLaudoContextToQueue(queueEntries = []) {

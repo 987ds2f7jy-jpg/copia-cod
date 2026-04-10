@@ -85,6 +85,20 @@ function mapRegisterPayload(registrationData) {
   };
 }
 
+function mapBootstrapPayload(registrationData) {
+  return {
+    fullName: registrationData.full_name.trim(),
+    role: registrationData.role,
+    phone: registrationData.phone?.trim() || '',
+    cpf: registrationData.cpf?.trim() || '',
+    birthDate: registrationData.birth_date?.trim() || '',
+    sex: registrationData.sex?.trim() || '',
+    address: registrationData.address?.trim() || '',
+    city: registrationData.city?.trim() || '',
+    state: registrationData.state?.trim().toUpperCase() || '',
+  };
+}
+
 function sanitizeProfilePayload(data = {}) {
   const payload = {};
   const hasOwn = (key) => Object.prototype.hasOwnProperty.call(data, key);
@@ -191,13 +205,21 @@ export const authService = {
     const registrationData = registerSchema.parse(payload);
 
     try {
-      const result = await accountApi.bootstrapAppUserRequest(
-        mapRegisterPayload(registrationData),
-      );
+      const signupPayload = mapRegisterPayload(registrationData);
+      const signupResult = await supabaseAuthRepository.signUp({
+        email: signupPayload.email,
+        password: signupPayload.password,
+        metadata: {
+          full_name: signupPayload.fullName,
+          role: signupPayload.role,
+        },
+      });
+      const accessToken = signupResult?.session?.access_token;
+      const refreshToken = signupResult?.session?.refresh_token;
 
-      if (!result?.session?.accessToken || !result?.session?.refreshToken) {
+      if (!accessToken || !refreshToken) {
         throw new AppError({
-          message: 'Cadastro criado sem sessao autenticada.',
+          message: 'Cadastro no Supabase Auth nao retornou sessao.',
           userMessage: 'Conta criada, mas a sessao nao foi iniciada automaticamente. Tente entrar para continuar.',
           status: 409,
           code: 'AUTH_SESSION_NOT_CREATED',
@@ -205,11 +227,15 @@ export const authService = {
       }
 
       await supabaseAuthRepository.setSession({
-        accessToken: result.session.accessToken,
-        refreshToken: result.session.refreshToken,
+        accessToken,
+        refreshToken,
       });
 
-      return ensureActiveUser(toUiUser(result.appUser || null));
+      const result = await accountApi.bootstrapAppUserRequest(
+        mapBootstrapPayload(registrationData),
+      );
+
+      return ensureActiveUser(toUiUser(result?.appUser || null));
     } catch (error) {
       throw normalizeAccountError(error, 'Nao foi possivel concluir o cadastro.');
     }

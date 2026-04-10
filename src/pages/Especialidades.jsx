@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
+import { getProfessionalCatalogRequest } from '@/client-api/professionalCatalog';
 import { motion } from 'framer-motion';
 import PullToRefresh from '@/components/PullToRefresh';
 import { Button } from "@/components/ui/button";
@@ -60,19 +60,17 @@ export default function Especialidades() {
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
   // Only visible professionals: status = 'approved' AND perfil_ativo = true
-  const { data: professionals = [], isLoading } = useQuery({
-    queryKey: ['professionals', selectedSpecialty],
-    queryFn: async () => {
-      const filters = { status: 'approved', perfil_ativo: true };
-      if (selectedSpecialty) filters.specialty = selectedSpecialty;
-      return base44.entities.ProfessionalPublicProfile.filter(filters);
-    },
+  const { data: catalogData, isLoading } = useQuery({
+    queryKey: ['professionals', selectedSpecialty, searchTerm],
+    queryFn: () => getProfessionalCatalogRequest({
+      specialty: selectedSpecialty || '',
+      searchTerm,
+      onlyActive: true,
+    }),
   });
+  const professionals = catalogData?.professionals || [];
 
-  const filteredProfessionals = professionals.filter(prof =>
-    prof.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    prof.specialty?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredProfessionals = professionals;
 
   const handleRefresh = async () => {
     await queryClient.invalidateQueries({ queryKey: ['professionals'] });

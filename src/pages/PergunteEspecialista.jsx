@@ -1,10 +1,10 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
 import {
   createQuestionRequest,
   deleteQuestionRequest,
 } from '@/client-api/questions';
+import { getForumReadRequest } from '@/client-api/forumRead';
 import { useAuth } from '@/components/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -136,23 +136,18 @@ export default function PergunteEspecialista() {
   const [filterSpecialty, setFilterSpecialty] = useState('Todas');
   const [submitted, setSubmitted] = useState(false);
 
-  // Fórum público: apenas perguntas RESPONDIDAS
-  const { data: publicQuestions = [], isLoading } = useQuery({
+  const { data: forumRead, isLoading } = useQuery({
     queryKey: ['forumPublic', filterSpecialty],
-    queryFn: () => base44.entities.Question.filter({ status: 'RESPONDIDA' }, '-answered_at', 50),
+    queryFn: () => getForumReadRequest({
+      filterSpecialty,
+      includePublic: true,
+      includeMine: Boolean(user?.id),
+    }),
   });
 
-  const { data: professionalPublicProfiles = [] } = useQuery({
-    queryKey: ['forumProfessionalProfiles'],
-    queryFn: () => base44.entities.ProfessionalPublicProfile.filter({ status: 'approved' }, '-created_date', 200),
-  });
-
-  // Minhas perguntas (paciente)
-  const { data: myQuestions = [] } = useQuery({
-    queryKey: ['myQuestions', user?.id],
-    queryFn: () => base44.entities.Question.filter({ paciente_id: user.id }, '-created_date', 50),
-    enabled: !!user?.id,
-  });
+  const professionalPublicProfiles = forumRead?.professionalPublicProfiles || [];
+  const publicQuestions = forumRead?.publicQuestions || [];
+  const myQuestions = forumRead?.myQuestions || [];
 
   const submitQuestion = useMutation({
     mutationFn: ({ specialty, questionText }) => createQuestionRequest({

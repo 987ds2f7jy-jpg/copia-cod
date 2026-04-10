@@ -1,100 +1,43 @@
-import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { supabase } from '@/integrations/supabase/client';
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import React, { useMemo, useState } from 'react';
+import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { acceptAppointmentRequest } from '@/client-api/professionalAppointments';
 
-async function resolveFunctionErrorMessage(error, fallbackMessage) {
-  const response = error?.context;
-
-  if (response && typeof response.clone === 'function') {
-    try {
-      const payload = await response.clone().json();
-
-      if (payload?.error?.message) {
-        return payload.error.message;
-      }
-    } catch {
-      // Ignore non-JSON error responses and keep the fallback message.
-    }
-  }
-
-  return error?.message || fallbackMessage;
-}
-
-export default function SolicitacoesAgendamento({ professional }) {
+export default function SolicitacoesAgendamento({ professional, appointments = [] }) {
   const queryClient = useQueryClient();
   const [acceptingId, setAcceptingId] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
 
-  const { data: solBySpecialty = [] } = useQuery({
-    queryKey: ['solicitacoes-esp', professional?.id, professional?.specialty],
-    queryFn: () => base44.entities.Appointment.filter({
-      specialty: professional.specialty,
-      appointment_type: 'ESPECIALIDADE',
-      status: 'SOLICITADO',
-    }, '-scheduled_datetime', 50),
-    enabled: !!professional?.id && !!professional?.specialty,
-    refetchInterval: 30_000,
-  });
+  const solicitacoes = useMemo(() => (
+    appointments
+      .filter((item) => {
+        if (!item?.id) {
+          return false;
+        }
 
-  const { data: solPriority = [] } = useQuery({
-    queryKey: ['solicitacoes-pri', professional?.id],
-    queryFn: () => base44.entities.Appointment.filter({
-      professional_id: professional.id,
-      appointment_type: 'priority',
-      status: 'SOLICITADO',
-    }, '-scheduled_datetime', 50),
-    enabled: !!professional?.id,
-    refetchInterval: 30_000,
-  });
-
-  const isLoading = false;
-  const solicitacoes = [...solBySpecialty, ...solPriority]
-    .filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx)
-    .sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''));
+        const isPending = item.status === 'SOLICITADO';
+        const isPriority = item.appointment_type === 'priority' && item.professional_id === professional?.id;
+        const isSpecialty = item.appointment_type === 'ESPECIALIDADE' && item.specialty === professional?.specialty;
+        return isPending && (isPriority || isSpecialty);
+      })
+      .filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx)
+      .sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''))
+  ), [appointments, professional?.id, professional?.specialty]);
 
   const acceptMutation = useMutation({
     mutationFn: async (solicitacao) => {
       setErrorMsg(null);
-
-      const { data, error } = await supabase.functions.invoke('accept-appointment', {
-        body: {
-          appointmentId: solicitacao.id,
-        },
-      });
-
-      if (error) {
-        throw new Error(
-          await resolveFunctionErrorMessage(error, 'Erro ao aceitar solicitacao.'),
-        );
-      }
-
-      if (!data?.data?.appointment?.id || !data?.data?.consulta?.id) {
+      const data = await acceptAppointmentRequest({ appointmentId: solicitacao.id });
+      if (!data?.appointment?.id || !data?.consulta?.id) {
         throw new Error('Resposta invalida ao aceitar a solicitacao.');
       }
-
-      return data.data;
+      return data;
     },
     onSuccess: (result, solicitacao) => {
-      const removeAcceptedRequest = (items) => (
-        Array.isArray(items)
-          ? items.filter((item) => item.id !== solicitacao.id)
-          : []
-      );
-
-      queryClient.setQueryData(
-        ['solicitacoes-esp', professional?.id, professional?.specialty],
-        removeAcceptedRequest,
-      );
-      queryClient.setQueryData(
-        ['solicitacoes-pri', professional?.id],
-        removeAcceptedRequest,
-      );
       queryClient.setQueryData(['profAppts', professional?.id], (items) => {
         if (!Array.isArray(items)) {
           return items;
@@ -115,9 +58,6 @@ export default function SolicitacoesAgendamento({ professional }) {
           ...items.filter((item) => item.id !== solicitacao.id),
         ];
       });
-
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes-esp'] });
-      queryClient.invalidateQueries({ queryKey: ['solicitacoes-pri'] });
       queryClient.invalidateQueries({ queryKey: ['profAppts'] });
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setAcceptingId(null);
@@ -137,14 +77,6 @@ export default function SolicitacoesAgendamento({ professional }) {
       return dt;
     }
   };
-
-  if (isLoading) {
-    return (
-      <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-center h-32">
-        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
-      </div>
-    );
-  }
 
   return (
     <div className="bg-white rounded-xl shadow-sm overflow-hidden">

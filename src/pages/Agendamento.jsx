@@ -3,7 +3,6 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { createAppointmentRequest } from '@/client-api/appointments';
+import { getBookingDataRequest } from '@/client-api/booking';
 
 function AgendamentoInner() {
   const [searchParams] = useSearchParams();
@@ -34,18 +34,12 @@ function AgendamentoInner() {
   const [appointmentType, setAppointmentType] = useState('standard');
   const [symptoms, setSymptoms] = useState('');
 
-  const { data: professional, isLoading: loadingProfessional } = useQuery({
+  const { data: bookingData, isLoading: loadingProfessional } = useQuery({
     queryKey: ['professional', professionalId],
-    queryFn: async () => {
-      // Try ProfessionalProfile first (new entity), then Professional (legacy)
-      let list = await base44.entities.ProfessionalProfile.filter({ id: professionalId });
-      if (!list || list.length === 0) {
-        list = await base44.entities.Professional.filter({ id: professionalId });
-      }
-      return list[0] || null;
-    },
+    queryFn: () => getBookingDataRequest({ professionalId }),
     enabled: !!professionalId,
   });
+  const professional = bookingData?.publicProfile || null;
 
   const [submitError, setSubmitError] = useState(null);
 
