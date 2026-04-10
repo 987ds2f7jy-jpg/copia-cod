@@ -1,5 +1,4 @@
-import { base44 } from '@/api/base44Client';
-import { env } from '@/config/env';
+import { setProfessionalDutyRequest } from '@/client-api/professionalDashboard';
 
 export const PLANTAO_ESPECIALIDADES = ['clinico_geral', 'pediatria', 'psicologia', 'psiquiatria'];
 
@@ -54,50 +53,19 @@ export function mapAdminActionToStatuses(action) {
 }
 
 export async function setProfessionalPublicDuty(publicProfileId, isOnDuty) {
-  if (!publicProfileId) {
-    return null;
-  }
-
-  return base44.entities.ProfessionalPublicProfile.update(publicProfileId, {
-    is_on_duty: Boolean(isOnDuty),
-  });
+  // Back-compat helper used by dashboard components.
+  // The Edge Function validates the authenticated user and applies writes server-side.
+  return setProfessionalDutyRequest({ isOnDuty: Boolean(isOnDuty) });
 }
 
 export async function resetProfessionalDutyForUser(userId) {
-  if (!userId) {
-    return [];
-  }
-
-  const publicProfiles = await base44.entities.ProfessionalPublicProfile.filter({ user_id: userId });
-  const activeProfiles = publicProfiles.filter((profile) => profile?.is_on_duty);
-
-  if (activeProfiles.length === 0) {
-    return [];
-  }
-
-  return Promise.all(
-    activeProfiles.map((profile) => setProfessionalPublicDuty(profile.id, false)),
-  );
+  // Deprecated: duty is managed per-session via Edge Function.
+  // Kept for compatibility, but no longer performs client-side writes.
+  return [];
 }
 
 export function sendKeepaliveDutyOff(publicProfileId) {
-  if (!publicProfileId || typeof window === 'undefined') {
-    return;
-  }
-
-  const endpoint = `${env.supabaseUrl}/rest/v1/professional_public_profiles?id=eq.${publicProfileId}`;
-
-  void fetch(endpoint, {
-    method: 'PATCH',
-    keepalive: true,
-    headers: {
-      apikey: env.supabasePublishableKey,
-      Authorization: `Bearer ${env.supabasePublishableKey}`,
-      'Content-Type': 'application/json',
-      Prefer: 'return=minimal',
-    },
-    body: JSON.stringify({
-      is_on_duty: false,
-    }),
-  }).catch(() => {});
+  // Removed: direct REST PATCH is forbidden after backend separation.
+  // Session cleanup should call setProfessionalPublicDuty(false) on unmount.
+  void publicProfileId;
 }

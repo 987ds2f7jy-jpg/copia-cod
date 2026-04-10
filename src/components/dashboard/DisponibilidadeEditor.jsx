@@ -1,11 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Save, Clock } from 'lucide-react';
 import { toast } from 'sonner';
 import { ALL_TIME_SLOTS, WEEKDAY_LABELS } from '@/lib/scheduling';
+import { getProfessionalDashboardRequest, replaceAvailabilitySlotsRequest } from '@/client-api/professionalDashboard';
 
 // weekdays: 0=Dom, 1=Seg, ..., 6=Sáb
 const ALL_WEEKDAYS = [0, 1, 2, 3, 4, 5, 6];
@@ -16,7 +16,10 @@ export default function DisponibilidadeEditor({ professional }) {
   // Carregar slots existentes
   const { data: existingSlots = [], isLoading } = useQuery({
     queryKey: ['avail-slots', professional?.id],
-    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
+      return result?.availabilitySlots || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -47,31 +50,17 @@ export default function DisponibilidadeEditor({ professional }) {
 
   const saveMutation = useMutation({
     mutationFn: async () => {
-      const existingByKey = new Map(
-        existingSlots.map((slot) => [`${slot.weekday}|${slot.time_slot}`, slot])
-      );
-      const desiredKeys = new Set(selected);
+      const slots = [...selected].map((key) => {
+        const [weekday, timeSlot] = key.split('|');
+        return { weekday: Number(weekday), timeSlot };
+      });
 
-      const toCreate = [...desiredKeys]
-        .filter((key) => !existingByKey.has(key))
-        .map((key) => {
-          const [weekday, time_slot] = key.split('|');
-          return { professional_id: professional.id, weekday: Number(weekday), time_slot };
-        });
-
-      const toDelete = existingSlots.filter(
-        (slot) => !desiredKeys.has(`${slot.weekday}|${slot.time_slot}`)
-      );
-
-      if (toCreate.length > 0) {
-        await base44.entities.AvailabilitySlot.bulkCreate(toCreate);
-      }
-
-      await Promise.all(toDelete.map((slot) => base44.entities.AvailabilitySlot.delete(slot.id)));
+      await replaceAvailabilitySlotsRequest({ slots });
     },
     onSuccess: () => {
       toast.success('Disponibilidade salva!');
       queryClient.invalidateQueries({ queryKey: ['avail-slots', professional?.id] });
+      queryClient.invalidateQueries({ queryKey: ['professional-dashboard'] });
     },
     onError: (err) => toast.error(err?.message || 'Erro ao salvar disponibilidade'),
   });

@@ -1,5 +1,4 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthContext';
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { toast } from 'sonner';
 import { Link } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
 import { mapAdminActionToStatuses } from '@/lib/professionals';
+import { getAdminApprovalQueueRequest, reviewProfessionalApplicationRequest } from '@/client-api/professionalDashboard';
 
 const STATUS_COLORS = {
   pending_review: 'bg-amber-100 text-amber-700',
@@ -34,35 +34,26 @@ export default function AdminAprovacao() {
 
   const { data: profiles = [], isLoading } = useQuery({
     queryKey: ['admin-public-profiles', filterStatus],
-    queryFn: () => {
-      const filters = filterStatus !== 'all' ? { status: filterStatus } : {};
-      return base44.entities.ProfessionalPublicProfile.filter(filters, '-created_date', 100);
+    queryFn: async () => {
+      const result = await getAdminApprovalQueueRequest({ status: filterStatus, limit: 100 });
+      return result?.publicProfiles || [];
     },
     enabled: user?.role === 'admin',
   });
 
   const { data: privateProfiles = [] } = useQuery({
     queryKey: ['admin-private-profiles'],
-    queryFn: () => base44.entities.ProfessionalProfile.list('-created_date', 200),
+    queryFn: async () => {
+      const result = await getAdminApprovalQueueRequest({ status: 'all', limit: 200 });
+      return result?.privateProfiles || [];
+    },
     enabled: user?.role === 'admin',
   });
 
   const approvePublicMutation = useMutation({
     mutationFn: async ({ publicProfileId, privateProfileId, action }) => {
-      const { publicStatus, privateStatus, isOnDuty } = mapAdminActionToStatuses(action);
-
-      await base44.entities.ProfessionalPublicProfile.update(publicProfileId, {
-        status: publicStatus,
-        is_on_duty: isOnDuty,
-      });
-
-      if (privateProfileId) {
-        await base44.entities.ProfessionalProfile.update(privateProfileId, {
-          status: privateStatus,
-          is_on_duty: isOnDuty,
-        });
-      }
-
+      await reviewProfessionalApplicationRequest({ publicProfileId, action });
+      const { publicStatus } = mapAdminActionToStatuses(action);
       return { action, newStatus: publicStatus };
     },
     onSuccess: ({ action }) => {

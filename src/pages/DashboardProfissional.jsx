@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom';
 import MeuPerfil from '@/components/dashboard/MeuPerfil';
 import SolicitacoesAgendamento from '@/components/dashboard/SolicitacoesAgendamento';
 import MinhasConsultasHoje from '@/components/dashboard/MinhasConsultasHoje';
-import { base44 } from '@/api/base44Client';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -41,9 +40,9 @@ import {
   isProfessionalApprovedStatus,
   normalizePlantaoSpecialty,
   PLANTAO_ESPECIALIDADES,
-  sendKeepaliveDutyOff,
   setProfessionalPublicDuty,
 } from '@/lib/professionals';
+import { getProfessionalDashboardRequest } from '@/client-api/professionalDashboard';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -114,11 +113,8 @@ function DashboardProfissionalInner() {
   const { data: professional, isLoading: loadingProfessional, isError: profError } = useQuery({
     queryKey: ['myProfessionalProfile', user?.id],
     queryFn: async () => {
-      let profs = await base44.entities.ProfessionalProfile.filter({ user_id: user.id });
-      if (!profs || profs.length === 0) {
-        profs = await base44.entities.Professional.filter({ user_id: user.id });
-      }
-      return profs?.[0] || null;
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
+      return result?.professional || null;
     },
     enabled: !!user?.id,
     staleTime: 30_000,
@@ -127,7 +123,10 @@ function DashboardProfissionalInner() {
   // Load public profile for editing in "Meu Perfil"
   const { data: publicProfile } = useQuery({
     queryKey: ['myPublicProfile', professional?.id],
-    queryFn: () => base44.entities.ProfessionalPublicProfile.filter({ professional_profile_id: professional.id }),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
+      return result?.publicProfile ? [result.publicProfile] : [];
+    },
     enabled: !!professional?.id,
     select: (list) => list?.[0] || null,
     staleTime: 60_000,
@@ -138,7 +137,10 @@ function DashboardProfissionalInner() {
   // ── Queries ────────────────────────────────────────────────────────────────
   const { data: appointments = [], isLoading: loadingAppts } = useQuery({
     queryKey: ['profAppts', professional?.id],
-    queryFn: () => base44.entities.Appointment.filter({ professional_id: professional.id }, '-date', 200),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 200, includeQueue: false, includeQuestions: false, includeReviews: false });
+      return result?.appointments || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -146,9 +148,8 @@ function DashboardProfissionalInner() {
   const { data: queuePatients = [] } = useQuery({
     queryKey: ['queueWaiting', professional?.id, professional?.specialty],
     queryFn: async () => {
-      const normalized = normalizePlantaoSpecialty(professional?.specialty);
-      const queueEntries = await base44.entities.Queue.filter({ specialty: normalized, status: 'waiting' });
-      return attachLaudoContextToQueue(queueEntries);
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: true, includeQuestions: false, includeReviews: false });
+      return attachLaudoContextToQueue(result?.queueWaiting || []);
     },
     enabled: !!professional?.id && !!professional?.specialty && canWorkOnDuty(professional?.specialty) && currentDutyStatus,
     refetchInterval: currentDutyStatus ? 10000 : false,
@@ -159,7 +160,10 @@ function DashboardProfissionalInner() {
 
   const { data: queueAll = [] } = useQuery({
     queryKey: ['queueAll', professional?.id],
-    queryFn: () => base44.entities.Queue.filter({ assigned_professional_id: professional.id }, '-created_date', 100),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: true, includeQuestions: false, includeReviews: false });
+      return result?.queueAll || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -168,18 +172,8 @@ function DashboardProfissionalInner() {
   const { data: pendingQuestions = [] } = useQuery({
     queryKey: ['pendingQuestions', professional?.id, professionalSpecialty],
     queryFn: async () => {
-      const bySpecialty = await base44.entities.Question.filter({
-        status: 'PENDENTE',
-        specialty: professionalSpecialty,
-      }, 'created_date', 50);
-      const byAll = await base44.entities.Question.filter({
-        status: 'PENDENTE',
-        specialty: 'Todas',
-      }, 'created_date', 50);
-      // Merge and deduplicate by id
-      const merged = [...bySpecialty, ...byAll];
-      const seen = new Set();
-      return merged.filter(q => { if (seen.has(q.id)) return false; seen.add(q.id); return true; });
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: true, includeReviews: false });
+      return result?.pendingQuestions || [];
     },
     enabled: !!professional?.id && !!professionalSpecialty,
     refetchInterval: 30_000,
@@ -188,7 +182,10 @@ function DashboardProfissionalInner() {
   // Perguntas já respondidas por este profissional
   const { data: answeredQuestions = [] } = useQuery({
     queryKey: ['answeredQuestions', professional?.id],
-    queryFn: () => base44.entities.Question.filter({ answered_by_professional_id: professional.id }, '-answered_at', 50),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: true, includeReviews: false });
+      return result?.answeredQuestions || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -205,7 +202,10 @@ function DashboardProfissionalInner() {
 
   const { data: reviews = [] } = useQuery({
     queryKey: ['profReviews', professional?.id],
-    queryFn: () => base44.entities.Review.filter({ professional_id: professional.id }, '-created_date', 100),
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: true });
+      return result?.reviews || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -262,8 +262,6 @@ function DashboardProfissionalInner() {
       if (!activeDutyStatusRef.current || !activeDutyProfileIdRef.current) {
         return;
       }
-
-      sendKeepaliveDutyOff(activeDutyProfileIdRef.current);
     };
 
     window.addEventListener('pagehide', handlePageHide);
@@ -278,29 +276,6 @@ function DashboardProfissionalInner() {
       void setProfessionalPublicDuty(activeDutyProfileIdRef.current, false);
     };
   }, []);
-
-  const _answerQuestionLegacy = useMutation({
-    mutationFn: async ({ id, answer }) => {
-      // Guard: prevent answering already-answered question
-      const current = await base44.entities.Question.get(id);
-      if (current?.status === 'RESPONDIDA') {
-        throw new Error('Esta pergunta já foi respondida.');
-      }
-      return Promise.resolve(buildQuestionAnswerPayload({
-        professional,
-        publicProfileId: publicProfile?.id,
-        answer,
-      }));
-    },
-    onSuccess: () => {
-      setAnswerModal({ open: false, question: null });
-      setAnswerText('');
-      queryClient.invalidateQueries({ queryKey: ['pendingQuestions'] });
-      queryClient.invalidateQueries({ queryKey: ['answeredQuestions'] });
-      queryClient.invalidateQueries({ queryKey: ['forumPublic'] });
-      queryClient.invalidateQueries({ queryKey: ['perfil-questions'] });
-    },
-  });
 
   const answerQuestion = useMutation({
     mutationFn: ({ id, answer }) => answerQuestionRequest({

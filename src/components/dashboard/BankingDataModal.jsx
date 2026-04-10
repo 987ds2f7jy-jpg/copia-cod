@@ -5,9 +5,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, CheckCircle } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
+import { getFinanceDashboardRequest, upsertProfessionalBankingDataRequest } from '@/client-api/finance';
 
 export default function BankingDataModal({ open, onOpenChange, professionalId }) {
   const queryClient = useQueryClient();
@@ -28,9 +28,11 @@ export default function BankingDataModal({ open, onOpenChange, professionalId })
 
   const { data: existing } = useQuery({
     queryKey: ['bankingData', professionalId],
-    queryFn: () => base44.entities.ProfessionalBankingData.filter({ professional_id: professionalId }),
-    enabled: !!professionalId && open,
-    select: (list) => list?.[0] || null,
+    queryFn: async () => {
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 1, saquesLimit: 1 });
+      return result?.bankingData ?? null;
+    },
+    enabled: open,
   });
 
   useEffect(() => {
@@ -41,15 +43,25 @@ export default function BankingDataModal({ open, onOpenChange, professionalId })
 
   const save = useMutation({
     mutationFn: async () => {
-      const data = { ...form, professional_id: professionalId };
-      if (existing?.id) {
-        return base44.entities.ProfessionalBankingData.update(existing.id, data);
-      }
-      return base44.entities.ProfessionalBankingData.create(data);
+      return upsertProfessionalBankingDataRequest({
+        tipoPessoa: form.tipo_pessoa,
+        nomeTitular: form.nome_titular,
+        cpfCnpj: form.cpf_cnpj,
+        tipoRecebimento: form.tipo_recebimento,
+        tipoChavePix: form.tipo_chave_pix,
+        chavePix: form.chave_pix,
+        banco: form.banco,
+        agencia: form.agencia,
+        conta: form.conta,
+        digitoConta: form.digito_conta,
+        tipoConta: form.tipo_conta,
+        razaoSocial: form.razao_social,
+      });
     },
     onSuccess: () => {
       toast.success('Dados bancários salvos com sucesso!');
       queryClient.invalidateQueries({ queryKey: ['bankingData', professionalId] });
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
       onOpenChange(false);
     },
     onError: () => toast.error('Erro ao salvar dados bancários.'),

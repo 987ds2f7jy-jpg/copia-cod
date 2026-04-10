@@ -2,7 +2,6 @@ import React, { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
-import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import BankingDataModal from '@/components/dashboard/BankingDataModal';
 import { Button } from "@/components/ui/button";
@@ -20,6 +19,7 @@ import { ptBR } from 'date-fns/locale';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, CartesianGrid } from 'recharts';
 import { toast } from 'sonner';
 import { buildSaquePayload, buildWithdrawalMethodSummary, getSaqueDescriptor, SAQUE_STATUS_META } from '@/lib/saques';
+import { getFinanceDashboardRequest, requestWithdrawalRequest } from '@/client-api/finance';
 
 const fmt = (value) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
 const PLATFORM_FEE = 0.15;
@@ -59,30 +59,36 @@ function FinanceiroProfissionalInner() {
   const { data: professional } = useQuery({
     queryKey: ['myProfessionalProfile', user?.id],
     queryFn: async () => {
-      let profiles = await base44.entities.ProfessionalProfile.filter({ user_id: user.id });
-      if (!profiles?.length) {
-        profiles = await base44.entities.Professional.filter({ user_id: user.id });
-      }
-      return profiles?.[0] || null;
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 1, saquesLimit: 1 });
+      return result?.professional || null;
     },
     enabled: !!user?.id,
   });
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['profAppts', professional?.id],
-    queryFn: () => base44.entities.Appointment.filter({ professional_id: professional.id }, '-date', 500),
+    queryFn: async () => {
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 500, saquesLimit: 1 });
+      return result?.appointments || [];
+    },
     enabled: !!professional?.id,
   });
 
   const { data: saques = [] } = useQuery({
     queryKey: ['saques', professional?.id],
-    queryFn: () => base44.entities.Saque.filter({ professional_id: professional.id }, '-created_date', 50),
+    queryFn: async () => {
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 1, saquesLimit: 50 });
+      return result?.saques || [];
+    },
     enabled: !!professional?.id,
   });
 
   const { data: bankingData } = useQuery({
     queryKey: ['bankingData', professional?.id],
-    queryFn: () => base44.entities.ProfessionalBankingData.filter({ professional_id: professional.id }),
+    queryFn: async () => {
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 1, saquesLimit: 1 });
+      return result?.bankingData ? [result.bankingData] : [];
+    },
     enabled: !!professional?.id,
     select: (list) => list?.[0] || null,
   });
@@ -155,11 +161,11 @@ function FinanceiroProfissionalInner() {
         throw new Error('Cadastre seus dados bancarios ou informe uma chave PIX antes de solicitar o saque.');
       }
 
-      return base44.entities.Saque.create(buildSaquePayload({
-        professionalId: professional.id,
+      // O backend recalcula saldo e registra o saque.
+      return requestWithdrawalRequest({
         value,
-        bankingData: payoutData,
-      }));
+        pixKey: chavePix || null,
+      });
     },
     onSuccess: () => {
       toast.success('Solicitacao de saque enviada!');
@@ -167,6 +173,7 @@ function FinanceiroProfissionalInner() {
       setValorSaque('');
       setChavePix('');
       queryClient.invalidateQueries({ queryKey: ['saques', professional?.id] });
+      queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
     },
     onError: (error) => toast.error(error.message || 'Erro ao solicitar saque.'),
   });

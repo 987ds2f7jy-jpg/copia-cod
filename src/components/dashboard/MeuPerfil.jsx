@@ -1,5 +1,4 @@
 import React, { useMemo, useState, useCallback, useEffect } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +18,8 @@ import { createPageUrl } from '@/utils';
 import DisponibilidadeEditor from '@/components/dashboard/DisponibilidadeEditor';
 import MapboxMap from '@/components/map/MapboxMap';
 import { getOfficeLocation, saveOfficeLocation, deleteOfficeLocation } from '@/lib/officeLocations';
+import { uploadPublicFile } from '@/client-api/uploads';
+import { upsertProfessionalProfileRequest } from '@/client-api/professionalDashboard';
 
 const PATIENT_TYPES = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
 const MODALITIES = [
@@ -52,7 +53,11 @@ export default function MeuPerfil({ professional, publicProfile }) {
 
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ['avail-slots', professional?.id],
-    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
+    queryFn: async () => {
+      // Disponibilidade vem do dashboard; aqui mantemos a queryKey para compat.
+      const res = await upsertProfessionalProfileRequest({});
+      return res?.availabilitySlots || [];
+    },
     enabled: !!professional?.id,
   });
 
@@ -182,8 +187,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!file) return;
     setUploading(true);
     try {
-      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/photos' });
-      set('photo_url', file_url);
+      const uploaded = await uploadPublicFile({ file, folder: 'professionals/photos' });
+      set('photo_url', uploaded?.publicUrl || '');
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a foto.');
     } finally {
@@ -196,10 +201,11 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!files.length) return;
     setUploadingGallery(true);
     try {
-      const uploads = await Promise.all(
-        files.map((file) => base44.integrations.Core.UploadFile({ file, folder: 'professionals/gallery' })),
-      );
-      set('gallery_urls', [...form.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
+      const uploads = await Promise.all(files.map((file) => uploadPublicFile({ file, folder: 'professionals/gallery' })));
+      set('gallery_urls', [
+        ...form.gallery_urls,
+        ...uploads.map((upload) => upload?.publicUrl).filter(Boolean),
+      ]);
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a galeria.');
     } finally {
@@ -256,7 +262,12 @@ export default function MeuPerfil({ professional, publicProfile }) {
         office_address: needsLocation ? officeForm.formatted_address || officeForm.address_line : '',
       };
 
-      await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, publicOfficeUpdates);
+      await upsertProfessionalProfileRequest({
+        modality: publicOfficeUpdates.modality,
+        officeCity: publicOfficeUpdates.office_city,
+        officeState: publicOfficeUpdates.office_state,
+        officeAddress: publicOfficeUpdates.office_address,
+      });
 
       if (needsLocation) {
         await saveOfficeLocation(publicProfile.id, officeForm);
@@ -273,6 +284,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] });
       queryClient.invalidateQueries({ queryKey: ['professionals'] });
       queryClient.invalidateQueries({ queryKey: ['office-location'] });
+      queryClient.invalidateQueries({ queryKey: ['professional-dashboard'] });
     },
     onError: (err) => toast.error(err?.message || 'Erro ao salvar mapa e endereco'),
   });
@@ -335,17 +347,28 @@ export default function MeuPerfil({ professional, publicProfile }) {
         prioritario_ativo: form.prioritario_ativo,
       };
 
-      await base44.entities.ProfessionalProfile.update(professional.id, privateUpdates);
+      await upsertProfessionalProfileRequest({
+        bio: publicUpdates.bio,
+        photoUrl: publicUpdates.photo_url,
+        instagramUrl: publicUpdates.instagram_url,
+        tags: publicUpdates.tags,
+        patientTypes: publicUpdates.patient_types,
+        modality: publicUpdates.modality,
+        officeCity: publicUpdates.office_city,
+        officeState: publicUpdates.office_state,
+        officeAddress: publicUpdates.office_address,
+        galleryUrls: publicUpdates.gallery_urls,
+        priceStandard: publicUpdates.price_standard,
+        pricePriority: publicUpdates.price_priority,
+        availableDays: publicUpdates.available_days,
+        availableHours: publicUpdates.available_hours,
+        perfilAtivo: publicUpdates.perfil_ativo,
+        prioritarioAtivo: publicUpdates.prioritario_ativo,
+      });
 
       if (publicProfile?.id) {
-        await base44.entities.ProfessionalPublicProfile.update(publicProfile.id, publicUpdates);
-
-        // Save or delete office location
-        if (needsLocation) {
-          await saveOfficeLocation(publicProfile.id, officeForm);
-        } else {
-          await deleteOfficeLocation(publicProfile.id);
-        }
+        if (needsLocation) await saveOfficeLocation(publicProfile.id, officeForm);
+        else await deleteOfficeLocation(publicProfile.id);
       }
     },
     onSuccess: () => {
@@ -354,6 +377,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] });
       queryClient.invalidateQueries({ queryKey: ['professionals'] });
       queryClient.invalidateQueries({ queryKey: ['office-location'] });
+      queryClient.invalidateQueries({ queryKey: ['professional-dashboard'] });
     },
     onError: (err) => toast.error(err?.message || 'Erro ao salvar perfil'),
   });
