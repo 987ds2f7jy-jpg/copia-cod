@@ -48,10 +48,7 @@ function createCancelAppointmentRepository(client: SupabaseClient): CancelAppoin
     },
 
     async listProfessionalIdentityIdsForUser(userId: string): Promise<string[]> {
-      const [privateResult, legacyResult] = await Promise.all([
-        client.from('professional_profiles').select('id').eq('user_id', userId),
-        client.from('professionals').select('id').eq('user_id', userId),
-      ]);
+      const privateResult = await client.from('professional_profiles').select('id').eq('user_id', userId);
 
       if (privateResult.error) {
         throw new AppError({
@@ -62,19 +59,7 @@ function createCancelAppointmentRepository(client: SupabaseClient): CancelAppoin
         });
       }
 
-      if (legacyResult.error) {
-        throw new AppError({
-          status: 500,
-          code: 'PROFESSIONAL_LEGACY_LOOKUP_FAILED',
-          message: 'Unable to load professional identities.',
-          details: legacyResult.error.message,
-        });
-      }
-
-      return [
-        ...(privateResult.data || []).map((row) => String(row.id || '')),
-        ...(legacyResult.data || []).map((row) => String(row.id || '')),
-      ].filter(Boolean);
+      return (privateResult.data || []).map((row) => String(row.id || '')).filter(Boolean);
     },
 
     async cancelAppointment({ appointmentId, reason }): Promise<AppointmentRecord> {

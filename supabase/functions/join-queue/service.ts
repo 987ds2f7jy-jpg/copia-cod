@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
   JoinQueueCommand,
   JoinQueueRepository,
@@ -21,10 +22,6 @@ function normalizeSpecialty(value: string) {
 function normalizePlantaoSpecialty(value: string) {
   const normalized = normalizeSpecialty(value);
   return SPECIALTY_ALIASES[normalized] || normalized;
-}
-
-function isApprovedStatus(status: string) {
-  return status === 'approved' || status === 'active';
 }
 
 export async function joinQueue({
@@ -92,7 +89,7 @@ export async function joinQueue({
   const availableProfiles = await repository.listOnDutyPublicProfiles();
   const hasAvailableProfessionals = availableProfiles.some((profile) =>
     profile.isOnDuty &&
-    isApprovedStatus(profile.status) &&
+    isApprovedProfessionalStatus(profile.status) &&
     normalizePlantaoSpecialty(profile.specialty) === normalizedSpecialty
   );
 

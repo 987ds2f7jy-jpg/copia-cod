@@ -2,7 +2,7 @@ import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-legacy-session-token, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 };
 
@@ -13,7 +13,6 @@ type AppUser = {
   role: string;
   is_active: boolean;
   auth_user_id?: string | null;
-  token_expires_at?: string | null;
 };
 
 type Consulta = {
@@ -193,37 +192,9 @@ async function resolveAppUserFromSupabaseSession(req: Request, adminClient: Retu
   return appUser as AppUser | null;
 }
 
-async function resolveAppUserFromLegacySession(req: Request, adminClient: ReturnType<typeof createClient>) {
-  const legacyToken = req.headers.get('x-legacy-session-token')?.trim();
-
-  if (!legacyToken) {
-    return null;
-  }
-
-  const { data, error } = await adminClient
-    .from('app_users')
-    .select('id, full_name, email, role, is_active, token_expires_at')
-    .eq('session_token', legacyToken)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  if (!data) {
-    return null;
-  }
-
-  if (data.token_expires_at && new Date(data.token_expires_at) <= new Date()) {
-    return null;
-  }
-
-  return data as AppUser;
-}
-
 async function resolveAppUser(req: Request, adminClient: ReturnType<typeof createClient>) {
   const sessionUser = await resolveAppUserFromSupabaseSession(req, adminClient);
-  const appUser = sessionUser || await resolveAppUserFromLegacySession(req, adminClient);
+  const appUser = sessionUser;
 
   if (!appUser || appUser.is_active === false) {
     return null;
@@ -235,34 +206,17 @@ async function resolveAppUser(req: Request, adminClient: ReturnType<typeof creat
 async function fetchProfessionalParticipantIds(adminClient: ReturnType<typeof createClient>, appUserId: string) {
   const participantIds = new Set<string>([appUserId]);
 
-  const [profilesResult, legacyProfilesResult] = await Promise.all([
-    adminClient
-      .from('professional_profiles')
-      .select('id')
-      .eq('user_id', appUserId)
-      .limit(10),
-    adminClient
-      .from('professionals')
-      .select('id')
-      .eq('user_id', appUserId)
-      .limit(10),
-  ]);
+  const profilesResult = await adminClient
+    .from('professional_profiles')
+    .select('id')
+    .eq('user_id', appUserId)
+    .limit(10);
 
   if (profilesResult.error) {
     throw profilesResult.error;
   }
 
-  if (legacyProfilesResult.error) {
-    throw legacyProfilesResult.error;
-  }
-
   for (const row of profilesResult.data || []) {
-    if (row?.id) {
-      participantIds.add(row.id);
-    }
-  }
-
-  for (const row of legacyProfilesResult.data || []) {
     if (row?.id) {
       participantIds.add(row.id);
     }

@@ -7,12 +7,12 @@ import { isProfessionalApprovedStatus } from '@/lib/professionals';
 
 /**
  * Bloqueia acesso ao dashboard se o profissional não estiver aprovado.
- * Statuses bloqueantes: pending_review, rejected, suspended (e o legado "pending")
+ * Statuses bloqueantes: pending_review, pending, rejected e suspended.
  */
 export default function ProfessionalStatusGate({ professional, children }) {
   const status = professional?.status;
 
-  // Approved OR legacy "active" → allow through
+  // Apenas "approved" libera o dashboard.
   if (isProfessionalApprovedStatus(status)) {
     return <>{children}</>;
   }

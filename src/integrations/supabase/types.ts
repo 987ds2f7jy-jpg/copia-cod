@@ -17,6 +17,7 @@ export type Database = {
       app_users: {
         Row: {
           address: string | null
+          auth_user_id: string | null
           birth_date: string | null
           city: string | null
           cpf: string | null
@@ -25,18 +26,16 @@ export type Database = {
           full_name: string
           id: string
           is_active: boolean | null
-          password_hash: string
           phone: string | null
           profile_complete: boolean | null
           role: string
-          session_token: string | null
           sex: string | null
           state: string | null
-          token_expires_at: string | null
           updated_at: string
         }
         Insert: {
           address?: string | null
+          auth_user_id?: string | null
           birth_date?: string | null
           city?: string | null
           cpf?: string | null
@@ -45,18 +44,16 @@ export type Database = {
           full_name: string
           id?: string
           is_active?: boolean | null
-          password_hash: string
           phone?: string | null
           profile_complete?: boolean | null
           role?: string
-          session_token?: string | null
           sex?: string | null
           state?: string | null
-          token_expires_at?: string | null
           updated_at?: string
         }
         Update: {
           address?: string | null
+          auth_user_id?: string | null
           birth_date?: string | null
           city?: string | null
           cpf?: string | null
@@ -65,14 +62,11 @@ export type Database = {
           full_name?: string
           id?: string
           is_active?: boolean | null
-          password_hash?: string
           phone?: string | null
           profile_complete?: boolean | null
           role?: string
-          session_token?: string | null
           sex?: string | null
           state?: string | null
-          token_expires_at?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -257,16 +257,9 @@ function createSubmitConsultaEvaluationRepository(client: SupabaseClient): Submi
     },
 
     async updateProfessionalReviewStats({ professionalId, averageRating, totalReviews }): Promise<void> {
-      const [privateResult, legacyResult, publicResult] = await Promise.all([
+      const [privateResult, publicResult] = await Promise.all([
         client
           .from('professional_profiles')
-          .update({
-            rating: averageRating,
-            total_reviews: totalReviews,
-          })
-          .eq('id', professionalId),
-        client
-          .from('professionals')
           .update({
             rating: averageRating,
             total_reviews: totalReviews,
@@ -287,15 +280,6 @@ function createSubmitConsultaEvaluationRepository(client: SupabaseClient): Submi
           code: 'PRIVATE_REVIEW_METRICS_UPDATE_FAILED',
           message: 'Unable to update professional review metrics.',
           details: privateResult.error.message,
-        });
-      }
-
-      if (legacyResult.error) {
-        throw new AppError({
-          status: 500,
-          code: 'LEGACY_REVIEW_METRICS_UPDATE_FAILED',
-          message: 'Unable to update professional review metrics.',
-          details: legacyResult.error.message,
         });
       }
 

@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
   AnswerQuestionCommand,
   AnswerQuestionRepository,
@@ -12,10 +13,6 @@ function normalizeSpecialty(value: string) {
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/\s+/g, '_');
-}
-
-function isApprovedStatus(status: string) {
-  return status === 'active' || status === 'approved';
 }
 
 export async function answerQuestion({
@@ -62,7 +59,7 @@ export async function answerQuestion({
     });
   }
 
-  if (!isApprovedStatus(professional.status)) {
+  if (!isApprovedProfessionalStatus(professional.status)) {
     throw new AppError({
       status: 403,
       code: 'PROFESSIONAL_PROFILE_NOT_APPROVED',

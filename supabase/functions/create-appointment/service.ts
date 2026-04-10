@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
   CreateAppointmentCommand,
   CreateAppointmentRepository,
@@ -204,11 +205,11 @@ export async function createAppointment({
       });
     }
 
-    if (professional.status !== 'active') {
+    if (!isApprovedProfessionalStatus(professional.status)) {
       throw new AppError({
         status: 403,
-        code: 'PROFESSIONAL_PROFILE_NOT_ACTIVE',
-        message: 'Professional profile must be active.',
+        code: 'PROFESSIONAL_PROFILE_NOT_APPROVED',
+        message: 'Professional profile must be approved.',
       });
     }
 

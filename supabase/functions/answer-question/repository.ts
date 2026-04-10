@@ -100,36 +100,7 @@ async function findProfessionalContext(
     };
   }
 
-  const legacyLookup = await client
-    .from('professionals')
-    .select('id, full_name, specialty, status')
-    .eq('user_id', userId)
-    .order('created_date', { ascending: true })
-    .limit(1);
-
-  if (legacyLookup.error) {
-    throw new AppError({
-      status: 500,
-      code: 'LEGACY_PROFESSIONAL_LOOKUP_FAILED',
-      message: 'Unable to load professional profile.',
-      details: legacyLookup.error.message,
-    });
-  }
-
-  const legacyProfessional = (legacyLookup.data as ProfessionalRow[] | null)?.[0];
-
-  if (!legacyProfessional?.id) {
-    return null;
-  }
-
-  return {
-    professionalId: legacyProfessional.id,
-    fullName: legacyProfessional.full_name || '',
-    specialty: legacyProfessional.specialty || '',
-    status: legacyProfessional.status || '',
-    publicProfileId: await findPublicProfileId(client, legacyProfessional.id, userId),
-    source: 'professionals',
-  };
+  return null;
 }
 
 function createAnswerQuestionRepository(client: SupabaseClient): AnswerQuestionRepository {

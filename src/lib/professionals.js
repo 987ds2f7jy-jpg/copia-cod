@@ -25,14 +25,14 @@ export function canWorkOnDuty(value) {
 }
 
 export function isProfessionalApprovedStatus(status) {
-  return status === 'approved' || status === 'active';
+  return status === 'approved';
 }
 
 export function mapAdminActionToStatuses(action) {
   if (action === 'approve') {
     return {
       publicStatus: 'approved',
-      privateStatus: 'active',
+      privateStatus: 'approved',
       isOnDuty: false,
     };
   }
@@ -40,14 +40,14 @@ export function mapAdminActionToStatuses(action) {
   if (action === 'suspend') {
     return {
       publicStatus: 'suspended',
-      privateStatus: 'inactive',
+      privateStatus: 'suspended',
       isOnDuty: false,
     };
   }
 
   return {
     publicStatus: 'rejected',
-    privateStatus: 'inactive',
+    privateStatus: 'rejected',
     isOnDuty: false,
   };
 }

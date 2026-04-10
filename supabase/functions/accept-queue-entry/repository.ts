@@ -75,7 +75,7 @@ async function loadProfessionalProfile(
     .from(tableName)
     .select('id, user_id, full_name, specialty, status, is_on_duty')
     .eq('user_id', appUserId)
-    .eq('status', 'active')
+    .eq('status', 'approved')
     .limit(1);
 
   if (error) {
@@ -270,8 +270,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
 
     async findProfessionalDutyContextByUserId(appUserId: string): Promise<ProfessionalDutyRecord | null> {
       const profile =
-        await loadProfessionalProfile(client, 'professional_profiles', appUserId) ||
-        await loadProfessionalProfile(client, 'professionals', appUserId);
+        await loadProfessionalProfile(client, 'professional_profiles', appUserId);
 
       if (!profile?.id) {
         return null;

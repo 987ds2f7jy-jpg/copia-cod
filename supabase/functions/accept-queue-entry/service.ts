@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
   AcceptQueueEntryCommand,
   AcceptQueueEntryRepository,
@@ -19,10 +20,6 @@ function normalizePlantaoSpecialty(value: string) {
     .replace(/\s+/g, '_');
 
   return SPECIALTY_ALIASES[normalized] || normalized;
-}
-
-function isApprovedProfessionalPublicStatus(status: string) {
-  return status === '' || status === 'approved' || status === 'active';
 }
 
 export async function acceptQueueEntry({
@@ -69,7 +66,7 @@ export async function acceptQueueEntry({
     });
   }
 
-  if (!isApprovedProfessionalPublicStatus(professional.publicStatus)) {
+  if (!isApprovedProfessionalStatus(professional.publicStatus)) {
     throw new AppError({
       status: 403,
       code: 'PROFESSIONAL_PROFILE_NOT_ELIGIBLE',
