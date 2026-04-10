@@ -1,72 +1,96 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Loader2, FileText, ChevronDown } from 'lucide-react';
+import { ChevronDown, FileText, Loader2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { getTeleconsultaContextRequest } from '@/client-api/teleconsulta';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 function ProntuarioItem({ prontuario }) {
-  const [open, setOpen] = React.useState(false);
+  const [open, setOpen] = useState(false);
+
   return (
-    <div className="border border-gray-700 rounded-lg overflow-hidden">
+    <div className="overflow-hidden rounded-lg border border-gray-700">
       <button
-        onClick={() => setOpen(o => !o)}
-        className="w-full flex items-center justify-between p-3 bg-gray-800 hover:bg-gray-750 text-left"
+        type="button"
+        onClick={() => setOpen((current) => !current)}
+        className="w-full bg-gray-800 p-3 text-left hover:bg-gray-750"
       >
-        <div>
-          <p className="text-sm font-medium text-white">{prontuario.motivo_consulta}</p>
-          <p className="text-xs text-gray-400 mt-0.5">
-            {prontuario.created_date ? format(new Date(prontuario.created_date), "dd/MM/yyyy 'às' HH:mm", { locale: ptBR }) : '—'}
-          </p>
+        <div className="flex items-center justify-between">
+          <div>
+            <p className="text-sm font-medium text-white">{prontuario.motivoConsulta || 'Sem resumo'}</p>
+            <p className="mt-0.5 text-xs text-gray-400">
+              {prontuario.createdAt
+                ? format(new Date(prontuario.createdAt), "dd/MM/yyyy 'as' HH:mm", { locale: ptBR })
+                : '-'}
+            </p>
+          </div>
+          <ChevronDown className={`h-4 w-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
         </div>
-        <ChevronDown className={`w-4 h-4 text-gray-400 transition-transform ${open ? 'rotate-180' : ''}`} />
       </button>
+
       {open && (
-        <div className="p-3 bg-gray-900 space-y-2">
+        <div className="space-y-2 bg-gray-900 p-3">
           {[
-            ['Histórico de Risco', prontuario.historico_risco],
-            ['Exames / Imagens', prontuario.exames_imagem],
-            ['Exame Físico', prontuario.exame_fisico],
-            ['Avaliação Diagnóstica', prontuario.avaliacao_diagnostico],
-            ['Recomendações', prontuario.recomendacoes],
-          ].filter(([, v]) => v).map(([label, val]) => (
-            <div key={label}>
-              <p className="text-xs font-medium text-emerald-400">{label}</p>
-              <p className="text-xs text-gray-300 mt-0.5 whitespace-pre-wrap">{val}</p>
-            </div>
-          ))}
+            ['Historico de risco', prontuario.historicoRisco],
+            ['Exames / imagens', prontuario.examesImagem],
+            ['Exame fisico', prontuario.exameFisico],
+            ['Avaliacao diagnostica', prontuario.avaliacaoDiagnostico],
+            ['Recomendacoes', prontuario.recomendacoes],
+          ]
+            .filter(([, value]) => value)
+            .map(([label, value]) => (
+              <div key={label}>
+                <p className="text-xs font-medium text-emerald-400">{label}</p>
+                <p className="mt-0.5 whitespace-pre-wrap text-xs text-gray-300">{value}</p>
+              </div>
+            ))}
         </div>
       )}
     </div>
   );
 }
 
-export default function ProntuariosAnteriores({ open, onClose, pacienteId }) {
-  const { data: prontuarios = [], isLoading } = useQuery({
-    queryKey: ['prontuariosAnteriores', pacienteId],
-    queryFn: () => base44.entities.Prontuario.filter({ paciente_id: pacienteId }, '-created_date', 20),
-    enabled: open && !!pacienteId,
+export default function ProntuariosAnteriores({
+  open,
+  onClose,
+  patientId,
+  excludeConsultationId = null,
+}) {
+  const { data, isLoading } = useQuery({
+    queryKey: ['teleconsulta-history', patientId, excludeConsultationId],
+    queryFn: () => getTeleconsultaContextRequest({
+      patientId,
+      historyLimit: 20,
+      excludeConsultationId,
+    }),
+    enabled: open && Boolean(patientId),
+    staleTime: 30_000,
   });
+
+  const prontuarios = data?.recentProntuarios || [];
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
-      <DialogContent className="bg-gray-900 border-gray-700 max-w-lg">
+      <DialogContent className="max-w-lg border-gray-700 bg-gray-900">
         <DialogHeader>
-          <DialogTitle className="text-white flex items-center gap-2">
-            <FileText className="w-4 h-4 text-emerald-400" />
-            Prontuários Anteriores
+          <DialogTitle className="flex items-center gap-2 text-white">
+            <FileText className="h-4 w-4 text-emerald-400" />
+            Prontuarios anteriores
           </DialogTitle>
         </DialogHeader>
-        <div className="max-h-[60vh] overflow-y-auto space-y-2 mt-2">
+
+        <div className="mt-2 max-h-[60vh] space-y-2 overflow-y-auto">
           {isLoading ? (
             <div className="flex justify-center py-8">
-              <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+              <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
             </div>
           ) : prontuarios.length === 0 ? (
-            <p className="text-sm text-gray-400 text-center py-6">Nenhum prontuário anterior</p>
+            <p className="py-6 text-center text-sm text-gray-400">Nenhum prontuario anterior</p>
           ) : (
-            prontuarios.map(p => <ProntuarioItem key={p.id} prontuario={p} />)
+            prontuarios.map((prontuario) => (
+              <ProntuarioItem key={prontuario.id} prontuario={prontuario} />
+            ))
           )}
         </div>
       </DialogContent>

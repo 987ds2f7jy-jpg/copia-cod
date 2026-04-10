@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import ZoomVideo, { VideoQuality } from '@zoom/videosdk';
-import { supabase } from '@/integrations/supabase/client';
-import { buildZoomUserIdentity, getZoomSdkRole } from '@/lib/zoom';
+import { requestZoomToken } from '@/client-api/teleconsulta';
 import { logUiWarning, serializeError } from '@/lib/observability';
 
 export interface ZoomParticipant {
@@ -131,24 +130,12 @@ export function useZoomSession({
   }, []);
 
   const fetchToken = useCallback(async () => {
-    const requestBody = {
+    return requestZoomToken({
       consultationId,
       participantRole,
-      role: getZoomSdkRole(participantRole),
-      userIdentity: buildZoomUserIdentity({ userId, participantRole }),
       userName,
-    };
-
-    const { data, error } = await supabase.functions.invoke('zoom-token', {
-      body: requestBody,
-    });
-
-    if (error) {
-      throw new Error(error.message || 'Falha ao obter token do Zoom');
-    }
-
-    return data as ZoomTokenResponse;
-  }, [consultationId, participantRole, userId, userName]);
+    }) as Promise<ZoomTokenResponse>;
+  }, [consultationId, participantRole, userName]);
 
   const getClientParticipants = useCallback((client: any): ZoomParticipant[] => {
     const users = client.getAllUser?.() ?? [];

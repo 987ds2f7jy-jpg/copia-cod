@@ -1,11 +1,9 @@
-// Objetivo: Automatizar o preenchimento do prontuário eletrônico durante a consulta de telemedicina.
-// O médico clica em "Iniciar Preenchimento Automático", a IA escuta a conversa, transcreve em tempo real e, ao parar, preenche automaticamente todos os campos do prontuário com uma única chamada de IA (Groq). O médico sempre revisa antes de salvar.
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { Loader2, Sparkles, Waves } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Sheet, SheetContent, SheetDescription, SheetHeader, SheetTitle } from '@/components/ui/sheet';
 import { toast } from '@/components/ui/use-toast';
-import { supabase } from '@/integrations/supabase/client';
+import { requestDeepgramToken, requestGroqCompletion } from '@/client-api/teleconsulta';
 
 export type ProntuarioAutomaticoFields = {
   motivo_da_consulta: string;
@@ -89,11 +87,7 @@ function convertFloat32ToInt16Buffer(input: Float32Array) {
 function downsampleTo16kHz(input: Float32Array, sourceSampleRate: number) {
   const targetSampleRate = 16000;
 
-  if (sourceSampleRate === targetSampleRate) {
-    return input;
-  }
-
-  if (sourceSampleRate < targetSampleRate) {
+  if (sourceSampleRate <= targetSampleRate) {
     return input;
   }
 
@@ -123,11 +117,14 @@ function downsampleTo16kHz(input: Float32Array, sourceSampleRate: number) {
 }
 
 function normalizeTranscriptPayload(payload: any) {
-  const data = payload?.type === 'Results' ? payload : payload?.channel ? payload : payload?.data || payload;
-  const transcript = String(data?.channel?.alternatives?.[0]?.transcript || '').trim();
+  const data = payload?.type === 'Results'
+    ? payload
+    : payload?.channel
+      ? payload
+      : payload?.data || payload;
 
   return {
-    transcript,
+    transcript: String(data?.channel?.alternatives?.[0]?.transcript || '').trim(),
     isFinal: Boolean(data?.is_final),
     speechFinal: Boolean(data?.speech_final),
     type: String(data?.type || payload?.type || ''),
@@ -135,12 +132,8 @@ function normalizeTranscriptPayload(payload: any) {
 }
 
 async function getConsultaMediaStream(): Promise<MediaStream> {
-  // TODO: substituir este fallback pelo MediaStream real da videochamada WebRTC na rota /consulta.
-  // Exemplo esperado aqui:
-  // return activePeerConnection.getReceivers()[0].track ou um MediaStream já exposto pela página da consulta.
-  // Enquanto esse ponto não for conectado ao stream real da sala, usamos o microfone local como fallback.
   if (!navigator.mediaDevices?.getUserMedia) {
-    throw new Error('Seu navegador não suporta captura de áudio para transcrição.');
+    throw new Error('Seu navegador nao suporta captura de audio para transcricao.');
   }
 
   return navigator.mediaDevices.getUserMedia({
@@ -241,41 +234,30 @@ export default function PreenchimentoAutomaticoProntuario({
 
   const displayTranscript = useMemo(() => {
     const combinedTranscript = [transcriptFull, interimTranscript].filter(Boolean).join('\n');
-
-    if (combinedTranscript) {
-      return combinedTranscript;
-    }
-
-    return 'A transcrição ao vivo aparecerá aqui assim que a conversa for capturada.';
+    return combinedTranscript || 'A transcricao ao vivo aparecera aqui assim que a conversa for capturada.';
   }, [interimTranscript, transcriptFull]);
 
   useEffect(() => {
-    if (!transcriptScrollRef.current) {
-      return;
+    if (transcriptScrollRef.current) {
+      transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
     }
-
-    transcriptScrollRef.current.scrollTop = transcriptScrollRef.current.scrollHeight;
   }, [displayTranscript]);
 
-  useEffect(() => {
-    return () => {
-      isUnmountingRef.current = true;
-      closeDeepgramConnection(deepgramConnectionRef.current);
-      stopMediaCapture(mediaStreamRef.current);
-      void stopAudioProcessing(audioProcessingRef.current);
-    };
+  useEffect(() => () => {
+    isUnmountingRef.current = true;
+    closeDeepgramConnection(deepgramConnectionRef.current);
+    stopMediaCapture(mediaStreamRef.current);
+    void stopAudioProcessing(audioProcessingRef.current);
   }, []);
 
   const processTranscriptWithGroq = async (transcript: string) => {
-    const { data, error } = await supabase.functions.invoke('groq-completion', {
-      body: { transcript },
-    });
+    const result = await requestGroqCompletion({ transcript });
 
-    if (error || !data?.content) {
-      throw new Error(data?.error || error?.message || 'A IA não retornou um conteúdo válido para o prontuário.');
+    if (!result?.content) {
+      throw new Error('A IA nao retornou um conteudo valido para o prontuario.');
     }
 
-    return parseGroqJsonResponse(data.content);
+    return parseGroqJsonResponse(result.content);
   };
 
   const appendFinalTranscript = (nextChunk: string) => {
@@ -296,9 +278,7 @@ export default function PreenchimentoAutomaticoProntuario({
   const updateLiveTranscript = (partialTranscript = '') => {
     const stableTranscript = currentUtteranceSegmentsRef.current.join(' ').trim();
     const partial = partialTranscript.trim();
-    const nextLiveTranscript = [stableTranscript, partial].filter(Boolean).join(' ').trim();
-
-    setInterimTranscript(nextLiveTranscript);
+    setInterimTranscript([stableTranscript, partial].filter(Boolean).join(' ').trim());
   };
 
   const pushStableSegment = (segment: string) => {
@@ -309,11 +289,9 @@ export default function PreenchimentoAutomaticoProntuario({
     }
 
     const lastSegment = currentUtteranceSegmentsRef.current[currentUtteranceSegmentsRef.current.length - 1];
-    if (lastSegment === trimmedSegment) {
-      return;
+    if (lastSegment !== trimmedSegment) {
+      currentUtteranceSegmentsRef.current = [...currentUtteranceSegmentsRef.current, trimmedSegment];
     }
-
-    currentUtteranceSegmentsRef.current = [...currentUtteranceSegmentsRef.current, trimmedSegment];
   };
 
   const commitCurrentUtterance = () => {
@@ -345,19 +323,13 @@ export default function PreenchimentoAutomaticoProntuario({
       setIsPanelOpen(true);
       setIsListening(true);
 
-      // Fetch Deepgram key from edge function
-      const { data: tokenData, error: tokenError } = await supabase.functions.invoke('deepgram-token', {
-        body: {},
-      });
+      const tokenData = await requestDeepgramToken();
 
-      if (tokenError || !tokenData?.key) {
-        throw new Error(tokenData?.error || tokenError?.message || 'Não foi possível obter o token do Deepgram.');
+      if (!tokenData?.key) {
+        throw new Error('Nao foi possivel obter o token do Deepgram.');
       }
 
-      const deepgramApiKey = tokenData.key;
-
       const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
-
       const stream = await getConsultaMediaStream();
       mediaStreamRef.current = stream;
 
@@ -374,7 +346,7 @@ export default function PreenchimentoAutomaticoProntuario({
       audioProcessingRef.current.processorNode = processorNode;
       audioProcessingRef.current.gainNode = gainNode;
 
-      const deepgramClient = createClient(deepgramApiKey);
+      const deepgramClient = createClient(tokenData.key);
       const listenOptions = {
         model: 'nova-3',
         language: 'pt',
@@ -389,6 +361,7 @@ export default function PreenchimentoAutomaticoProntuario({
         channels: 1,
         no_delay: true,
       };
+
       const connection = typeof deepgramClient.listen?.live === 'function'
         ? deepgramClient.listen.live(listenOptions)
         : typeof (deepgramClient.listen as any)?.v1?.connect === 'function'
@@ -396,7 +369,7 @@ export default function PreenchimentoAutomaticoProntuario({
           : null;
 
       if (!connection) {
-        throw new Error('Não foi possível abrir a conexão de transcrição ao vivo.');
+        throw new Error('Nao foi possivel abrir a conexao de transcricao ao vivo.');
       }
 
       deepgramConnectionRef.current = connection;
@@ -405,11 +378,7 @@ export default function PreenchimentoAutomaticoProntuario({
       const openEventName = LiveTranscriptionEvents?.Open || 'open';
       const errorEventName = LiveTranscriptionEvents?.Error || 'error';
 
-      connection.on?.(openEventName, () => {
-        setErrorMessage(null);
-      });
-
-      connection.on?.(transcriptEventName, (payload: any) => {
+      const handleTranscriptEvent = (payload: any) => {
         const normalized = normalizeTranscriptPayload(payload);
 
         if (!normalized.transcript) {
@@ -439,43 +408,13 @@ export default function PreenchimentoAutomaticoProntuario({
         }
 
         updateLiveTranscript(normalized.transcript);
-      });
+      };
 
-      connection.on?.('message', (payload: any) => {
-        const normalized = normalizeTranscriptPayload(payload);
-
-        if (!normalized.transcript) {
-          if (normalized.type === 'UtteranceEnd') {
-            commitCurrentUtterance();
-          }
-          return;
-        }
-
-        const snapshot = `${normalized.isFinal ? 'final' : 'partial'}:${normalized.transcript}`;
-        if (lastTranscriptSnapshotRef.current === snapshot) {
-          return;
-        }
-
-        lastTranscriptSnapshotRef.current = snapshot;
-
-        if (normalized.isFinal) {
-          pushStableSegment(normalized.transcript);
-
-          if (normalized.speechFinal) {
-            commitCurrentUtterance();
-            return;
-          }
-
-          updateLiveTranscript();
-          return;
-        }
-
-        updateLiveTranscript(normalized.transcript);
-      });
-
+      connection.on?.(openEventName, () => setErrorMessage(null));
+      connection.on?.(transcriptEventName, handleTranscriptEvent);
+      connection.on?.('message', handleTranscriptEvent);
       connection.on?.(errorEventName, (event: any) => {
-        const nextErrorMessage = String(event?.message || event || 'Erro ao transcrever a consulta.');
-        setErrorMessage(nextErrorMessage);
+        setErrorMessage(String(event?.message || event || 'Erro ao transcrever a consulta.'));
       });
 
       connection.connect?.();
@@ -506,11 +445,11 @@ export default function PreenchimentoAutomaticoProntuario({
 
       const message = error instanceof Error
         ? error.message
-        : 'Não foi possível iniciar o preenchimento automático.';
+        : 'Nao foi possivel iniciar o preenchimento automatico.';
 
       setErrorMessage(message);
       toast({
-        title: 'Falha ao iniciar a transcrição',
+        title: 'Falha ao iniciar a transcricao',
         description: message,
         variant: 'destructive',
       });
@@ -527,7 +466,7 @@ export default function PreenchimentoAutomaticoProntuario({
 
     try {
       await stopAudioProcessing(audioProcessingRef.current);
-      mediaStreamRef.current?.getTracks().forEach((track) => track.stop());
+      stopMediaCapture(mediaStreamRef.current);
       mediaStreamRef.current = null;
 
       await new Promise((resolve) => window.setTimeout(resolve, 350));
@@ -538,8 +477,8 @@ export default function PreenchimentoAutomaticoProntuario({
       const finalTranscript = transcriptFullRef.current.trim();
       if (!finalTranscript) {
         toast({
-          title: 'Nenhuma transcrição foi capturada',
-          description: 'Tente novamente após confirmar o áudio da consulta.',
+          title: 'Nenhuma transcricao foi capturada',
+          description: 'Tente novamente apos confirmar o audio da consulta.',
           variant: 'destructive',
         });
         return;
@@ -547,6 +486,7 @@ export default function PreenchimentoAutomaticoProntuario({
 
       setIsProcessing(true);
       const autoFilledFields = await processTranscriptWithGroq(finalTranscript);
+
       if (isUnmountingRef.current) {
         return;
       }
@@ -557,7 +497,7 @@ export default function PreenchimentoAutomaticoProntuario({
       });
 
       toast({
-        title: '✅ Prontuário preenchido automaticamente! Revise e salve.',
+        title: 'Prontuario preenchido automaticamente. Revise e salve.',
       });
     } catch (error) {
       if (isUnmountingRef.current) {
@@ -566,11 +506,11 @@ export default function PreenchimentoAutomaticoProntuario({
 
       const message = error instanceof Error
         ? error.message
-        : 'Não foi possível preencher o prontuário automaticamente.';
+        : 'Nao foi possivel preencher o prontuario automaticamente.';
 
       setErrorMessage(message);
       toast({
-        title: 'Falha no preenchimento automático',
+        title: 'Falha no preenchimento automatico',
         description: message,
         variant: 'destructive',
       });
@@ -587,31 +527,27 @@ export default function PreenchimentoAutomaticoProntuario({
         type="button"
         onClick={() => void (isListening ? stopListening() : startListening())}
         disabled={disabled || isProcessing}
-        className={`w-full h-10 text-xs ${
-          isListening
-            ? 'bg-red-600 hover:bg-red-700'
-            : 'bg-emerald-600 hover:bg-emerald-700'
+        className={`h-10 w-full text-xs ${
+          isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
         }`}
       >
         {isProcessing ? (
           <>
             <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />
-            Processando transcrição IA...
+            Processando transcricao IA...
           </>
         ) : isListening ? (
-          '⏹️ Parar Preenchimento Automático'
+          'Parar preenchimento automatico'
         ) : (
-          '▶️ Iniciar Preenchimento Automático IA'
+          'Iniciar preenchimento automatico IA'
         )}
       </Button>
 
       <p className="text-[11px] text-gray-400">
-        A IA apenas sugere o preenchimento. O médico revisa e salva o prontuário manualmente.
+        A IA apenas sugere o preenchimento. O medico revisa e salva o prontuario manualmente.
       </p>
 
-      {errorMessage && (
-        <p className="text-[11px] text-red-300">{errorMessage}</p>
-      )}
+      {errorMessage && <p className="text-[11px] text-red-300">{errorMessage}</p>}
 
       <Sheet open={isPanelOpen} onOpenChange={setIsPanelOpen}>
         <SheetContent
@@ -622,17 +558,17 @@ export default function PreenchimentoAutomaticoProntuario({
             <SheetHeader className="border-b border-gray-800 px-5 py-4">
               <SheetTitle className="flex items-center gap-2 text-white">
                 <Sparkles className="h-4 w-4 text-emerald-400" />
-                Transcrição ao Vivo - Assistente IA
+                Transcricao ao vivo - Assistente IA
               </SheetTitle>
               <SheetDescription className="text-xs text-gray-400">
-                Paciente autorizou a transcrição para auxiliar o preenchimento automático do prontuário.
+                Paciente autorizou a transcricao para auxiliar o preenchimento automatico do prontuario.
               </SheetDescription>
             </SheetHeader>
 
             <div className="flex-1 overflow-hidden px-5 py-4">
               <div
                 ref={transcriptScrollRef}
-                className="h-full min-h-[320px] overflow-y-auto rounded-xl border border-gray-700 bg-gray-950 p-4 text-sm leading-6 text-gray-100 shadow-inner whitespace-pre-wrap"
+                className="h-full min-h-[320px] overflow-y-auto whitespace-pre-wrap rounded-xl border border-gray-700 bg-gray-950 p-4 text-sm leading-6 text-gray-100 shadow-inner"
               >
                 {displayTranscript}
               </div>
@@ -649,7 +585,7 @@ export default function PreenchimentoAutomaticoProntuario({
                 </div>
                 <div className="flex items-center gap-1 text-[11px] text-gray-400">
                   <Waves className="h-3.5 w-3.5 text-emerald-400" />
-                  Atualização por frase em tempo real
+                  Atualizacao por frase em tempo real
                 </div>
               </div>
             </div>

@@ -1,9 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { differenceInYears } from 'date-fns';
-import { format } from 'date-fns';
+import { differenceInYears, format } from 'date-fns';
 import { ClipboardList, Loader2, Paperclip, User } from 'lucide-react';
-import { base44 } from '@/api/base44Client';
+import { getTeleconsultaContextRequest } from '@/client-api/teleconsulta';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { listDirectSolicitacoesForProfessional } from '@/lib/solicitacoesExames';
@@ -32,7 +31,6 @@ function formatAge(value) {
   }
 
   const date = new Date(value);
-
   if (Number.isNaN(date.getTime())) {
     return 'Nao informado';
   }
@@ -41,96 +39,79 @@ function formatAge(value) {
   return age >= 0 ? `${age} anos` : 'Nao informado';
 }
 
-async function loadPatientLookup(pacienteIds) {
-  const uniqueIds = Array.from(new Set((pacienteIds || []).filter(Boolean)));
-
-  if (uniqueIds.length === 0) {
-    return {};
-  }
-
-  const results = await Promise.all(
-    uniqueIds.map(async (patientId) => {
-      const latestProntuarios = await base44.entities.Prontuario.filter(
-        { paciente_id: patientId },
-        '-created_date',
-        1,
-      );
-      const latestProntuario = latestProntuarios?.[0] || null;
-
-      return {
-        id: patientId,
-        doencas_previas: latestProntuario?.historico_risco || '',
-      };
-    }),
-  );
-
-  return Object.fromEntries(
-    results
-      .filter(Boolean)
-      .map((patient) => [patient.id, patient]),
-  );
-}
-
 export default function ServicosExtras({ professional, onAtender }) {
   const { data: solicitacoes = [], isLoading } = useQuery({
     queryKey: ['solicitacoes-exames', professional?.id, professional?.specialty],
     queryFn: () => listDirectSolicitacoesForProfessional(professional),
-    enabled: !!professional?.id,
+    enabled: Boolean(professional?.id),
     refetchInterval: 15000,
   });
 
   const visibleSolicitacoes = solicitacoes;
+  const patientIds = useMemo(
+    () => Array.from(new Set(visibleSolicitacoes.map((item) => item.paciente_id).filter(Boolean))),
+    [visibleSolicitacoes],
+  );
 
-  const { data: patientLookup = {}, isLoading: loadingPatients } = useQuery({
-    queryKey: ['solicitacoes-exames-patients', visibleSolicitacoes.map((item) => item.paciente_id).join(',')],
-    queryFn: () => loadPatientLookup(visibleSolicitacoes.map((item) => item.paciente_id)),
-    enabled: visibleSolicitacoes.length > 0,
+  const { data: patientContext, isLoading: loadingPatients } = useQuery({
+    queryKey: ['teleconsulta-patient-summaries', patientIds.join(',')],
+    queryFn: () => getTeleconsultaContextRequest({
+      patientIds,
+      historyLimit: 1,
+    }),
+    enabled: patientIds.length > 0,
     staleTime: 60_000,
   });
 
-  const pendingCount = visibleSolicitacoes.length;
+  const patientLookup = useMemo(() => (
+    Object.fromEntries(
+      (patientContext?.patientSummaries || []).map((patient) => [patient.id, patient]),
+    )
+  ), [patientContext?.patientSummaries]);
 
   return (
-    <div className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
-          <ClipboardList className="w-4 h-4 text-emerald-500" />
+    <div className="overflow-hidden rounded-xl border-0 bg-white shadow-sm">
+      <div className="flex items-center justify-between border-b border-gray-50 px-5 py-4">
+        <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+          <ClipboardList className="h-4 w-4 text-emerald-500" />
           Servicos Extras
         </h3>
-        <Badge className="bg-emerald-100 text-emerald-700">{pendingCount}</Badge>
+        <Badge className="bg-emerald-100 text-emerald-700">{visibleSolicitacoes.length}</Badge>
       </div>
-      <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+
+      <div className="max-h-96 divide-y divide-gray-50 overflow-y-auto">
         {isLoading || loadingPatients ? (
-          <div className="px-5 py-6 flex justify-center">
-            <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+          <div className="flex justify-center px-5 py-6">
+            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
           </div>
         ) : visibleSolicitacoes.length === 0 ? (
-          <p className="px-5 py-6 text-sm text-gray-400 text-center">Nenhuma solicitacao pendente</p>
+          <p className="px-5 py-6 text-center text-sm text-gray-400">Nenhuma solicitacao pendente</p>
         ) : (
           visibleSolicitacoes.map((solicitacao) => {
             const patient = patientLookup[solicitacao.paciente_id] || null;
-            const patientName = solicitacao.paciente_nome || patient?.full_name || 'Paciente';
+            const patientName = solicitacao.paciente_nome || patient?.fullName || 'Paciente';
             const mergedSolicitacao = {
               ...solicitacao,
               paciente_nome: patientName,
               paciente_sexo: patient?.sex || '',
-              paciente_idade: formatAge(patient?.birth_date),
-              doencas_previas: patient?.doencas_previas || '',
+              paciente_idade: formatAge(patient?.birthDate),
+              doencas_previas: patient?.latestRiskHistory || '',
             };
 
             return (
-              <div key={solicitacao.id} className="px-5 py-3 space-y-2">
+              <div key={solicitacao.id} className="space-y-2 px-5 py-3">
                 <div className="flex items-center justify-between gap-2">
-                  <div className="flex items-center gap-2 min-w-0">
-                    <User className="w-4 h-4 text-gray-400 shrink-0" />
-                    <span className="text-sm font-medium text-gray-800 truncate">{patientName}</span>
+                  <div className="flex min-w-0 items-center gap-2">
+                    <User className="h-4 w-4 shrink-0 text-gray-400" />
+                    <span className="truncate text-sm font-medium text-gray-800">{patientName}</span>
                   </div>
+
                   <Badge
                     variant="outline"
                     className={
                       solicitacao.tipo === 'renovacao_receitas'
-                        ? 'border-violet-300 text-violet-700 text-xs'
-                        : 'border-emerald-300 text-emerald-700 text-xs'
+                        ? 'border-violet-300 text-xs text-violet-700'
+                        : 'border-emerald-300 text-xs text-emerald-700'
                     }
                   >
                     {solicitacao.tipo === 'renovacao_receitas' ? 'Renovacao de Receitas' : 'Check-Up'}
@@ -150,14 +131,16 @@ export default function ServicosExtras({ professional, onAtender }) {
                           rel="noopener noreferrer"
                           className="inline-flex items-center gap-1 text-violet-600 hover:underline"
                         >
-                          <Paperclip className="w-3 h-3 shrink-0" />
+                          <Paperclip className="h-3 w-3 shrink-0" />
                           Ver receita anexada
                         </a>
                       )}
                     </>
                   ) : (
                     <>
-                      <p className="line-clamp-2">Motivo: {mergedSolicitacao.motivo || 'Exames de rotina / check-up preventivo'}</p>
+                      <p className="line-clamp-2">
+                        Motivo: {mergedSolicitacao.motivo || 'Exames de rotina / check-up preventivo'}
+                      </p>
                       <p>Sexo: {formatSexLabel(mergedSolicitacao.paciente_sexo)}</p>
                       <p>Idade: {mergedSolicitacao.paciente_idade}</p>
                       <p className="line-clamp-2">
@@ -173,7 +156,7 @@ export default function ServicosExtras({ professional, onAtender }) {
                   </span>
                   <Button
                     size="sm"
-                    className="text-xs px-3 h-7 bg-emerald-600 hover:bg-emerald-700 text-white"
+                    className="h-7 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700"
                     onClick={() => onAtender?.(mergedSolicitacao)}
                   >
                     Atender Solicitacao
