@@ -19,7 +19,7 @@ type ProfessionalProfileRow = {
 };
 
 type LoadedProfessionalProfile = ProfessionalProfileRow & {
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 function getRequiredEnv(name: string) {
@@ -58,11 +58,10 @@ function createSupabaseAuthUserLookup(client: SupabaseClient): AuthenticatedUser
 
 async function loadProfessionalProfile(
   client: SupabaseClient,
-  tableName: 'professional_profiles' | 'professionals',
   appUserId: string,
 ): Promise<LoadedProfessionalProfile | null> {
   const { data, error } = await client
-    .from(tableName)
+    .from('professional_profiles')
     .select('id, user_id, full_name, specialty, status')
     .eq('user_id', appUserId)
     .eq('status', 'approved')
@@ -85,7 +84,7 @@ async function loadProfessionalProfile(
 
   return {
     ...row,
-    source: tableName,
+    source: 'professional_profiles',
   };
 }
 
@@ -196,8 +195,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
     },
 
     async findActiveProfessionalProfileByUserId(appUserId: string): Promise<ProfessionalProfileRecord | null> {
-      const profile =
-        await loadProfessionalProfile(client, 'professional_profiles', appUserId);
+      const profile = await loadProfessionalProfile(client, appUserId);
 
       if (!profile?.id) {
         return null;

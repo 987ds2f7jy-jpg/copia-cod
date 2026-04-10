@@ -12,6 +12,46 @@ import type {
   GetAdminApprovalQueueRepository,
 } from './types.ts';
 
+function normalizeString(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
+  const path = normalizeString(value);
+
+  if (!path || /^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const { data, error } = await client.storage
+    .from('uploads')
+    .createSignedUrl(path, 60 * 60);
+
+  if (error || !data?.signedUrl) {
+    return path;
+  }
+
+  return data.signedUrl;
+}
+
+async function decoratePublicProfile(client: SupabaseClient, profile: AdminPublicProfile) {
+  return {
+    ...profile,
+    photo_path: profile.photo_url,
+    photo_url: await createSignedUploadUrl(client, profile.photo_url),
+  };
+}
+
+async function decoratePrivateProfile(client: SupabaseClient, profile: AdminPrivateProfile) {
+  return {
+    ...profile,
+    diploma_path: profile.diploma_url,
+    diploma_url: await createSignedUploadUrl(client, profile.diploma_url),
+    photo_path: profile.photo_url,
+    photo_url: await createSignedUploadUrl(client, profile.photo_url),
+  };
+}
+
 async function listPublicProfiles(client: SupabaseClient, status: string | null, limit: number) {
   let query = client
     .from('professional_public_profiles')
@@ -34,7 +74,9 @@ async function listPublicProfiles(client: SupabaseClient, status: string | null,
     });
   }
 
-  return (data as AdminPublicProfile[] | null) || [];
+  return Promise.all(((data as AdminPublicProfile[] | null) || []).map((profile) =>
+    decoratePublicProfile(client, profile)
+  ));
 }
 
 async function listPrivateProfiles(client: SupabaseClient, limit: number) {
@@ -53,7 +95,9 @@ async function listPrivateProfiles(client: SupabaseClient, limit: number) {
     });
   }
 
-  return (data as AdminPrivateProfile[] | null) || [];
+  return Promise.all(((data as AdminPrivateProfile[] | null) || []).map((profile) =>
+    decoratePrivateProfile(client, profile)
+  ));
 }
 
 function createGetAdminApprovalQueueRepository(client: SupabaseClient): GetAdminApprovalQueueRepository {

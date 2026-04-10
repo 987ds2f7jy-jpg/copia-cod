@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Clock, Loader2, Stethoscope, Users, Video } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { joinQueueEntry, leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -102,7 +102,7 @@ function ConsultaAgoraInner() {
       return null;
     }
 
-    const consultas = await base44.entities.Consulta.filter({ paciente_id: patientId }, '-created_date', 20);
+    const consultas = await entities.Consulta.filter({ paciente_id: patientId }, '-created_date', 20);
 
     return consultas.find((consulta) =>
       consulta.tipo_consulta === 'plantao' &&
@@ -112,7 +112,7 @@ function ConsultaAgoraInner() {
 
   const findCurrentQueueEntry = async (patientId, queueId) => {
     if (queueId) {
-      const directMatch = await base44.entities.Queue.filter({ id: queueId }, undefined, 1);
+      const directMatch = await entities.Queue.filter({ id: queueId, patient_id: patientId }, undefined, 1);
 
       if (directMatch?.[0] && ['waiting', 'in_progress', 'em_atendimento'].includes(directMatch[0].status)) {
         return directMatch[0];
@@ -120,9 +120,9 @@ function ConsultaAgoraInner() {
     }
 
     const [waiting, inProgress, inAttendance] = await Promise.all([
-      base44.entities.Queue.filter({ patient_id: patientId, status: 'waiting' }),
-      base44.entities.Queue.filter({ patient_id: patientId, status: 'in_progress' }),
-      base44.entities.Queue.filter({ patient_id: patientId, status: 'em_atendimento' }),
+      entities.Queue.filter({ patient_id: patientId, status: 'waiting' }),
+      entities.Queue.filter({ patient_id: patientId, status: 'in_progress' }),
+      entities.Queue.filter({ patient_id: patientId, status: 'em_atendimento' }),
     ]);
 
     return waiting[0] || inProgress[0] || inAttendance[0] || null;
@@ -170,7 +170,7 @@ function ConsultaAgoraInner() {
   const { data: onDutyProfessionals = [] } = useQuery({
     queryKey: ['onDutyProfessionals'],
     queryFn: async () => {
-      const publicProfiles = await base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true });
+      const publicProfiles = await entities.ProfessionalPublicProfile.filter({ is_on_duty: true });
       return normalizeOnDutyProfessionals(publicProfiles);
     },
     refetchInterval: 8000,
@@ -198,7 +198,7 @@ function ConsultaAgoraInner() {
         filters.specialty = selectedSpecialty;
       }
 
-      const queue = await base44.entities.Queue.filter(filters);
+      const queue = await entities.Queue.filter(filters);
       return { count: queue.length, estimatedWait: queue.length * 10 };
     },
     refetchInterval: 30000,
@@ -242,7 +242,7 @@ function ConsultaAgoraInner() {
       return undefined;
     }
 
-    const unsubscribe = base44.entities.Queue.subscribe((event) => {
+    const unsubscribe = entities.Queue.subscribe((event) => {
       if (event.id !== queueEntry.id || event.type !== 'update') {
         return;
       }

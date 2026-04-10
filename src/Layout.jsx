@@ -17,7 +17,13 @@ import {
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
 
-const LOGO_URL = "https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699cf7ff429d9e728fec4557/63297c12a_logo.png";
+function BrandMark({ className = 'h-8 w-8' }) {
+  return (
+    <span className={`${className} inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white`}>
+      <Stethoscope className="h-5 w-5" />
+    </span>
+  );
+}
 
 // Pages that are "root" pages (show logo) vs "child" pages (show back button on mobile)
 const ROOT_PAGES = ['Home', 'Especialidades', 'AgendamentoEspecialidade', 'ConsultaAgora', 'PergunteEspecialista'];
@@ -83,7 +89,7 @@ function LayoutInner({ children, currentPageName }) {
                     <ArrowLeft className="w-5 h-5 text-gray-700" />
                   </button>
                   <Link to={createPageUrl('Home')} className="hidden lg:flex items-center gap-2">
-                    <img src={LOGO_URL} alt="Rápido Doutor" className="h-9 w-auto" />
+                    <BrandMark className="h-9 w-9" />
                     <span className="text-xl font-bold text-gray-900">Rápido Doutor</span>
                   </Link>
                   <span className="lg:hidden text-base font-semibold text-gray-900">
@@ -101,7 +107,7 @@ function LayoutInner({ children, currentPageName }) {
                 </>
               ) : (
                 <Link to={createPageUrl('Home')} className="flex items-center gap-2">
-                  <img src={LOGO_URL} alt="Rápido Doutor" className="h-8 lg:h-9 w-auto" />
+                  <BrandMark className="h-8 w-8 lg:h-9 lg:w-9" />
                   <span className="text-lg lg:text-xl font-bold text-gray-900">Rápido Doutor</span>
                 </Link>
               )}
@@ -247,7 +253,7 @@ function LayoutInner({ children, currentPageName }) {
           <div className="grid grid-cols-2 md:grid-cols-4 gap-8">
             <div className="col-span-2 md:col-span-1">
               <div className="flex items-center gap-2 mb-4">
-                <img src={LOGO_URL} alt="Rápido Doutor" className="h-9 w-auto" />
+                <BrandMark className="h-9 w-9" />
                 <span className="text-xl font-bold">Rápido Doutor</span>
               </div>
               <p className="text-gray-400 text-sm">

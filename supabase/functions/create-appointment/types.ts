@@ -27,7 +27,7 @@ export type ProfessionalTargetRecord = {
   priceStandard: number;
   pricePriority: number;
   availableHours: string[];
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 export type AvailabilitySlotRecord = {

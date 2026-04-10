@@ -119,14 +119,6 @@ function buildZoomDisplayName({
   return toSafeString(fallbackName || 'Participante').slice(0, 64);
 }
 
-function hasMissingColumnError(error: unknown, columnName: string) {
-  if (!error) return false;
-  const obj = error as Record<string, unknown>;
-  const message = obj?.message ? String(obj.message) : (error instanceof Error ? error.message : String(error ?? ''));
-  const code = obj?.code ? String(obj.code) : '';
-  return (code === '42703' && message.includes(columnName)) || (message.includes(columnName) && message.includes('column'));
-}
-
 async function createZoomSignature(secret: string, payload: Record<string, unknown>) {
   const encoder = new TextEncoder();
   const header = { alg: 'HS256', typ: 'JWT' };
@@ -226,40 +218,17 @@ async function fetchProfessionalParticipantIds(adminClient: ReturnType<typeof cr
 }
 
 async function fetchConsulta(adminClient: ReturnType<typeof createClient>, consultationId: string) {
-  const baseSelect = 'id, paciente_id, paciente_nome, profissional_id, profissional_nome, status, sala_id, token_sala';
-
-  const primaryResult = await adminClient
+  const { data, error } = await adminClient
     .from('consultas')
-    .select(`${baseSelect}, profissional_user_id`)
+    .select('id, paciente_id, paciente_nome, profissional_id, profissional_user_id, profissional_nome, status, sala_id, token_sala')
     .eq('id', consultationId)
     .maybeSingle();
 
-  if (!primaryResult.error) {
-    return primaryResult.data as Consulta | null;
+  if (error) {
+    throw error;
   }
 
-  if (!hasMissingColumnError(primaryResult.error, 'profissional_user_id')) {
-    throw primaryResult.error;
-  }
-
-  const fallbackResult = await adminClient
-    .from('consultas')
-    .select(baseSelect)
-    .eq('id', consultationId)
-    .maybeSingle();
-
-  if (fallbackResult.error) {
-    throw fallbackResult.error;
-  }
-
-  if (!fallbackResult.data) {
-    return null;
-  }
-
-  return {
-    ...fallbackResult.data,
-    profissional_user_id: null,
-  } as Consulta;
+  return data as Consulta | null;
 }
 
 function resolveParticipantRole(consulta: Consulta, appUser: AppUser, professionalIds: Set<string>) {

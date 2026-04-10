@@ -67,7 +67,7 @@ function getZoomConnectionErrorMessage(error: unknown) {
     rawMessage.includes('edge function') ||
     rawMessage.includes('functions/v1/zoom-token')
   ) {
-    return 'Servico de video ainda nao publicado. Publique a funcao zoom-token no Supabase.';
+    return 'Servico de video ainda nao publicado. Publique a funcao zoom-token no backend.';
   }
 
   if (rawMessage.includes('403') || rawMessage.includes('forbidden')) {

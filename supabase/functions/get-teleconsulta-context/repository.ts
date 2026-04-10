@@ -66,39 +66,35 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
     },
 
     async findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null> {
-      const load = async (tableName: 'professional_profiles' | 'professionals') => {
-        const { data, error } = await client
-          .from(tableName)
-          .select('id, user_id, full_name, specialty')
-          .eq('user_id', appUserId)
-          .order('created_date', { ascending: false })
-          .limit(1);
+      const { data, error } = await client
+        .from('professional_profiles')
+        .select('id, user_id, full_name, specialty')
+        .eq('user_id', appUserId)
+        .order('created_date', { ascending: false })
+        .limit(1);
 
-        if (error) {
-          throw new AppError({
-            status: 500,
-            code: 'PROFESSIONAL_IDENTITY_LOOKUP_FAILED',
-            message: 'Unable to resolve professional identity.',
-            details: error.message,
-          });
-        }
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'PROFESSIONAL_IDENTITY_LOOKUP_FAILED',
+          message: 'Unable to resolve professional identity.',
+          details: error.message,
+        });
+      }
 
-        const row = (data?.[0] || null) as ProfessionalRow | null;
+      const row = (data?.[0] || null) as ProfessionalRow | null;
 
-        if (!row?.id) {
-          return null;
-        }
+      if (!row?.id) {
+        return null;
+      }
 
-        return {
-          profileId: row.id,
-          appUserId: row.user_id || null,
-          fullName: row.full_name || '',
-          specialty: row.specialty || '',
-          source: tableName,
-        } satisfies ProfessionalIdentityRow;
+      return {
+        profileId: row.id,
+        appUserId: row.user_id || null,
+        fullName: row.full_name || '',
+        specialty: row.specialty || '',
+        source: 'professional_profiles',
       };
-
-      return (await load('professional_profiles')) || (await load('professionals'));
     },
 
     async findProntuarioByConsultationId(consultationId: string): Promise<ProntuarioRow | null> {

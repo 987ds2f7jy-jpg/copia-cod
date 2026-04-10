@@ -20,7 +20,7 @@ type ProfessionalProfileRow = {
 };
 
 type LoadedProfessionalProfile = ProfessionalProfileRow & {
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 type ProfessionalPublicProfileRow = {
@@ -68,11 +68,10 @@ function createSupabaseAuthUserLookup(client: SupabaseClient): AuthenticatedUser
 
 async function loadProfessionalProfile(
   client: SupabaseClient,
-  tableName: 'professional_profiles' | 'professionals',
   appUserId: string,
 ): Promise<LoadedProfessionalProfile | null> {
   const { data, error } = await client
-    .from(tableName)
+    .from('professional_profiles')
     .select('id, user_id, full_name, specialty, status, is_on_duty')
     .eq('user_id', appUserId)
     .eq('status', 'approved')
@@ -95,57 +94,30 @@ async function loadProfessionalProfile(
 
   return {
     ...row,
-    source: tableName,
+    source: 'professional_profiles',
   };
 }
 
 async function loadProfessionalPublicProfile(
   client: SupabaseClient,
-  {
-    profileId,
-    appUserId,
-  }: {
-    profileId: string;
-    appUserId: string;
-  },
+  profileId: string,
 ): Promise<ProfessionalPublicProfileRow | null> {
-  const directMatch = await client
+  const result = await client
     .from('professional_public_profiles')
     .select('id, professional_profile_id, user_id, specialty, status, is_on_duty')
     .eq('professional_profile_id', profileId)
     .limit(1);
 
-  if (directMatch.error) {
+  if (result.error) {
     throw new AppError({
       status: 500,
       code: 'PROFESSIONAL_PUBLIC_PROFILE_LOOKUP_FAILED',
       message: 'Unable to resolve professional public profile.',
-      details: directMatch.error.message,
+      details: result.error.message,
     });
   }
 
-  const directRow = (directMatch.data?.[0] || null) as ProfessionalPublicProfileRow | null;
-
-  if (directRow) {
-    return directRow;
-  }
-
-  const fallbackMatch = await client
-    .from('professional_public_profiles')
-    .select('id, professional_profile_id, user_id, specialty, status, is_on_duty')
-    .eq('user_id', appUserId)
-    .limit(1);
-
-  if (fallbackMatch.error) {
-    throw new AppError({
-      status: 500,
-      code: 'PROFESSIONAL_PUBLIC_PROFILE_LOOKUP_FAILED',
-      message: 'Unable to resolve professional public profile.',
-      details: fallbackMatch.error.message,
-    });
-  }
-
-  return (fallbackMatch.data?.[0] || null) as ProfessionalPublicProfileRow | null;
+  return (result.data?.[0] || null) as ProfessionalPublicProfileRow | null;
 }
 
 function mapTransactionError(error: { message?: string; details?: string } | null) {
@@ -269,17 +241,13 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
     },
 
     async findProfessionalDutyContextByUserId(appUserId: string): Promise<ProfessionalDutyRecord | null> {
-      const profile =
-        await loadProfessionalProfile(client, 'professional_profiles', appUserId);
+      const profile = await loadProfessionalProfile(client, appUserId);
 
       if (!profile?.id) {
         return null;
       }
 
-      const publicProfile = await loadProfessionalPublicProfile(client, {
-        profileId: profile.id,
-        appUserId,
-      });
+      const publicProfile = await loadProfessionalPublicProfile(client, profile.id);
 
       return {
         appUserId,

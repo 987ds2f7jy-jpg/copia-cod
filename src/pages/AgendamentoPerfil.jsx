@@ -3,7 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -42,7 +42,7 @@ function AgendamentoPerfilInner() {
   const { data: publicProfile, isLoading: loadingPublic } = useQuery({
     queryKey: ['pub-prof', professionalId],
     queryFn: async () => {
-      const list = await base44.entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
+      const list = await entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
       return list?.[0] || null;
     },
     enabled: !!professionalId,
@@ -52,13 +52,13 @@ function AgendamentoPerfilInner() {
 
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ['avail-slots', privateProfileId],
-    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: privateProfileId }),
+    queryFn: () => entities.AvailabilitySlot.filter({ professional_id: privateProfileId }),
     enabled: !!privateProfileId,
   });
 
   const { data: bookedAppointments = [] } = useQuery({
     queryKey: ['booked-appts', privateProfileId],
-    queryFn: () => base44.entities.Appointment.filter({
+    queryFn: () => entities.Appointment.filter({
       professional_id: privateProfileId,
       status: 'CONFIRMADO',
     }),
@@ -118,7 +118,7 @@ function AgendamentoPerfilInner() {
         if (dt > addHours(now, 36)) throw new Error('Consulta prioritária disponível apenas para as próximas 36h.');
       }
 
-      const existing = await base44.entities.Appointment.filter({
+      const existing = await entities.Appointment.filter({
         professional_id: privateProfileId,
         scheduled_datetime: scheduledDatetime,
         status: 'CONFIRMADO',

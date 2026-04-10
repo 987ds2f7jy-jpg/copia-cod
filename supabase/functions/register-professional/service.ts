@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { normalizeUploadPath, normalizeUploadPathList } from '../_shared/uploadPaths.ts';
 import type {
   RegisterProfessionalCommand,
   RegisterProfessionalRepository,
@@ -104,6 +105,18 @@ export async function registerProfessional({
     repository,
     slugify(`${input.fullName}-${input.specialty}`),
   );
+  const diplomaUrl = normalizeUploadPath(input.diplomaUrl, {
+    allowedPrefixes: ['professionals/diplomas/'],
+    fieldName: 'diplomaUrl',
+  });
+  const photoUrl = normalizeUploadPath(input.photoUrl, {
+    allowedPrefixes: ['professionals/photos/'],
+    fieldName: 'photoUrl',
+  });
+  const galleryUrls = normalizeUploadPathList(input.galleryUrls, {
+    allowedPrefixes: ['professionals/gallery/'],
+    fieldName: 'galleryUrls',
+  });
 
   console.info('[register-professional] request:start', {
     requestId,
@@ -122,11 +135,11 @@ export async function registerProfessional({
     rqe: input.rqe,
     university: input.university,
     graduationYear: input.graduationYear,
-    diplomaUrl: input.diplomaUrl,
+    diplomaUrl,
     sex: input.sex,
     phone: input.phone,
     cpf: input.cpf,
-    photoUrl: input.photoUrl,
+    photoUrl,
     bio: input.bio,
   });
 
@@ -141,7 +154,7 @@ export async function registerProfessional({
     registerState: input.registerState,
     rqe: input.rqe,
     bio: input.bio,
-    photoUrl: input.photoUrl,
+    photoUrl,
     graduationYear: input.graduationYear,
     education: input.university,
     tags: input.tags,
@@ -151,7 +164,7 @@ export async function registerProfessional({
     officeState: input.officeState,
     officeAddress: input.officeAddress,
     instagramUrl: input.instagramUrl,
-    galleryUrls: input.galleryUrls,
+    galleryUrls,
   });
 
   console.info('[register-professional] request:success', {

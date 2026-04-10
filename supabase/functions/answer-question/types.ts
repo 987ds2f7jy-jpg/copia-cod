@@ -28,7 +28,7 @@ export type ProfessionalContextRecord = {
   specialty: string;
   status: string;
   publicProfileId: string | null;
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 export type AnswerQuestionResult = {

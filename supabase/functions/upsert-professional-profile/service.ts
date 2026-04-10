@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { normalizeUploadPath, normalizeUploadPathList } from '../_shared/uploadPaths.ts';
 import type {
   UpsertProfessionalProfileCommand,
   UpsertProfessionalProfileRepository,
@@ -69,8 +70,12 @@ export async function upsertProfessionalProfile({
   }
 
   if (input.photoUrl !== undefined) {
-    privateUpdates.photo_url = input.photoUrl;
-    publicUpdates.photo_url = input.photoUrl;
+    const photoUrl = normalizeUploadPath(input.photoUrl, {
+      allowedPrefixes: ['professionals/photos/'],
+      fieldName: 'photoUrl',
+    });
+    privateUpdates.photo_url = photoUrl;
+    publicUpdates.photo_url = photoUrl;
   }
 
   if (input.priceStandard !== undefined) {
@@ -110,7 +115,12 @@ export async function upsertProfessionalProfile({
   if (input.officeCity !== undefined) publicUpdates.office_city = input.officeCity;
   if (input.officeState !== undefined) publicUpdates.office_state = input.officeState;
   if (input.officeAddress !== undefined) publicUpdates.office_address = input.officeAddress;
-  if (input.galleryUrls !== undefined) publicUpdates.gallery_urls = input.galleryUrls;
+  if (input.galleryUrls !== undefined) {
+    publicUpdates.gallery_urls = normalizeUploadPathList(input.galleryUrls, {
+      allowedPrefixes: ['professionals/gallery/'],
+      fieldName: 'galleryUrls',
+    });
+  }
 
   const updatedProfessional = Object.keys(privateUpdates).length > 0
     ? await repository.updateProfessionalProfile({

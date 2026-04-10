@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '@/components/AuthContext';
-import { deleteUploadedFiles, uploadPublicFile } from '@/client-api/uploads';
+import { deleteUploadedFiles, uploadFile } from '@/client-api/uploads';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -85,7 +85,7 @@ export default function RenovacaoReceitas() {
     let uploadedFilePath = '';
 
     try {
-      const uploadedFile = await uploadPublicFile({
+      const uploadedFile = await uploadFile({
         file: arquivo,
         folder: 'renovacao_receitas',
       });
@@ -95,7 +95,7 @@ export default function RenovacaoReceitas() {
         nomeMedicamento: medicamento.trim(),
         dosagem: dosagem.trim(),
         frequencia,
-        arquivoReceitaUrl: uploadedFile?.publicUrl || '',
+        arquivoReceitaUrl: uploadedFile?.path || '',
       });
 
       setSuccess(true);

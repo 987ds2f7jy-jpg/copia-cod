@@ -1,4 +1,9 @@
-import { supabase } from '@/integrations/supabase/client';
+import { env } from '@/config/env';
+import {
+  clearStoredSession,
+  getStoredSession,
+  saveStoredSession,
+} from './session';
 
 function createFunctionError({
   message,
@@ -14,54 +19,161 @@ function createFunctionError({
   return functionError;
 }
 
-async function resolveFunctionError(error, fallbackMessage) {
-  const response = error?.context;
+async function parseResponsePayload(response) {
+  const contentType = response.headers.get('content-type') || '';
 
-  if (response && typeof response.clone === 'function') {
-    try {
-      const payload = await response.clone().json();
-
-      if (payload?.error?.message) {
-        return {
-          message: payload.error.message,
-          code: payload.error.code || error?.code || 'EDGE_FUNCTION_ERROR',
-          status: response.status || error?.status || 500,
-          details: payload.error.details || null,
-        };
-      }
-    } catch {
-      // Ignore non-JSON error responses and keep the fallback message.
-    }
+  if (!contentType.includes('application/json')) {
+    return null;
   }
 
-  return {
-    message: error?.message || fallbackMessage,
-    code: error?.code || 'EDGE_FUNCTION_ERROR',
-    status: error?.status || response?.status || 500,
-    details: error?.details || null,
-  };
+  try {
+    return await response.json();
+  } catch {
+    return null;
+  }
+}
+
+function resolveAuthToken(authMode) {
+  if (authMode === 'none') {
+    return '';
+  }
+
+  const session = getStoredSession();
+
+  if ((authMode === 'session' || authMode === 'optional') && session?.accessToken) {
+    return session.accessToken;
+  }
+
+  return env.edgeFunctionsPublishableKey;
+}
+
+function buildHeaders({ body, authMode }) {
+  const headers = new Headers();
+  headers.set('apikey', env.edgeFunctionsPublishableKey);
+
+  const authToken = resolveAuthToken(authMode);
+
+  if (authToken) {
+    headers.set('Authorization', `Bearer ${authToken}`);
+  }
+
+  if (!(body instanceof FormData)) {
+    headers.set('Content-Type', 'application/json');
+  }
+
+  return headers;
+}
+
+function buildRequestBody(body) {
+  if (body instanceof FormData) {
+    return body;
+  }
+
+  return JSON.stringify(body ?? {});
+}
+
+async function executeEdgeFunction(functionName, {
+  body,
+  fallbackMessage,
+  authMode,
+}) {
+  const response = await fetch(`${env.edgeFunctionsBaseUrl}/${functionName}`, {
+    method: 'POST',
+    headers: buildHeaders({ body, authMode }),
+    body: buildRequestBody(body),
+  });
+
+  const payload = await parseResponsePayload(response);
+
+  if (!response.ok) {
+    throw createFunctionError({
+      message: payload?.error?.message || fallbackMessage || 'Erro ao chamar o backend.',
+      code: payload?.error?.code || 'EDGE_FUNCTION_ERROR',
+      status: response.status,
+      details: payload?.error?.details || null,
+    });
+  }
+
+  if (payload?.error?.message) {
+    throw createFunctionError({
+      message: payload.error.message,
+      code: payload.error.code,
+      status: payload.error.status || 500,
+      details: payload.error.details || null,
+    });
+  }
+
+  return payload?.data ?? payload;
+}
+
+let refreshPromise = null;
+
+async function refreshStoredSessionOnce() {
+  const currentSession = getStoredSession();
+
+  if (!currentSession?.refreshToken) {
+    return null;
+  }
+
+  if (!refreshPromise) {
+    refreshPromise = executeEdgeFunction('refresh-app-session', {
+      body: {
+        refreshToken: currentSession.refreshToken,
+      },
+      fallbackMessage: 'Nao foi possivel renovar a sessao.',
+      authMode: 'anon',
+    })
+      .then((result) => {
+        const nextSession = result?.session;
+
+        if (!nextSession?.accessToken || !nextSession?.refreshToken) {
+          clearStoredSession();
+          return null;
+        }
+
+        return saveStoredSession(nextSession);
+      })
+      .catch((error) => {
+        clearStoredSession();
+        throw error;
+      })
+      .finally(() => {
+        refreshPromise = null;
+      });
+  }
+
+  return refreshPromise;
 }
 
 export async function invokeEdgeFunction(functionName, {
   body,
   fallbackMessage,
+  authMode = 'session',
+  retryOnUnauthorized = true,
 }) {
-  const { data, error } = await supabase.functions.invoke(functionName, {
-    body,
-  });
-
-  if (error) {
-    throw createFunctionError(await resolveFunctionError(error, fallbackMessage));
-  }
-
-  if (data?.error?.message) {
-    throw createFunctionError({
-      message: data.error.message,
-      code: data.error.code,
-      status: data.error.status || 500,
-      details: data.error.details || null,
+  try {
+    return await executeEdgeFunction(functionName, {
+      body,
+      fallbackMessage,
+      authMode,
     });
-  }
+  } catch (error) {
+    if (
+      retryOnUnauthorized &&
+      (authMode === 'session' || authMode === 'optional') &&
+      error?.status === 401
+    ) {
+      const refreshedSession = await refreshStoredSessionOnce();
 
-  return data?.data ?? data;
+      if (refreshedSession?.accessToken) {
+        return executeEdgeFunction(functionName, {
+          body,
+          fallbackMessage,
+          authMode,
+        });
+      }
+    }
+
+    throw error;
+  }
 }

@@ -37,11 +37,10 @@ type AppointmentRow = AppointmentRecord;
 
 async function loadProfessionalTarget(
   client: SupabaseClient,
-  tableName: 'professional_profiles' | 'professionals',
   profileId: string,
 ): Promise<ProfessionalTargetRecord | null> {
   const { data, error } = await client
-    .from(tableName)
+    .from('professional_profiles')
     .select('id, user_id, full_name, specialty, status, price_standard, price_priority, available_hours')
     .eq('id', profileId)
     .maybeSingle();
@@ -70,7 +69,7 @@ async function loadProfessionalTarget(
     priceStandard: Number(row.price_standard || 0),
     pricePriority: Number(row.price_priority || 0),
     availableHours: Array.isArray(row.available_hours) ? row.available_hours.filter(Boolean) : [],
-    source: tableName,
+    source: 'professional_profiles',
   };
 }
 
@@ -109,11 +108,7 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
     },
 
     async findProfessionalTargetById(profileId: string): Promise<ProfessionalTargetRecord | null> {
-      return (
-        await loadProfessionalTarget(client, 'professional_profiles', profileId)
-      ) || (
-        await loadProfessionalTarget(client, 'professionals', profileId)
-      );
+      return loadProfessionalTarget(client, profileId);
     },
 
     async listAvailabilitySlots(profileId: string): Promise<AvailabilitySlotRecord[]> {

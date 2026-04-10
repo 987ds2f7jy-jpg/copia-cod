@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
-import { deleteUploadedFiles, uploadPublicFile } from '@/client-api/uploads';
+import { deleteUploadedFiles, uploadFile as uploadPrivateFile } from '@/client-api/uploads';
 import { leaveQueueEntry } from '@/client-api/queues';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -302,14 +302,14 @@ function LaudosMedicosInner() {
       exames: 'laudos/exames',
       relatorios: 'laudos/relatorios',
     };
-    const uploadedFile = await uploadPublicFile({
+    const uploadedFile = await uploadPrivateFile({
       file,
       folder: folderMap[folderName] || 'laudos/documento_identidade',
     });
 
     return {
       path: uploadedFile?.path || buildUploadPath(user.id, folderName, file),
-      publicUrl: uploadedFile?.publicUrl || '',
+      publicUrl: uploadedFile?.path || '',
       fileName: file.name,
     };
   }

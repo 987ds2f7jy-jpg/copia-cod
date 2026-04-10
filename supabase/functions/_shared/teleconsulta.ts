@@ -57,7 +57,7 @@ export type ProfessionalIdentityRow = {
   appUserId: string | null;
   fullName: string;
   specialty: string;
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 function toSafeString(value: unknown) {

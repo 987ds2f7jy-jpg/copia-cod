@@ -18,8 +18,9 @@ import { createPageUrl } from '@/utils';
 import DisponibilidadeEditor from '@/components/dashboard/DisponibilidadeEditor';
 import MapboxMap from '@/components/map/MapboxMap';
 import { getOfficeLocation, saveOfficeLocation, deleteOfficeLocation } from '@/lib/officeLocations';
-import { uploadPublicFile } from '@/client-api/uploads';
-import { upsertProfessionalProfileRequest } from '@/client-api/professionalDashboard';
+import { uploadFile } from '@/client-api/uploads';
+import { getProfessionalDashboardRequest, upsertProfessionalProfileRequest } from '@/client-api/professionalDashboard';
+import { searchMapboxPlaces } from '@/client-api/mapbox';
 
 const PATIENT_TYPES = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
 const MODALITIES = [
@@ -54,15 +55,19 @@ export default function MeuPerfil({ professional, publicProfile }) {
   const { data: availabilitySlots = [] } = useQuery({
     queryKey: ['avail-slots', professional?.id],
     queryFn: async () => {
-      // Disponibilidade vem do dashboard; aqui mantemos a queryKey para compat.
-      const res = await upsertProfessionalProfileRequest({});
+      const res = await getProfessionalDashboardRequest({
+        appointmentsLimit: 1,
+        includeQueue: false,
+        includeQuestions: false,
+        includeReviews: false,
+      });
       return res?.availabilitySlots || [];
     },
     enabled: !!professional?.id,
   });
 
   const [form, setForm] = useState({
-    photo_url: publicProfile?.photo_url || professional?.photo_url || '',
+    photo_url: publicProfile?.photo_path || professional?.photo_path || publicProfile?.photo_url || professional?.photo_url || '',
     bio: publicProfile?.bio || professional?.bio || '',
     instagram_url: publicProfile?.instagram_url || '',
     patient_types: publicProfile?.patient_types || [],
@@ -71,7 +76,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
     office_city: publicProfile?.office_city || '',
     office_state: publicProfile?.office_state || '',
     office_address: publicProfile?.office_address || '',
-    gallery_urls: publicProfile?.gallery_urls || [],
+    gallery_urls: publicProfile?.gallery_paths || publicProfile?.gallery_urls || [],
     price_standard: publicProfile?.price_standard || professional?.price_standard || '',
     price_priority: publicProfile?.price_priority || professional?.price_priority || '',
     available_days: publicProfile?.available_days || professional?.available_days || [],
@@ -79,6 +84,35 @@ export default function MeuPerfil({ professional, publicProfile }) {
     perfil_ativo: publicProfile?.perfil_ativo || professional?.perfil_ativo || false,
     prioritario_ativo: publicProfile?.prioritario_ativo || professional?.prioritario_ativo || false,
   });
+  const [photoPreviewUrl, setPhotoPreviewUrl] = useState(publicProfile?.photo_url || professional?.photo_url || '');
+  const [galleryPreviewUrls, setGalleryPreviewUrls] = useState(publicProfile?.gallery_urls || []);
+
+  useEffect(() => {
+    if (!professional && !publicProfile) {
+      return;
+    }
+
+    setForm({
+      photo_url: publicProfile?.photo_path || professional?.photo_path || publicProfile?.photo_url || professional?.photo_url || '',
+      bio: publicProfile?.bio || professional?.bio || '',
+      instagram_url: publicProfile?.instagram_url || '',
+      patient_types: publicProfile?.patient_types || [],
+      tags: publicProfile?.tags || [],
+      modality: publicProfile?.modality || 'online',
+      office_city: publicProfile?.office_city || '',
+      office_state: publicProfile?.office_state || '',
+      office_address: publicProfile?.office_address || '',
+      gallery_urls: publicProfile?.gallery_paths || publicProfile?.gallery_urls || [],
+      price_standard: publicProfile?.price_standard || professional?.price_standard || '',
+      price_priority: publicProfile?.price_priority || professional?.price_priority || '',
+      available_days: publicProfile?.available_days || professional?.available_days || [],
+      available_hours: publicProfile?.available_hours || professional?.available_hours || [],
+      perfil_ativo: publicProfile?.perfil_ativo || professional?.perfil_ativo || false,
+      prioritario_ativo: publicProfile?.prioritario_ativo || professional?.prioritario_ativo || false,
+    });
+    setPhotoPreviewUrl(publicProfile?.photo_url || professional?.photo_url || '');
+    setGalleryPreviewUrls(publicProfile?.gallery_urls || []);
+  }, [professional?.id, publicProfile?.id]);
 
   // Office location state
   const [officeForm, setOfficeForm] = useState({
@@ -135,11 +169,12 @@ export default function MeuPerfil({ professional, publicProfile }) {
   const searchAddress = useCallback(async (query) => {
     if (!query || query.length < 3 || !MAPBOX_TOKEN) return;
     try {
-      const res = await fetch(
-        `https://api.mapbox.com/geocoding/v5/mapbox.places/${encodeURIComponent(query)}.json?country=BR&language=pt&access_token=${MAPBOX_TOKEN}&limit=5`
-      );
-      const data = await res.json();
-      setSearchResults(data.features || []);
+      const features = await searchMapboxPlaces({
+        query,
+        token: MAPBOX_TOKEN,
+        limit: 5,
+      });
+      setSearchResults(features);
     } catch { setSearchResults([]); }
   }, [MAPBOX_TOKEN]);
 
@@ -187,8 +222,9 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!file) return;
     setUploading(true);
     try {
-      const uploaded = await uploadPublicFile({ file, folder: 'professionals/photos' });
-      set('photo_url', uploaded?.publicUrl || '');
+      const uploaded = await uploadFile({ file, folder: 'professionals/photos' });
+      set('photo_url', uploaded?.path || '');
+      setPhotoPreviewUrl(uploaded?.signedUrl || uploaded?.path || '');
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a foto.');
     } finally {
@@ -201,10 +237,14 @@ export default function MeuPerfil({ professional, publicProfile }) {
     if (!files.length) return;
     setUploadingGallery(true);
     try {
-      const uploads = await Promise.all(files.map((file) => uploadPublicFile({ file, folder: 'professionals/gallery' })));
+      const uploads = await Promise.all(files.map((file) => uploadFile({ file, folder: 'professionals/gallery' })));
       set('gallery_urls', [
         ...form.gallery_urls,
-        ...uploads.map((upload) => upload?.publicUrl).filter(Boolean),
+        ...uploads.map((upload) => upload?.path).filter(Boolean),
+      ]);
+      setGalleryPreviewUrls((current) => [
+        ...current,
+        ...uploads.map((upload) => upload?.signedUrl || upload?.path).filter(Boolean),
       ]);
     } catch (error) {
       toast.error(error?.message || 'Erro ao enviar a galeria.');
@@ -217,6 +257,11 @@ export default function MeuPerfil({ professional, publicProfile }) {
     const tag = tagInput.trim();
     if (tag && !form.tags.includes(tag)) set('tags', [...form.tags, tag]);
     setTagInput('');
+  };
+
+  const removeGalleryImage = (index) => {
+    set('gallery_urls', form.gallery_urls.filter((_, itemIndex) => itemIndex !== index));
+    setGalleryPreviewUrls((current) => current.filter((_, itemIndex) => itemIndex !== index));
   };
 
   const togglePatientType = (type) => {
@@ -428,8 +473,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
           <div className="flex items-center gap-4">
             {form.photo_url ? (
               <div className="relative">
-                <img src={form.photo_url} alt="Foto" className="w-24 h-24 rounded-xl object-cover" />
-                <button onClick={() => set('photo_url', '')} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
+                <img src={photoPreviewUrl || form.photo_url} alt="Foto" className="w-24 h-24 rounded-xl object-cover" />
+                <button onClick={() => { set('photo_url', ''); setPhotoPreviewUrl(''); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
               </div>
             ) : (
               <label className="cursor-pointer w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 hover:border-emerald-400 transition-colors">
@@ -652,7 +697,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
                   <AlertCircle className="w-3 h-3" />
                   Busque o endereço acima para definir a localização no mapa
                 </p>
-              )}
+              ) : null}
             </div>
           )}
         </CardContent>
@@ -665,8 +710,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
           <div className="flex flex-wrap gap-2">
             {form.gallery_urls.map((url, i) => (
               <div key={i} className="relative">
-                <img src={url} alt="" className="w-16 h-16 rounded-lg object-cover" />
-                <button onClick={() => set('gallery_urls', form.gallery_urls.filter((_, j) => j !== i))} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">✕</button>
+                <img src={galleryPreviewUrls[i] || url} alt="" className="w-16 h-16 rounded-lg object-cover" />
+                <button onClick={() => removeGalleryImage(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">✕</button>
               </div>
             ))}
             <label className="cursor-pointer w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-emerald-400 transition-colors">

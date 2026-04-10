@@ -1,11 +1,11 @@
 import { invokeEdgeFunction } from './edgeFunctions';
 
-export async function uploadPublicFile({ file, folder = 'public' }) {
+export async function uploadFile({ file, folder = 'public' }) {
   const formData = new FormData();
   formData.append('folder', folder);
   formData.append('file', file);
 
-  const result = await invokeEdgeFunction('upload-public-file', {
+  const result = await invokeEdgeFunction('upload-file', {
     body: formData,
     fallbackMessage: 'Nao foi possivel enviar o arquivo.',
   });

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, ChevronLeft, ChevronRight, CalendarDays, Zap } from 'lucide-react';
 import { WEEKDAY_LABELS } from '@/lib/scheduling';
@@ -35,7 +35,7 @@ export default function ProfileCalendar({ professional }) {
 
   const { data: slots = [] } = useQuery({
     queryKey: ['avail-slots-public', professional?.id],
-    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
+    queryFn: () => entities.AvailabilitySlot.filter({ professional_id: professional.id }),
     enabled: !!professional?.id,
     staleTime: 120_000,
   });

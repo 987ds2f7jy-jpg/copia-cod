@@ -55,3 +55,17 @@ export async function leaveQueueEntry({ queueId = null } = {}) {
     queueEntry: normalizeQueueEntry(result?.queueEntry),
   };
 }
+
+export async function acceptQueueEntryRequest({ queueId }) {
+  const result = await invokeEdgeFunction('accept-queue-entry', {
+    body: {
+      queueId,
+    },
+    fallbackMessage: 'Nao foi possivel aceitar o paciente da fila.',
+  });
+
+  return {
+    ...result,
+    queue: normalizeQueueEntry(result?.queue),
+  };
+}

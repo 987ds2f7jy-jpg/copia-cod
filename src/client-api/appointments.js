@@ -36,6 +36,15 @@ export async function cancelAppointmentRequest({
   return result?.appointment ?? null;
 }
 
+export async function acceptAppointmentRequest({ appointmentId }) {
+  return invokeEdgeFunction('accept-appointment', {
+    body: {
+      appointmentId,
+    },
+    fallbackMessage: 'Nao foi possivel aceitar a solicitacao.',
+  });
+}
+
 export async function submitAppointmentReviewRequest({
   appointmentId,
   rating,

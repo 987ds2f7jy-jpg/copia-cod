@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import {
   createQuestionRequest,
   deleteQuestionRequest,
@@ -139,18 +139,18 @@ export default function PergunteEspecialista() {
   // Fórum público: apenas perguntas RESPONDIDAS
   const { data: publicQuestions = [], isLoading } = useQuery({
     queryKey: ['forumPublic', filterSpecialty],
-    queryFn: () => base44.entities.Question.filter({ status: 'RESPONDIDA' }, '-answered_at', 50),
+    queryFn: () => entities.Question.filter({ status: 'RESPONDIDA' }, '-answered_at', 50),
   });
 
   const { data: professionalPublicProfiles = [] } = useQuery({
     queryKey: ['forumProfessionalProfiles'],
-    queryFn: () => base44.entities.ProfessionalPublicProfile.filter({ status: 'approved' }, '-created_date', 200),
+    queryFn: () => entities.ProfessionalPublicProfile.filter({ status: 'approved' }, '-created_date', 200),
   });
 
   // Minhas perguntas (paciente)
   const { data: myQuestions = [] } = useQuery({
     queryKey: ['myQuestions', user?.id],
-    queryFn: () => base44.entities.Question.filter({ paciente_id: user.id }, '-created_date', 50),
+    queryFn: () => entities.Question.filter({ paciente_id: user.id }, '-created_date', 50),
     enabled: !!user?.id,
   });
 

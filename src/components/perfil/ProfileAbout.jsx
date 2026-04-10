@@ -142,7 +142,7 @@ export default function ProfileAbout({ professional }) {
         </div>
       )}
 
-      {/* Fallback: office without map (online-only with address set) */}
+      {/* Office details without map (online-only with address set) */}
       {hasOffice && !showMap && (
         <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
           <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2">

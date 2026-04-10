@@ -33,6 +33,7 @@ import PlantaoBlock from '@/components/dashboard/PlantaoBlock';
 import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGate';
 import ServicosExtras from '@/components/dashboard/ServicosExtras';
 import { answerQuestionRequest } from '@/client-api/questions';
+import { acceptQueueEntryRequest } from '@/client-api/queues';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import { attachLaudoContextToQueue } from '@/lib/solicitacoesExames';
 import {
@@ -293,15 +294,25 @@ function DashboardProfissionalInner() {
   });
 
   const acceptQueuePatient = useMutation({
-    mutationFn: async () => {
-      throw new Error(
-        'TODO: implementar Edge Function accept-queue-entry para atender pacientes da fila sem criar consulta no frontend.',
-      );
+    mutationFn: async (queueEntry) => {
+      if (!queueEntry?.id) {
+        throw new Error('Entrada da fila invalida.');
+      }
+
+      return acceptQueueEntryRequest({ queueId: queueEntry.id });
+    },
+    onSuccess: (result) => {
+      queryClient.invalidateQueries({ queryKey: ['queueWaiting'] });
+      queryClient.invalidateQueries({ queryKey: ['queueAll'] });
+
+      if (result?.consulta?.id) {
+        navigate(`/consulta/${result.consulta.id}`);
+      }
     },
     onError: (error) => {
       toast({
-        title: 'Fluxo pendente de backend',
-        description: error.message || 'Implementar accept-queue-entry no backend antes de atender a fila.',
+        title: 'Nao foi possivel atender a fila',
+        description: error.message || 'Tente novamente em instantes.',
         variant: 'destructive',
       });
     },
@@ -508,8 +519,8 @@ function DashboardProfissionalInner() {
                 navigate(`/consulta/${a.consulta_id}`);
               } else {
                 toast({
-                  title: 'Fluxo pendente de backend',
-                  description: 'Este agendamento ainda nao possui consulta vinculada. TODO: garantir criacao via accept-appointment no backend antes de iniciar.',
+                  title: 'Consulta ainda nao vinculada',
+                  description: 'Aceite a solicitacao novamente ou atualize a pagina para carregar o vinculo criado no backend.',
                   variant: 'destructive',
                 });
               }

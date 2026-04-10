@@ -19,7 +19,7 @@ export type ProfessionalDutyRecord = {
   specialty: string;
   isOnDuty: boolean;
   publicStatus: string;
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 export type AcceptQueueEntryTransactionRecord = {

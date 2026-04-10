@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { useQuery } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Stethoscope, ArrowLeft, Loader2 } from 'lucide-react';
@@ -26,11 +26,9 @@ export default function PerfilProfissional() {
     queryKey: ['perfil-professional', professionalId],
     queryFn: async () => {
       if (!professionalId) return null;
-      // Primary: ProfessionalPublicProfile with approved status
-      let list = await base44.entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
+      let list = await entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
       if (list && list.length > 0) return list[0];
-      // Fallback for profiles linked via professional_profile_id
-      list = await base44.entities.ProfessionalPublicProfile.filter({ professional_profile_id: professionalId, status: 'approved' });
+      list = await entities.ProfessionalPublicProfile.filter({ professional_profile_id: professionalId, status: 'approved' });
       if (list && list.length > 0) return list[0];
       return null;
     },
@@ -40,7 +38,7 @@ export default function PerfilProfissional() {
 
   const { data: appointments = [] } = useQuery({
     queryKey: ['perfil-appts', professionalId],
-    queryFn: () => base44.entities.Appointment.filter(
+    queryFn: () => entities.Appointment.filter(
       { professional_id: professional?.professional_profile_id || professionalId, status: 'CONCLUIDO' },
       '-scheduled_datetime', 200
     ),
@@ -50,7 +48,7 @@ export default function PerfilProfissional() {
 
   const { data: reviews = [] } = useQuery({
     queryKey: ['perfil-reviews', professionalId],
-    queryFn: () => base44.entities.Review.filter(
+    queryFn: () => entities.Review.filter(
       { professional_id: professional?.professional_profile_id || professionalId },
       '-created_date', 100
     ),
@@ -60,7 +58,7 @@ export default function PerfilProfissional() {
 
   const { data: questions = [] } = useQuery({
     queryKey: ['perfil-questions', professionalId],
-    queryFn: () => base44.entities.Question.filter({
+    queryFn: () => entities.Question.filter({
       public_profile_id: professionalId,
       status: 'RESPONDIDA',
     }, '-answered_at', 50),

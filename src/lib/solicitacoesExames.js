@@ -1,4 +1,4 @@
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { joinQueueEntry } from '@/client-api/queues';
 import {
   createSolicitacaoExameRequest,
@@ -7,36 +7,11 @@ import {
 } from '@/client-api/solicitacoesExames';
 import { canWorkOnDuty, normalizePlantaoSpecialty, normalizeSpecialty } from '@/lib/professionals';
 
-const OPTIONAL_COLUMNS = [
-  'fluxo_destino',
-  'especialidade_destino',
-  'paciente_email',
-  'paciente_telefone',
-  'dados_identificacao',
-  'informacoes_saude',
-  'arquivos',
-  'queue_id',
-];
-
 const PLANTAO_STORAGE_KEY = 'rd.solicitacaoExames.plantao';
 const LAUDO_WIZARD_STORAGE_KEY = 'rd.laudosMedicos.wizard';
 const CLINICO_GERAL = 'clinico_geral';
 const MAX_UPLOAD_FILE_SIZE_BYTES = 10 * 1024 * 1024;
 const ALLOWED_UPLOAD_MIME_TYPES = ['application/pdf', 'image/jpeg', 'image/png'];
-
-function getErrorMessage(error) {
-  const message = error instanceof Error
-    ? error.message
-    : typeof error?.message === 'string'
-      ? error.message
-      : String(error ?? '');
-  return message;
-}
-
-function hasMissingColumnError(error, columnName) {
-  const message = getErrorMessage(error);
-  return message.includes(columnName) && message.includes('column');
-}
 
 function ensureAuthenticatedUser(user) {
   if (!user?.id) {
@@ -46,7 +21,7 @@ function ensureAuthenticatedUser(user) {
   return user;
 }
 
-async function createSolicitacaoExameWithFallback(payload) {
+async function createSolicitacaoExame(payload) {
   return createSolicitacaoExameRequest(payload);
 }
 
@@ -63,7 +38,7 @@ export function buildSpecificExamSymptoms({ exame, motivo, sintomas }) {
 export async function createCheckupRequest(user) {
   ensureAuthenticatedUser(user);
 
-  return createSolicitacaoExameWithFallback({
+  return createSolicitacaoExame({
     tipo: 'checkup',
     exameSolicitado: 'Check-Up Completo',
     motivo: 'Exames de rotina / check-up preventivo',
@@ -77,7 +52,7 @@ export async function createCheckupRequest(user) {
 export async function createSpecificExamRequest(user, { exame, motivo, sintomas }) {
   ensureAuthenticatedUser(user);
 
-  return createSolicitacaoExameWithFallback({
+  return createSolicitacaoExame({
     tipo: 'especificos',
     exameSolicitado: exame,
     motivo: motivo || '',
@@ -96,7 +71,7 @@ export async function createPrescriptionRenewalRequest(user, {
 }) {
   ensureAuthenticatedUser(user);
 
-  return createSolicitacaoExameWithFallback({
+  return createSolicitacaoExame({
     tipo: 'renovacao_receitas',
     exameSolicitado: '',
     motivo: '',
@@ -210,7 +185,7 @@ export function isLaudoQueueEntry(queueEntry) {
   return symptoms.includes('[laudo medico:');
 }
 
-export async function createQueueEntryWithFallback(payload) {
+export async function createQueueEntry(payload) {
   const result = await joinQueueEntry({
     specialty: payload.specialty,
     symptoms: payload.symptoms || '',
@@ -228,7 +203,7 @@ export async function findCurrentQueueEntry(patientId, specialty = CLINICO_GERAL
 
   const statuses = ['waiting', 'in_progress', 'em_atendimento'];
   const matches = await Promise.all(
-    statuses.map((status) => base44.entities.Queue.filter({ patient_id: patientId, specialty, status }, '-created_date', 5)),
+    statuses.map((status) => entities.Queue.filter({ patient_id: patientId, specialty, status }, '-created_date', 5)),
   );
 
   return matches.flat()[0] || null;
@@ -274,7 +249,7 @@ export async function createLaudoMedicoRequest(user, {
 }) {
   ensureAuthenticatedUser(user);
 
-  return createSolicitacaoExameWithFallback({
+  return createSolicitacaoExame({
     tipo: 'laudo_medico',
     exameSolicitado: '',
     motivo: especificacaoLaudo?.finalidade || '',
@@ -386,22 +361,11 @@ export async function listDirectSolicitacoesForProfessional(professional) {
     return [];
   }
 
-  try {
-    return await base44.entities.SolicitacaoExame.filter({
-      status: 'pending',
-      fluxo_destino: 'dashboard',
-      especialidade_destino: CLINICO_GERAL,
-    }, '-created_date');
-  } catch (error) {
-    const hasSchemaMismatch = OPTIONAL_COLUMNS.some((columnName) => hasMissingColumnError(error, columnName));
-
-    if (!hasSchemaMismatch) {
-      throw error;
-    }
-
-    const pendingSolicitacoes = await base44.entities.SolicitacaoExame.filter({ status: 'pending' }, '-created_date');
-    return pendingSolicitacoes.filter((solicitacao) => shouldShowSolicitacaoForProfessional(solicitacao, professional));
-  }
+  return entities.SolicitacaoExame.filter({
+    status: 'pending',
+    fluxo_destino: 'dashboard',
+    especialidade_destino: CLINICO_GERAL,
+  }, '-created_date');
 }
 
 export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
@@ -410,30 +374,24 @@ export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
   }
 
   if (queueEntry.solicitacao_exame_id) {
-    const directMatch = await base44.entities.SolicitacaoExame.filter({ id: queueEntry.solicitacao_exame_id }, undefined, 1);
+    const directMatch = await entities.SolicitacaoExame.filter({ id: queueEntry.solicitacao_exame_id }, undefined, 1);
     if (directMatch?.[0]) {
       return directMatch[0];
     }
   }
 
   if (queueEntry.id) {
-    try {
-      const queueLinkedMatches = await base44.entities.SolicitacaoExame.filter({
-        queue_id: queueEntry.id,
-        tipo: 'laudo_medico',
-      }, '-created_date', 5);
+    const queueLinkedMatches = await entities.SolicitacaoExame.filter({
+      queue_id: queueEntry.id,
+      tipo: 'laudo_medico',
+    }, '-created_date', 5);
 
-      if (queueLinkedMatches?.[0]) {
-        return queueLinkedMatches[0];
-      }
-    } catch (error) {
-      if (!hasMissingColumnError(error, 'queue_id')) {
-        throw error;
-      }
+    if (queueLinkedMatches?.[0]) {
+      return queueLinkedMatches[0];
     }
   }
 
-  const pendingMatches = await base44.entities.SolicitacaoExame.filter({
+  const pendingMatches = await entities.SolicitacaoExame.filter({
     paciente_id: queueEntry.patient_id,
     tipo: 'laudo_medico',
     status: 'pending',
@@ -443,7 +401,7 @@ export async function resolveLaudoSolicitacaoFromQueue(queueEntry) {
     return pendingMatches[0];
   }
 
-  const inProgressMatches = await base44.entities.SolicitacaoExame.filter({
+  const inProgressMatches = await entities.SolicitacaoExame.filter({
     paciente_id: queueEntry.patient_id,
     tipo: 'laudo_medico',
     status: 'in_progress',

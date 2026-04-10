@@ -26,45 +26,23 @@ type PublicProfileRow = {
 async function findPublicProfileId(
   client: SupabaseClient,
   professionalProfileId: string,
-  userId: string,
 ) {
-  const primaryLookup = await client
+  const lookup = await client
     .from('professional_public_profiles')
     .select('id')
     .eq('professional_profile_id', professionalProfileId)
     .limit(1);
 
-  if (primaryLookup.error) {
+  if (lookup.error) {
     throw new AppError({
       status: 500,
       code: 'PUBLIC_PROFILE_LOOKUP_FAILED',
       message: 'Unable to load professional public profile.',
-      details: primaryLookup.error.message,
+      details: lookup.error.message,
     });
   }
 
-  const primaryProfile = (primaryLookup.data as PublicProfileRow[] | null)?.[0];
-
-  if (primaryProfile?.id) {
-    return primaryProfile.id;
-  }
-
-  const fallbackLookup = await client
-    .from('professional_public_profiles')
-    .select('id')
-    .eq('user_id', userId)
-    .limit(1);
-
-  if (fallbackLookup.error) {
-    throw new AppError({
-      status: 500,
-      code: 'PUBLIC_PROFILE_LOOKUP_FAILED',
-      message: 'Unable to load professional public profile.',
-      details: fallbackLookup.error.message,
-    });
-  }
-
-  return ((fallbackLookup.data as PublicProfileRow[] | null)?.[0]?.id) || null;
+  return ((lookup.data as PublicProfileRow[] | null)?.[0]?.id) || null;
 }
 
 async function findProfessionalContext(
@@ -95,7 +73,7 @@ async function findProfessionalContext(
       fullName: privateProfile.full_name || '',
       specialty: privateProfile.specialty || '',
       status: privateProfile.status || '',
-      publicProfileId: await findPublicProfileId(client, privateProfile.id, userId),
+      publicProfileId: await findPublicProfileId(client, privateProfile.id),
       source: 'professional_profiles',
     };
   }

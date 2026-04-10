@@ -8,8 +8,6 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 
-const LOGO_URL = 'https://qtrypzzcjebvfcihiynt.supabase.co/storage/v1/object/public/base44-prod/public/699cf7ff429d9e728fec4557/63297c12a_logo.png';
-
 function resolveRedirectPath(user) {
   if (user?.role === 'professional') {
     return createPageUrl('DashboardProfissional');
@@ -65,7 +63,9 @@ export default function Entrar() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link to={createPageUrl('Home')} className="mb-6 inline-flex items-center gap-2">
-            <img src={LOGO_URL} alt="Rapido Doutor" className="h-10 w-auto" />
+            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
+              <Stethoscope className="h-5 w-5" />
+            </span>
             <span className="text-2xl font-bold text-gray-900">Rapido Doutor</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Entrar na sua conta</h1>

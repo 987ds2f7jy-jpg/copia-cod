@@ -17,7 +17,7 @@ export type ProfessionalProfileRecord = {
   profileId: string;
   fullName: string;
   specialty: string;
-  source: 'professional_profiles' | 'professionals';
+  source: 'professional_profiles';
 };
 
 export type AcceptAppointmentTransactionRecord = {

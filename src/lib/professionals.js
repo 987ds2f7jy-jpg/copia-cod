@@ -6,12 +6,29 @@ const SPECIALTY_ALIASES = {
   psicologia_clinica: 'psicologia',
 };
 
+function repairMojibake(value) {
+  const input = String(value || '');
+
+  if (!/[ÃÂ]/.test(input) || typeof TextDecoder === 'undefined') {
+    return input;
+  }
+
+  try {
+    const bytes = Uint8Array.from(Array.from(input, (char) => char.charCodeAt(0)));
+    const decoded = new TextDecoder('utf-8').decode(bytes);
+    return decoded.includes('\uFFFD') ? input : decoded;
+  } catch {
+    return input;
+  }
+}
+
 export function normalizeSpecialty(value) {
-  return (value || '')
+  return repairMojibake(value)
     .toLowerCase()
     .trim()
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\u00ad/g, '')
     .replace(/\s+/g, '_');
 }
 

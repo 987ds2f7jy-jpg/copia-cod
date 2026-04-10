@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useSearchParams, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { base44 } from '@/api/base44Client';
+import { entities } from '@/client-api/readModels';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -65,7 +65,7 @@ export default function Especialidades() {
     queryFn: async () => {
       const filters = { status: 'approved', perfil_ativo: true };
       if (selectedSpecialty) filters.specialty = selectedSpecialty;
-      return base44.entities.ProfessionalPublicProfile.filter(filters);
+      return entities.ProfessionalPublicProfile.filter(filters);
     },
   });
 

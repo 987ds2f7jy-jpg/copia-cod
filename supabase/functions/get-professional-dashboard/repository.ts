@@ -8,6 +8,58 @@ import {
 } from '../_shared/supabase.ts';
 import type { GetProfessionalDashboardRepository } from './types.ts';
 
+function normalizeString(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
+  const path = normalizeString(value);
+
+  if (!path || /^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const { data, error } = await client.storage
+    .from('uploads')
+    .createSignedUrl(path, 60 * 60);
+
+  if (error || !data?.signedUrl) {
+    return path;
+  }
+
+  return data.signedUrl;
+}
+
+async function decorateProfessionalProfile(client: SupabaseClient, profile: Record<string, unknown> | null) {
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    ...profile,
+    diploma_path: profile.diploma_url,
+    diploma_url: await createSignedUploadUrl(client, profile.diploma_url),
+    photo_path: profile.photo_url,
+    photo_url: await createSignedUploadUrl(client, profile.photo_url),
+  };
+}
+
+async function decoratePublicProfile(client: SupabaseClient, profile: Record<string, unknown> | null) {
+  if (!profile) {
+    return null;
+  }
+
+  const galleryUrls = Array.isArray(profile.gallery_urls) ? profile.gallery_urls : [];
+
+  return {
+    ...profile,
+    photo_path: profile.photo_url,
+    photo_url: await createSignedUploadUrl(client, profile.photo_url),
+    gallery_paths: galleryUrls,
+    gallery_urls: await Promise.all(galleryUrls.map((url) => createSignedUploadUrl(client, url))),
+  };
+}
+
 async function findProfessionalByAppUserId(client: SupabaseClient, appUserId: string) {
   const { data, error } = await client
     .from('professional_profiles')
@@ -26,7 +78,7 @@ async function findProfessionalByAppUserId(client: SupabaseClient, appUserId: st
     });
   }
 
-  return (data as Record<string, unknown> | null) || null;
+  return decorateProfessionalProfile(client, (data as Record<string, unknown> | null) || null);
 }
 
 async function findPublicProfileByProfessionalId(client: SupabaseClient, professionalId: string) {
@@ -47,7 +99,7 @@ async function findPublicProfileByProfessionalId(client: SupabaseClient, profess
     });
   }
 
-  return (data as Record<string, unknown> | null) || null;
+  return decoratePublicProfile(client, (data as Record<string, unknown> | null) || null);
 }
 
 async function listAvailabilitySlots(client: SupabaseClient, professionalId: string) {

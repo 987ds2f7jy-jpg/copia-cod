@@ -1,6 +1,11 @@
 import { z } from 'zod';
 import accountApi from '@/client-api/account';
-import { supabaseAuthRepository } from '@/repositories/supabaseAuthRepository';
+import {
+  clearStoredSession,
+  getStoredSession,
+  saveStoredSession,
+  subscribeToSessionChanges,
+} from '@/client-api/session';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
 
@@ -146,7 +151,7 @@ async function clearInactiveSession(error, stage) {
   }
 
   try {
-    await supabaseAuthRepository.signOut();
+    clearStoredSession();
   } catch (signOutError) {
     logUiWarning('auth', {
       stage,
@@ -157,14 +162,10 @@ async function clearInactiveSession(error, stage) {
 
 export const authService = {
   async restoreSession() {
-    if (!supabaseAuthRepository.isEnabled()) {
-      return null;
-    }
-
     try {
-      const session = await supabaseAuthRepository.getSession();
+      const session = getStoredSession();
 
-      if (!session?.access_token) {
+      if (!session?.accessToken) {
         return null;
       }
 
@@ -179,8 +180,22 @@ export const authService = {
     const credentials = loginSchema.parse({ email, password });
 
     try {
-      await supabaseAuthRepository.signIn(credentials);
-      return await syncAccountFromSession();
+      const result = await accountApi.loginAppUserRequest({
+        email: credentials.email,
+        password: credentials.password,
+      });
+
+      if (!result?.session?.accessToken || !result?.session?.refreshToken) {
+        throw new AppError({
+          message: 'Login concluido sem sessao autenticada.',
+          userMessage: 'Login concluido, mas a sessao nao foi iniciada automaticamente. Tente novamente.',
+          status: 409,
+          code: 'AUTH_SESSION_NOT_CREATED',
+        });
+      }
+
+      saveStoredSession(result.session);
+      return ensureActiveUser(toUiUser(result.appUser || null));
     } catch (error) {
       await clearInactiveSession(error, 'login-signout-inactive');
       throw normalizeAccountError(error, 'Nao foi possivel realizar o login.');
@@ -204,11 +219,7 @@ export const authService = {
         });
       }
 
-      await supabaseAuthRepository.setSession({
-        accessToken: result.session.accessToken,
-        refreshToken: result.session.refreshToken,
-      });
-
+      saveStoredSession(result.session);
       return ensureActiveUser(toUiUser(result.appUser || null));
     } catch (error) {
       throw normalizeAccountError(error, 'Nao foi possivel concluir o cadastro.');
@@ -216,15 +227,11 @@ export const authService = {
   },
 
   async logout() {
-    if (!supabaseAuthRepository.isEnabled()) {
-      return;
-    }
-
     try {
-      await supabaseAuthRepository.signOut();
+      clearStoredSession();
     } catch (error) {
       logUiWarning('auth', {
-        stage: 'logout-supabase',
+        stage: 'logout-local-session',
         error: serializeError(error),
       });
 
@@ -234,9 +241,9 @@ export const authService = {
 
   async refreshUser() {
     try {
-      const session = await supabaseAuthRepository.getSession();
+      const session = getStoredSession();
 
-      if (!session?.access_token) {
+      if (!session?.accessToken) {
         return null;
       }
 
@@ -270,7 +277,7 @@ export const authService = {
     }
 
     try {
-      await supabaseAuthRepository.signOut();
+      clearStoredSession();
     } catch (error) {
       logUiWarning('auth', {
         stage: 'deactivate-local-signout',
@@ -280,7 +287,7 @@ export const authService = {
   },
 
   subscribeToAuthChanges(listener) {
-    return supabaseAuthRepository.subscribe(async () => {
+    return subscribeToSessionChanges(async () => {
       try {
         const sessionUser = await this.restoreSession();
         listener(sessionUser);

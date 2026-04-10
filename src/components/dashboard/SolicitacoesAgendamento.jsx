@@ -1,30 +1,12 @@
 import React, { useState } from 'react';
-import { base44 } from '@/api/base44Client';
-import { supabase } from '@/integrations/supabase/client';
+import { entities } from '@/client-api/readModels';
+import { acceptAppointmentRequest } from '@/client-api/appointments';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
-
-async function resolveFunctionErrorMessage(error, fallbackMessage) {
-  const response = error?.context;
-
-  if (response && typeof response.clone === 'function') {
-    try {
-      const payload = await response.clone().json();
-
-      if (payload?.error?.message) {
-        return payload.error.message;
-      }
-    } catch {
-      // Ignore non-JSON error responses and keep the fallback message.
-    }
-  }
-
-  return error?.message || fallbackMessage;
-}
 
 export default function SolicitacoesAgendamento({ professional }) {
   const queryClient = useQueryClient();
@@ -33,7 +15,7 @@ export default function SolicitacoesAgendamento({ professional }) {
 
   const { data: solBySpecialty = [] } = useQuery({
     queryKey: ['solicitacoes-esp', professional?.id, professional?.specialty],
-    queryFn: () => base44.entities.Appointment.filter({
+    queryFn: () => entities.Appointment.filter({
       specialty: professional.specialty,
       appointment_type: 'ESPECIALIDADE',
       status: 'SOLICITADO',
@@ -44,7 +26,7 @@ export default function SolicitacoesAgendamento({ professional }) {
 
   const { data: solPriority = [] } = useQuery({
     queryKey: ['solicitacoes-pri', professional?.id],
-    queryFn: () => base44.entities.Appointment.filter({
+    queryFn: () => entities.Appointment.filter({
       professional_id: professional.id,
       appointment_type: 'priority',
       status: 'SOLICITADO',
@@ -62,23 +44,15 @@ export default function SolicitacoesAgendamento({ professional }) {
     mutationFn: async (solicitacao) => {
       setErrorMsg(null);
 
-      const { data, error } = await supabase.functions.invoke('accept-appointment', {
-        body: {
-          appointmentId: solicitacao.id,
-        },
+      const result = await acceptAppointmentRequest({
+        appointmentId: solicitacao.id,
       });
 
-      if (error) {
-        throw new Error(
-          await resolveFunctionErrorMessage(error, 'Erro ao aceitar solicitacao.'),
-        );
-      }
-
-      if (!data?.data?.appointment?.id || !data?.data?.consulta?.id) {
+      if (!result?.appointment?.id || !result?.consulta?.id) {
         throw new Error('Resposta invalida ao aceitar a solicitacao.');
       }
 
-      return data.data;
+      return result;
     },
     onSuccess: (result, solicitacao) => {
       const removeAcceptedRequest = (items) => (

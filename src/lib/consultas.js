@@ -1,14 +1,3 @@
-export function sanitizeConsultaPayloadForSchema(payload, options = {}) {
-  const { profissionalUserIdSupported = true } = options;
-  const nextPayload = { ...(payload || {}) };
-
-  if (!profissionalUserIdSupported) {
-    delete nextPayload.profissional_user_id;
-  }
-
-  return nextPayload;
-}
-
 export function getConsultaParticipantIds(consulta) {
   if (!consulta) return [];
 
