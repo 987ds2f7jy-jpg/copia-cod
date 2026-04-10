@@ -108,7 +108,7 @@ function buildAppUserPayload(params: {
   return {
     authUserId: params.authUserId,
     fullName,
-    email,
+    email: params.email,
     role,
     isActive: params.existingUser?.isActive ?? true,
     phone,
