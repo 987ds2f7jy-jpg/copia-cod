@@ -3,11 +3,11 @@ import { Link, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import {
   cancelAppointmentRequest,
   submitAppointmentReviewRequest,
 } from '@/client-api/appointments';
-import { getPatientDashboardRequest } from '@/client-api/patientDashboard';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import PullToRefresh from '@/components/PullToRefresh';
@@ -39,15 +39,18 @@ function DashboardPacienteInner() {
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [cancellingId, setCancellingId] = useState(null);
 
-  const { data: dashboardData, isLoading } = useQuery({
+  const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['patientAppointments', user?.id],
-    queryFn: () => getPatientDashboardRequest(),
+    queryFn: () => base44.entities.Appointment.filter({ patient_id: user.id }, '-scheduled_datetime'),
     enabled: !!user?.id,
   });
 
-  const appointments = dashboardData?.appointments || [];
-  const myReviews = dashboardData?.reviews || [];
-  const consultas = dashboardData?.consultas || [];
+  // Fetch existing reviews to prevent duplicates
+  const { data: myReviews = [] } = useQuery({
+    queryKey: ['patientReviews', user?.id],
+    queryFn: () => base44.entities.Review.filter({ patient_id: user.id }),
+    enabled: !!user?.id,
+  });
 
   const reviewedAppointmentIds = new Set(myReviews.map(r => r.appointment_id));
 
@@ -61,6 +64,38 @@ function DashboardPacienteInner() {
     onSettled: () => {
       setCancellingId(null);
       queryClient.invalidateQueries({ queryKey: ['patientAppointments', user?.id] });
+    },
+  });
+
+  const _submitReviewLegacy = useMutation({
+    mutationFn: async (data) => {
+      // Guard: prevent duplicate review per appointment
+      const existing = await base44.entities.Review.filter({ appointment_id: data.appointment_id, patient_id: data.patient_id });
+      if (existing.length > 0) throw new Error('Você já avaliou esta consulta.');
+      return Promise.resolve(data);
+    },
+    onSuccess: async (_, vars) => {
+      // Recalculate and update professional's rating
+      const allReviews = await base44.entities.Review.filter({ professional_id: vars.professional_id });
+      if (allReviews.length > 0) {
+        const avg = allReviews.reduce((s, r) => s + r.rating, 0) / allReviews.length;
+        // Try ProfessionalProfile first, then Professional
+        try {
+          await base44.entities.ProfessionalProfile.update(vars.professional_id, {
+            rating: Math.round(avg * 10) / 10,
+            total_reviews: allReviews.length,
+          });
+        } catch {
+          await base44.entities.Professional.update(vars.professional_id, {
+            rating: Math.round(avg * 10) / 10,
+            total_reviews: allReviews.length,
+          });
+        }
+      }
+      setReviewModal({ open: false, appointment: null });
+      setReviewData({ rating: 5, comment: '' });
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments', user?.id] });
+      queryClient.invalidateQueries({ queryKey: ['patientReviews', user?.id] });
     },
   });
 
@@ -170,12 +205,11 @@ function DashboardPacienteInner() {
     } else if (appointment.meeting_link) {
       window.open(appointment.meeting_link, '_blank');
     } else {
-      const active = consultas.find((consulta) => (
-        ['em_atendimento', 'aguardando', 'in_progress'].includes(consulta.status)
-      ));
-      if (active?.id) {
-        navigate(`/consulta/${active.id}`);
-      }
+      // Buscar consulta pelo patient_id como fallback
+      base44.entities.Consulta.filter({ paciente_id: user.id }).then(cs => {
+        const active = cs.find(c => ['em_atendimento', 'aguardando', 'in_progress'].includes(c.status));
+        if (active) navigate(`/consulta/${active.id}`);
+      });
     }
   };
 

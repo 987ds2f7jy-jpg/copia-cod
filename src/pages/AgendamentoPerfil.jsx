@@ -3,6 +3,7 @@ import { useSearchParams, useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
@@ -22,7 +23,6 @@ import {
   buildDatetime
 } from '@/lib/scheduling';
 import { createAppointmentRequest } from '@/client-api/appointments';
-import { getBookingDataRequest } from '@/client-api/booking';
 
 function AgendamentoPerfilInner() {
   const [searchParams] = useSearchParams();
@@ -39,20 +39,31 @@ function AgendamentoPerfilInner() {
   const [symptoms, setSymptoms] = useState('');
   const [submitError, setSubmitError] = useState(null);
 
-  const { data: bookingData, isLoading: loadingPublic } = useQuery({
+  const { data: publicProfile, isLoading: loadingPublic } = useQuery({
     queryKey: ['pub-prof', professionalId],
-    queryFn: () => getBookingDataRequest({ professionalId }),
+    queryFn: async () => {
+      const list = await base44.entities.ProfessionalPublicProfile.filter({ id: professionalId, status: 'approved' });
+      return list?.[0] || null;
+    },
     enabled: !!professionalId,
   });
-  const publicProfile = bookingData?.publicProfile || null;
 
   const privateProfileId = publicProfile?.professional_profile_id;
 
-  const availabilitySlots = bookingData?.availabilitySlots || [];
-  const bookedAppointments = useMemo(
-    () => (bookingData?.appointments || []).filter((item) => item.status === 'CONFIRMADO'),
-    [bookingData?.appointments],
-  );
+  const { data: availabilitySlots = [] } = useQuery({
+    queryKey: ['avail-slots', privateProfileId],
+    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: privateProfileId }),
+    enabled: !!privateProfileId,
+  });
+
+  const { data: bookedAppointments = [] } = useQuery({
+    queryKey: ['booked-appts', privateProfileId],
+    queryFn: () => base44.entities.Appointment.filter({
+      professional_id: privateProfileId,
+      status: 'CONFIRMADO',
+    }),
+    enabled: !!privateProfileId,
+  });
 
   const prioritySlots = useMemo(() => {
     if (!selectedDate) return [];
@@ -107,12 +118,12 @@ function AgendamentoPerfilInner() {
         if (dt > addHours(now, 36)) throw new Error('Consulta prioritária disponível apenas para as próximas 36h.');
       }
 
-      const existing = bookedAppointments.filter((item) => (
-        item.professional_id === privateProfileId &&
-        item.scheduled_datetime === scheduledDatetime &&
-        item.status === 'CONFIRMADO'
-      ));
-      if (existing.length > 0) {
+      const existing = await base44.entities.Appointment.filter({
+        professional_id: privateProfileId,
+        scheduled_datetime: scheduledDatetime,
+        status: 'CONFIRMADO',
+      });
+      if (existing && existing.length > 0) {
         throw new Error('Este horário acabou de ser ocupado. Por favor, escolha outro.');
       }
 

@@ -1,8 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { base44 } from '@/api/base44Client';
 import { registerProfessionalRequest } from '@/client-api/professionals';
-import { uploadPublicFile } from '@/client-api/uploads';
 import { useAuth } from '@/components/AuthContext';
 import { useMutation } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
@@ -45,6 +45,16 @@ const MODALITIES = [
   { value: 'presencial', label: 'Presencial' },
   { value: 'ambos', label: 'Online e Presencial' },
 ];
+
+function generateSlug(name, specialty) {
+  const normalize = (str) => str
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-|-$/g, '');
+  return `${normalize(name)}-${normalize(specialty)}`;
+}
 
 export default function CadastroProfissional() {
   const navigate = useNavigate();
@@ -100,11 +110,8 @@ export default function CadastroProfissional() {
     if (!file) return;
     setUploading(true);
     try {
-      const upload = await uploadPublicFile({ file, folder: 'professionals/diplomas' });
-      if (!upload?.publicUrl) {
-        throw new Error('URL do arquivo nao retornada.');
-      }
-      set('diploma_url', upload.publicUrl);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/diplomas' });
+      set('diploma_url', file_url);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar o diploma.');
     } finally {
@@ -117,11 +124,8 @@ export default function CadastroProfissional() {
     if (!file) return;
     setUploadingPhoto(true);
     try {
-      const upload = await uploadPublicFile({ file, folder: 'professionals/photos' });
-      if (!upload?.publicUrl) {
-        throw new Error('URL da foto nao retornada.');
-      }
-      set('photo_url', upload.publicUrl);
+      const { file_url } = await base44.integrations.Core.UploadFile({ file, folder: 'professionals/photos' });
+      set('photo_url', file_url);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar a foto.');
     } finally {
@@ -135,12 +139,9 @@ export default function CadastroProfissional() {
     setUploadingGallery(true);
     try {
       const uploads = await Promise.all(
-        files.map((file) => uploadPublicFile({ file, folder: 'professionals/gallery' })),
+        files.map((file) => base44.integrations.Core.UploadFile({ file, folder: 'professionals/gallery' })),
       );
-      set('gallery_urls', [
-        ...formData.gallery_urls,
-        ...uploads.map((upload) => upload?.publicUrl).filter(Boolean),
-      ]);
+      set('gallery_urls', [...formData.gallery_urls, ...uploads.map((upload) => upload.file_url)]);
     } catch (error) {
       toast.error(error?.message || 'Nao foi possivel enviar a galeria.');
     } finally {
@@ -162,6 +163,97 @@ export default function CadastroProfissional() {
     const curr = formData.patient_types;
     set('patient_types', curr.includes(type) ? curr.filter(t => t !== type) : [...curr, type]);
   };
+
+  const _createProfessionalLegacy = useMutation({
+    mutationFn: async (data) => {
+      let currentUser = appUser;
+
+      // 1. Create or update user account
+        if (!currentUser) {
+          if (!email || !password) throw new Error('Informe email e senha para criar sua conta.');
+          currentUser = await register({
+            full_name: data.full_name,
+            email,
+          password,
+          role: 'professional',
+          phone: data.phone,
+          cpf: data.cpf,
+            sex: data.sex,
+          });
+        } else {
+          currentUser = {
+            ...currentUser,
+            role: 'professional',
+            full_name: data.full_name,
+            phone: data.phone,
+            cpf: data.cpf,
+            sex: data.sex,
+          };
+        }
+
+      const graduationYear = parseInt(data.graduation_year) || 0;
+
+      // 2. Create ProfessionalProfile (private — contains CPF, diploma, etc.)
+      const privateProfile = await Promise.resolve({
+        user_id: currentUser.id,
+        full_name: data.full_name,
+        profession: data.profession,
+        specialty: data.specialty,
+        register_number: data.register_number,
+        register_state: data.register_state,
+        rqe: data.rqe || '',
+        university: data.university,
+        graduation_year: graduationYear,
+        diploma_url: data.diploma_url,
+        sex: data.sex,
+        phone: data.phone,
+        cpf: data.cpf,
+        bio: data.bio,
+        photo_url: data.photo_url,
+        is_on_duty: false,
+        is_verified: false,
+        status: 'pending',
+        perfil_ativo: false,
+        prioritario_ativo: false,
+        rating: 0,
+        total_reviews: 0,
+      });
+
+      // 3. Create ProfessionalPublicProfile (public portfolio — NO sensitive data)
+      await Promise.resolve({
+        professional_profile_id: privateProfile.id,
+        user_id: currentUser.id,
+        full_name: data.full_name,
+        slug: generateSlug(data.full_name, data.specialty),
+        profession: data.profession,
+        specialty: data.specialty,
+        register_number: data.register_number,
+        register_state: data.register_state,
+        rqe: data.rqe || '',
+        bio: data.bio,
+        photo_url: data.photo_url,
+        graduation_year: graduationYear,
+        education: data.university || '',
+        tags: data.tags,
+        patient_types: data.patient_types,
+        modality: data.modality,
+        office_city: data.office_city,
+        office_state: data.office_state,
+        office_address: data.office_address,
+        instagram_url: data.instagram_url,
+        gallery_urls: data.gallery_urls,
+        is_on_duty: false,
+        rating: 0,
+        total_reviews: 0,
+        perfil_ativo: false,
+        prioritario_ativo: false,
+        status: 'pending_review',
+      });
+
+      return privateProfile;
+    },
+    onSuccess: () => setStep(99),
+  });
 
   const createProfessional = useMutation({
     mutationFn: async (data) => {
@@ -208,7 +300,7 @@ export default function CadastroProfissional() {
         galleryUrls: data.gallery_urls,
       });
 
-      await refreshUser();
+      await refreshUser(currentUser?.id);
       return result;
     },
     onSuccess: () => setStep(99),
@@ -343,6 +435,26 @@ export default function CadastroProfissional() {
                     <Button
                       onClick={async () => {
                         if (!formData.full_name || !formData.profession || !formData.specialty) {
+                          return;
+                        }
+
+                        if (!appUser) {
+                          try {
+                            await register({
+                              full_name: formData.full_name,
+                              email,
+                              password,
+                              role: 'professional',
+                              phone: formData.phone,
+                              cpf: formData.cpf,
+                              sex: formData.sex,
+                            });
+                          } catch (error) {
+                            toast.error(error?.message || 'Nao foi possivel criar sua conta profissional.');
+                            return;
+                          }
+
+                          setStep(2);
                           return;
                         }
 

@@ -43,7 +43,6 @@ import {
   setProfessionalPublicDuty,
 } from '@/lib/professionals';
 import { getProfessionalDashboardRequest } from '@/client-api/professionalDashboard';
-import { acceptQueueEntryRequest } from '@/client-api/professionalAppointments';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -294,23 +293,15 @@ function DashboardProfissionalInner() {
   });
 
   const acceptQueuePatient = useMutation({
-    mutationFn: async (queueEntry) => {
-      if (!queueEntry?.id) {
-        throw new Error('Entrada da fila invalida.');
-      }
-
-      return acceptQueueEntryRequest({ queueId: queueEntry.id });
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['queueWaiting'] });
-      queryClient.invalidateQueries({ queryKey: ['queueAll'] });
-      queryClient.invalidateQueries({ queryKey: ['profAppts'] });
-      queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
+    mutationFn: async () => {
+      throw new Error(
+        'TODO: implementar Edge Function accept-queue-entry para atender pacientes da fila sem criar consulta no frontend.',
+      );
     },
     onError: (error) => {
       toast({
-        title: 'Nao foi possivel aceitar o paciente da fila',
-        description: error.message || 'Tente novamente em instantes.',
+        title: 'Fluxo pendente de backend',
+        description: error.message || 'Implementar accept-queue-entry no backend antes de atender a fila.',
         variant: 'destructive',
       });
     },
@@ -528,7 +519,7 @@ function DashboardProfissionalInner() {
 
         {/* Solicitações de Agendamento + Serviços Extras */}
         <div className="grid lg:grid-cols-3 gap-4">
-          <SolicitacoesAgendamento professional={professional} appointments={appointments} />
+          <SolicitacoesAgendamento professional={professional} />
           <MinhasConsultasHoje appointments={appointments} />
           <ServicosExtras
             professional={professional}

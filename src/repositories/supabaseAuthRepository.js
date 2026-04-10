@@ -55,26 +55,6 @@ export const supabaseAuthRepository = {
     return data;
   },
 
-  async signUp({ email, password, metadata = {} }) {
-    if (!this.isEnabled()) {
-      return null;
-    }
-
-    const { data, error } = await supabase.auth.signUp({
-      email: normalizeEmail(email),
-      password,
-      options: {
-        data: metadata,
-      },
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return data;
-  },
-
   async setSession({ accessToken, refreshToken }) {
     if (!this.isEnabled()) {
       return null;

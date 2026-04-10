@@ -1,8 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { base44 } from '@/api/base44Client';
 import { useQuery } from '@tanstack/react-query';
 import { Clock, ChevronLeft, ChevronRight, CalendarDays, Zap } from 'lucide-react';
 import { WEEKDAY_LABELS } from '@/lib/scheduling';
-import { getBookingDataRequest } from '@/client-api/booking';
 
 // Maps JS getDay() (0=Sun) to our weekday numbers (0=Dom, 1=Seg...)
 // Both are 0=Sunday so they match directly
@@ -35,10 +35,7 @@ export default function ProfileCalendar({ professional }) {
 
   const { data: slots = [] } = useQuery({
     queryKey: ['avail-slots-public', professional?.id],
-    queryFn: async () => {
-      const data = await getBookingDataRequest({ professionalId: professional.id });
-      return data?.availabilitySlots || [];
-    },
+    queryFn: () => base44.entities.AvailabilitySlot.filter({ professional_id: professional.id }),
     enabled: !!professional?.id,
     staleTime: 120_000,
   });

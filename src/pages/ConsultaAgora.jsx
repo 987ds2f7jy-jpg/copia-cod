@@ -5,8 +5,8 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { AlertCircle, Clock, Loader2, Stethoscope, Users, Video } from 'lucide-react';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
+import { base44 } from '@/api/base44Client';
 import { joinQueueEntry, leaveQueueEntry } from '@/client-api/queues';
-import { getQueuesOverviewRequest } from '@/client-api/queuesRead';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -30,6 +30,10 @@ const SPECIALTIES = [
   { id: 'psiquiatria', name: 'Psiquiatria' },
 ];
 
+function buildProfessionalKey(profile) {
+  return profile?.user_id || profile?.professional_profile_id || profile?.id || '';
+}
+
 function normalizeOnDutyProfessionals(publicProfiles = []) {
   const merged = new Map();
 
@@ -38,7 +42,7 @@ function normalizeOnDutyProfessionals(publicProfiles = []) {
       return;
     }
 
-    const key = profile?.user_id || profile?.professional_profile_id || profile?.id || '';
+    const key = buildProfessionalKey(profile);
     if (!key) {
       return;
     }
@@ -93,22 +97,84 @@ function ConsultaAgoraInner() {
     }
   }, [searchParams, selectedSpecialty, step, symptoms]);
 
-  const { data: queueOverview } = useQuery({
-    queryKey: ['queueOverview', user?.id, selectedSpecialty, queueEntry?.id],
+  const findActivePlantaoConsulta = async (patientId) => {
+    if (!patientId) {
+      return null;
+    }
+
+    const consultas = await base44.entities.Consulta.filter({ paciente_id: patientId }, '-created_date', 20);
+
+    return consultas.find((consulta) =>
+      consulta.tipo_consulta === 'plantao' &&
+      ['aguardando', 'em_atendimento'].includes(consulta.status)
+    ) || null;
+  };
+
+  const findCurrentQueueEntry = async (patientId, queueId) => {
+    if (queueId) {
+      const directMatch = await base44.entities.Queue.filter({ id: queueId }, undefined, 1);
+
+      if (directMatch?.[0] && ['waiting', 'in_progress', 'em_atendimento'].includes(directMatch[0].status)) {
+        return directMatch[0];
+      }
+    }
+
+    const [waiting, inProgress, inAttendance] = await Promise.all([
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'waiting' }),
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'in_progress' }),
+      base44.entities.Queue.filter({ patient_id: patientId, status: 'em_atendimento' }),
+    ]);
+
+    return waiting[0] || inProgress[0] || inAttendance[0] || null;
+  };
+
+  useEffect(() => {
+    if (!user?.id) {
+      return undefined;
+    }
+
+    let active = true;
+
+    const restoreFlow = async () => {
+      const activeConsulta = await findActivePlantaoConsulta(user.id);
+      if (!active) {
+        return;
+      }
+
+      if (activeConsulta) {
+        navigate(`/consulta/${activeConsulta.id}`);
+        return;
+      }
+
+      const currentQueue = await findCurrentQueueEntry(user.id);
+      if (!active) {
+        return;
+      }
+
+      if (currentQueue) {
+        setQueueEntry(currentQueue);
+        setStep('queue');
+      } else {
+        setQueueEntry(null);
+        setStep('form');
+      }
+    };
+
+    void restoreFlow();
+
+    return () => {
+      active = false;
+    };
+  }, [user?.id, navigate]);
+
+  const { data: onDutyProfessionals = [] } = useQuery({
+    queryKey: ['onDutyProfessionals'],
     queryFn: async () => {
-      return getQueuesOverviewRequest({
-        specialty: selectedSpecialty,
-        queueId: queueEntry?.id || '',
-      });
+      const publicProfiles = await base44.entities.ProfessionalPublicProfile.filter({ is_on_duty: true });
+      return normalizeOnDutyProfessionals(publicProfiles);
     },
     refetchInterval: 8000,
-    enabled: !!user?.id,
   });
-
-  const onDutyProfessionals = useMemo(
-    () => normalizeOnDutyProfessionals(queueOverview?.onDutyProfessionals || []),
-    [queueOverview?.onDutyProfessionals],
-  );
 
   const availableProfessionals = useMemo(() => {
     if (!selectedSpecialtyNormalized) {
@@ -123,28 +189,25 @@ function ConsultaAgoraInner() {
   const medicosDisponiveis = availableProfessionals.length;
   const hasAvailableProfessionals = medicosDisponiveis > 0;
 
-  const queueStats = queueOverview?.queueStats || null;
+  const { data: queueStats } = useQuery({
+    queryKey: ['queueStats', selectedSpecialty],
+    queryFn: async () => {
+      const filters = { status: 'waiting' };
 
-  useEffect(() => {
-    if (queueOverview?.activeConsulta?.id) {
-      navigate(`/consulta/${queueOverview.activeConsulta.id}`);
-      return;
-    }
+      if (selectedSpecialty) {
+        filters.specialty = selectedSpecialty;
+      }
 
-    if (queueOverview?.currentQueueEntry?.id) {
-      setQueueEntry(queueOverview.currentQueueEntry);
-      setStep('queue');
-      return;
-    }
-
-    setQueueEntry(null);
-    setStep('form');
-  }, [queueOverview, navigate]);
+      const queue = await base44.entities.Queue.filter(filters);
+      return { count: queue.length, estimatedWait: queue.length * 10 };
+    },
+    refetchInterval: 30000,
+  });
 
   const enterQueue = useMutation({
     mutationFn: async (payload) => {
-      const currentQueue = queueOverview?.currentQueueEntry || null;
-      if (currentQueue?.id) {
+      const currentQueue = await findCurrentQueueEntry(payload.patient_id);
+      if (currentQueue) {
         return currentQueue;
       }
 
@@ -173,6 +236,71 @@ function ConsultaAgoraInner() {
       queryClient.invalidateQueries({ queryKey: ['queueStats'] });
     },
   });
+
+  useEffect(() => {
+    if (!queueEntry?.id) {
+      return undefined;
+    }
+
+    const unsubscribe = base44.entities.Queue.subscribe((event) => {
+      if (event.id !== queueEntry.id || event.type !== 'update') {
+        return;
+      }
+
+      setQueueEntry(event.data);
+
+      if (['in_progress', 'em_atendimento'].includes(event.data.status)) {
+        findActivePlantaoConsulta(user?.id).then((activeConsulta) => {
+          if (activeConsulta) {
+            navigate(`/consulta/${activeConsulta.id}`);
+          }
+        });
+      }
+    });
+
+    return () => unsubscribe();
+  }, [queueEntry?.id, user?.id, navigate]);
+
+  useEffect(() => {
+    if (!user?.id || !queueEntry?.id) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(async () => {
+      const activeConsulta = await findActivePlantaoConsulta(user.id);
+
+      if (activeConsulta) {
+        window.clearInterval(intervalId);
+        navigate(`/consulta/${activeConsulta.id}`);
+        return;
+      }
+
+      const currentQueue = await findCurrentQueueEntry(user.id, queueEntry.id);
+
+      if (!currentQueue || currentQueue.status === 'cancelled') {
+        window.clearInterval(intervalId);
+        setQueueEntry(null);
+        setStep('form');
+        return;
+      }
+
+      setQueueEntry((previous) => {
+        if (!previous) {
+          return currentQueue;
+        }
+
+        const hasChanged =
+          previous.status !== currentQueue.status ||
+          previous.position !== currentQueue.position ||
+          previous.estimated_wait_time !== currentQueue.estimated_wait_time ||
+          previous.assigned_professional_id !== currentQueue.assigned_professional_id;
+
+        return hasChanged ? currentQueue : previous;
+      });
+    }, 2500);
+
+    return () => window.clearInterval(intervalId);
+  }, [queueEntry?.id, user?.id, navigate]);
 
   const handleJoinQueue = () => {
     if (!user || !selectedSpecialty || !hasAvailableProfessionals) {
