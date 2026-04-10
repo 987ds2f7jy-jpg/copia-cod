@@ -1,1 +1,16 @@
 project_id = "uyvxvphfwqzzejbqxmaj"
+
+[functions.bootstrap-app-user]
+verify_jwt = false
+
+[functions.login-app-user]
+verify_jwt = false
+
+[functions.refresh-app-session]
+verify_jwt = false
+
+[functions.read-models]
+verify_jwt = false
+
+[functions.upload-file]
+verify_jwt = false

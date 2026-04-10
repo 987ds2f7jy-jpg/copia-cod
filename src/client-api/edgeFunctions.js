@@ -34,7 +34,7 @@ async function parseResponsePayload(response) {
 }
 
 function resolveAuthToken(authMode) {
-  if (authMode === 'none') {
+  if (authMode === 'none' || authMode === 'anon') {
     return '';
   }
 
@@ -44,7 +44,15 @@ function resolveAuthToken(authMode) {
     return session.accessToken;
   }
 
-  return env.edgeFunctionsPublishableKey;
+  if (authMode === 'session') {
+    throw createFunctionError({
+      message: 'Sessao autenticada obrigatoria.',
+      code: 'AUTH_SESSION_REQUIRED',
+      status: 401,
+    });
+  }
+
+  return '';
 }
 
 function buildHeaders({ body, authMode }) {
