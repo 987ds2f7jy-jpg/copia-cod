@@ -122,7 +122,7 @@ function DashboardProfissionalInner() {
   });
 
   // Load public profile for editing in "Meu Perfil"
-  const { data: publicProfile } = useQuery({
+  const { data: publicProfile, isLoading: loadingPublicProfile } = useQuery({
     queryKey: ['myPublicProfile', professional?.id],
     queryFn: async () => {
       const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
@@ -333,7 +333,7 @@ function DashboardProfissionalInner() {
   }, [appointments, period, reviews, pendingQuestions]);
 
   // ── States ─────────────────────────────────────────────────────────────────
-  if (loadingProfessional) {
+  if (loadingProfessional || (professional?.id && loadingPublicProfile)) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
@@ -354,9 +354,18 @@ function DashboardProfissionalInner() {
     );
   }
 
-  // Status gate: block pending/rejected/suspended professionals
-  if (professional.status && !isProfessionalApprovedStatus(professional.status)) {
-    return <ProfessionalStatusGate professional={professional} />;
+  const professionalApprovalStatus = publicProfile?.status || professional?.status || '';
+
+  // Use the public approval status as the source of truth for dashboard access.
+  if (professionalApprovalStatus && !isProfessionalApprovedStatus(professionalApprovalStatus)) {
+    return (
+      <ProfessionalStatusGate
+        professional={{
+          ...professional,
+          status: professionalApprovalStatus,
+        }}
+      />
+    );
   }
 
   const kpis = [

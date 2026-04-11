@@ -6,12 +6,12 @@ import type {
 
 function mapAdminAction(action: 'approve' | 'reject' | 'suspend') {
   if (action === 'approve') {
-    return { publicStatus: 'approved', privateStatus: 'approved', isOnDuty: false };
+    return { publicStatus: 'approved', privateStatus: 'approved', isOnDuty: false, isVerified: true };
   }
   if (action === 'suspend') {
-    return { publicStatus: 'suspended', privateStatus: 'suspended', isOnDuty: false };
+    return { publicStatus: 'suspended', privateStatus: 'suspended', isOnDuty: false, isVerified: true };
   }
-  return { publicStatus: 'rejected', privateStatus: 'rejected', isOnDuty: false };
+  return { publicStatus: 'rejected', privateStatus: 'rejected', isOnDuty: false, isVerified: false };
 }
 
 export async function reviewProfessionalApplication({
@@ -46,6 +46,7 @@ export async function reviewProfessionalApplication({
       updates: {
         status: mapping.privateStatus,
         is_on_duty: mapping.isOnDuty,
+        is_verified: mapping.isVerified,
       },
     });
   }
