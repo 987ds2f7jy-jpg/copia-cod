@@ -21,6 +21,7 @@ import { getOfficeLocation, saveOfficeLocation, deleteOfficeLocation } from '@/l
 import { uploadFile } from '@/client-api/uploads';
 import { getProfessionalDashboardRequest, upsertProfessionalProfileRequest } from '@/client-api/professionalDashboard';
 import { searchMapboxPlaces } from '@/client-api/mapbox';
+import { env } from '@/config/env';
 
 const PATIENT_TYPES = ['Criança', 'Adolescente', 'Adulto', 'Idoso'];
 const MODALITIES = [
@@ -164,7 +165,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
     setPendingMarker({ latitude: lat, longitude: lng });
   }, []);
 
-  const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+  const MAPBOX_TOKEN = env.mapboxToken;
 
   const searchAddress = useCallback(async (query) => {
     if (!query || query.length < 3 || !MAPBOX_TOKEN) return;

@@ -1,8 +1,9 @@
 import { useEffect, useRef, useCallback } from 'react';
 import mapboxgl from 'mapbox-gl';
 import 'mapbox-gl/dist/mapbox-gl.css';
+import { env } from '@/config/env';
 
-const MAPBOX_TOKEN = import.meta.env.VITE_MAPBOX_TOKEN || '';
+const MAPBOX_TOKEN = env.mapboxToken;
 mapboxgl.accessToken = MAPBOX_TOKEN;
 
 interface MarkerData {
