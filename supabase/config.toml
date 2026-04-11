@@ -28,7 +28,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.deepgram-token]
-verify_jwt = false
+verify_jwt = true
 
 [functions.delete-question]
 verify_jwt = false
@@ -55,7 +55,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.groq-completion]
-verify_jwt = false
+verify_jwt = true
 
 [functions.join-queue]
 verify_jwt = false
@@ -118,4 +118,4 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.zoom-token]
-verify_jwt = false
+verify_jwt = true

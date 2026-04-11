@@ -120,6 +120,7 @@ export default function ProntuarioForm({
   return (
     <div className="space-y-3">
       <PreenchimentoAutomaticoProntuario
+        consultationId={consultationId}
         disabled={disabled}
         onApply={applyAutomatico}
       />

@@ -1,41 +1,101 @@
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+import {
+  createRequestId,
+  ensureMethod,
+  errorResponse,
+  handlePreflight,
+  readJsonBody,
+  successResponse,
+} from '../_shared/http.ts';
+import type { CorsOptions } from '../_shared/http.ts';
+import { AppError } from '../_shared/errors.ts';
+import { createSessionAccountServiceClient } from '../_shared/sessionAccount.ts';
+import { requireConsultationAccess } from '../_shared/teleconsultaAccess.ts';
+
+const FUNCTION_NAME = 'groq-completion';
+const CORS: CorsOptions = {
+  allowedMethods: ['POST'],
 };
 
-function jsonResponse(body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-  });
-}
+function getGroqApiKey() {
+  const groqApiKey = Deno.env.get('GROQ_API_KEY')?.trim();
 
-Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+  if (!groqApiKey) {
+    throw new AppError({
+      status: 500,
+      code: 'GROQ_NOT_CONFIGURED',
+      message: 'Groq API key not configured.',
+    });
   }
 
-  if (req.method !== 'POST') {
-    return jsonResponse({ error: 'Method not allowed.' }, 405);
+  return groqApiKey;
+}
+
+function parseInput(body: unknown) {
+  if (!body || typeof body !== 'object' || Array.isArray(body)) {
+    throw new AppError({
+      status: 400,
+      code: 'INVALID_BODY',
+      message: 'Request body must be an object.',
+    });
+  }
+
+  const record = body as Record<string, unknown>;
+  const consultationId = String(record.consultationId ?? '').trim();
+  const transcript = String(record.transcript ?? '').trim();
+
+  if (!consultationId) {
+    throw new AppError({
+      status: 400,
+      code: 'CONSULTATION_ID_REQUIRED',
+      message: '"consultationId" is required.',
+    });
+  }
+
+  if (!transcript) {
+    throw new AppError({
+      status: 400,
+      code: 'TRANSCRIPT_REQUIRED',
+      message: 'Campo "transcript" e obrigatorio.',
+    });
+  }
+
+  return {
+    consultationId,
+    transcript,
+  };
+}
+
+async function handleGroqCompletionRequest(req: Request) {
+  const preflightResponse = handlePreflight(req, CORS);
+
+  if (preflightResponse) {
+    return preflightResponse;
+  }
+
+  const requestId = createRequestId();
+  const methodErrorResponse = ensureMethod(req, {
+    allowedMethods: ['POST'],
+    functionName: FUNCTION_NAME,
+    requestId,
+    cors: CORS,
+  });
+
+  if (methodErrorResponse) {
+    return methodErrorResponse;
   }
 
   try {
-    const groqApiKey = Deno.env.get('GROQ_API_KEY')?.trim();
+    const input = parseInput(await readJsonBody<unknown>(req));
+    const client = createSessionAccountServiceClient();
+    const { appUser } = await requireConsultationAccess({
+      req,
+      consultationId: input.consultationId,
+      client,
+      allowedRoles: ['professional'],
+    });
+    const groqApiKey = getGroqApiKey();
 
-    if (!groqApiKey) {
-      console.error('[groq-completion] Missing GROQ_API_KEY');
-      return jsonResponse({ error: 'Groq API key not configured.' }, 500);
-    }
-
-    const body = await req.json();
-    const transcript = body?.transcript;
-
-    if (!transcript || typeof transcript !== 'string' || !transcript.trim()) {
-      return jsonResponse({ error: 'Campo "transcript" é obrigatório.' }, 400);
-    }
-
-    const prompt = `Você é um médico brasileiro experiente. Organize a transcrição da consulta no formato JSON exatamente com estes campos:
+    const prompt = `Voce e um medico brasileiro experiente. Organize a transcricao da consulta no formato JSON exatamente com estes campos:
 
 {
   "motivo_da_consulta": "...",
@@ -46,15 +106,15 @@ Deno.serve(async (req) => {
   "recomendacoes_e_conduta": "..."
 }
 
-Transcrição completa da consulta:
-"""${transcript.trim()}"""
+Transcricao completa da consulta:
+"""${input.transcript}"""
 
-Responda APENAS com o JSON válido, sem nenhum texto adicional.`;
+Responda APENAS com o JSON valido, sem nenhum texto adicional.`;
 
     const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${groqApiKey}`,
+        Authorization: `Bearer ${groqApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -66,20 +126,48 @@ Responda APENAS com o JSON válido, sem nenhum texto adicional.`;
 
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('[groq-completion] Groq API error:', response.status, errorText);
-      return jsonResponse({ error: 'Erro ao chamar a API do Groq.' }, 502);
+
+      throw new AppError({
+        status: 502,
+        code: 'GROQ_UPSTREAM_ERROR',
+        message: 'Erro ao chamar a API do Groq.',
+        details: {
+          providerStatus: response.status,
+          providerBody: errorText,
+        },
+      });
     }
 
     const data = await response.json();
     const content = data?.choices?.[0]?.message?.content;
 
     if (!content) {
-      return jsonResponse({ error: 'A IA não retornou conteúdo válido.' }, 502);
+      throw new AppError({
+        status: 502,
+        code: 'GROQ_EMPTY_RESPONSE',
+        message: 'A IA nao retornou conteudo valido.',
+      });
     }
 
-    return jsonResponse({ content });
+    console.info('[groq-completion] request:success', {
+      requestId,
+      appUserId: appUser.id,
+      consultationId: input.consultationId,
+    });
+
+    return successResponse({
+      content,
+    }, requestId, {
+      status: 200,
+      cors: CORS,
+    });
   } catch (error) {
-    console.error('[groq-completion]', error);
-    return jsonResponse({ error: 'Erro interno ao processar transcrição.' }, 500);
+    return errorResponse(error, {
+      requestId,
+      functionName: FUNCTION_NAME,
+      cors: CORS,
+    });
   }
-});
+}
+
+Deno.serve(handleGroqCompletionRequest);

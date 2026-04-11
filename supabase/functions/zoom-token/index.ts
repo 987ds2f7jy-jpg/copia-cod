@@ -1,30 +1,14 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
+import type { SessionAccountRecord } from '../_shared/sessionAccount.ts';
+import {
+  requireConsultationAccess,
+  type ConsultationRecord,
+} from '../_shared/teleconsultaAccess.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
-
-type AppUser = {
-  id: string;
-  full_name: string;
-  email: string;
-  role: string;
-  is_active: boolean;
-  auth_user_id?: string | null;
-};
-
-type Consulta = {
-  id: string;
-  paciente_id: string;
-  paciente_nome?: string | null;
-  profissional_id: string;
-  profissional_user_id?: string | null;
-  profissional_nome?: string | null;
-  status: string;
-  sala_id?: string | null;
-  token_sala?: string | null;
 };
 
 function jsonResponse(body: unknown, status = 200) {
@@ -66,7 +50,7 @@ function stripUnsafeCharacters(value: unknown, pattern = /[^a-zA-Z0-9_-]/g) {
   return toSafeString(value).replace(pattern, '');
 }
 
-function buildZoomSessionName(consulta: Consulta) {
+function buildZoomSessionName(consulta: ConsultationRecord) {
   const explicitName = toSafeString(consulta.sala_id);
 
   if (explicitName) {
@@ -76,7 +60,7 @@ function buildZoomSessionName(consulta: Consulta) {
   return `consulta-${consulta.id}`.slice(0, 200);
 }
 
-function buildZoomSessionKey(consulta: Consulta) {
+function buildZoomSessionKey(consulta: ConsultationRecord) {
   const explicitKey = stripUnsafeCharacters(consulta.token_sala);
 
   if (explicitKey) {
@@ -97,8 +81,8 @@ function buildZoomDisplayName({
   participantRole,
   requestedName,
 }: {
-  appUser: AppUser;
-  consulta: Consulta;
+  appUser: SessionAccountRecord;
+  consulta: ConsultationRecord;
   participantRole: 'patient' | 'professional';
   requestedName?: unknown;
 }) {
@@ -108,8 +92,8 @@ function buildZoomDisplayName({
     return preferredName.slice(0, 64);
   }
 
-  if (appUser.full_name) {
-    return appUser.full_name.slice(0, 64);
+  if (appUser.fullName) {
+    return appUser.fullName.slice(0, 64);
   }
 
   const fallbackName = participantRole === 'professional'
@@ -152,102 +136,6 @@ async function createZoomSignature(secret: string, payload: Record<string, unkno
   return `${message}.${encodedSignature}`;
 }
 
-async function resolveAppUserFromSupabaseSession(req: Request, adminClient: ReturnType<typeof createClient>) {
-  const authHeader = req.headers.get('Authorization') || '';
-
-  if (!authHeader.startsWith('Bearer ')) {
-    return null;
-  }
-
-  const accessToken = authHeader.replace('Bearer ', '').trim();
-
-  if (!accessToken || accessToken === 'null' || accessToken === 'undefined') {
-    return null;
-  }
-
-  const { data, error } = await adminClient.auth.getUser(accessToken);
-
-  if (error || !data?.user?.id) {
-    return null;
-  }
-
-  const { data: appUser, error: appUserError } = await adminClient
-    .from('app_users')
-    .select('id, full_name, email, role, is_active, auth_user_id')
-    .eq('auth_user_id', data.user.id)
-    .maybeSingle();
-
-  if (appUserError) {
-    throw appUserError;
-  }
-
-  return appUser as AppUser | null;
-}
-
-async function resolveAppUser(req: Request, adminClient: ReturnType<typeof createClient>) {
-  const sessionUser = await resolveAppUserFromSupabaseSession(req, adminClient);
-  const appUser = sessionUser;
-
-  if (!appUser || appUser.is_active === false) {
-    return null;
-  }
-
-  return appUser;
-}
-
-async function fetchProfessionalParticipantIds(adminClient: ReturnType<typeof createClient>, appUserId: string) {
-  const participantIds = new Set<string>([appUserId]);
-
-  const profilesResult = await adminClient
-    .from('professional_profiles')
-    .select('id')
-    .eq('user_id', appUserId)
-    .limit(10);
-
-  if (profilesResult.error) {
-    throw profilesResult.error;
-  }
-
-  for (const row of profilesResult.data || []) {
-    if (row?.id) {
-      participantIds.add(row.id);
-    }
-  }
-
-  return participantIds;
-}
-
-async function fetchConsulta(adminClient: ReturnType<typeof createClient>, consultationId: string) {
-  const { data, error } = await adminClient
-    .from('consultas')
-    .select('id, paciente_id, paciente_nome, profissional_id, profissional_user_id, profissional_nome, status, sala_id, token_sala')
-    .eq('id', consultationId)
-    .maybeSingle();
-
-  if (error) {
-    throw error;
-  }
-
-  return data as Consulta | null;
-}
-
-function resolveParticipantRole(consulta: Consulta, appUser: AppUser, professionalIds: Set<string>) {
-  if (consulta.paciente_id === appUser.id) {
-    return 'patient' as const;
-  }
-
-  if (
-    professionalIds.has(consulta.profissional_id) ||
-    professionalIds.has(toSafeString(consulta.profissional_user_id)) ||
-    consulta.profissional_user_id === appUser.id ||
-    consulta.profissional_id === appUser.id
-  ) {
-    return 'professional' as const;
-  }
-
-  return null;
-}
-
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
@@ -278,27 +166,18 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'consultationId is required.' }, 400);
     }
 
-    const appUser = await resolveAppUser(req, adminClient);
-
-    if (!appUser) {
-      return jsonResponse({ error: 'Unauthorized.' }, 401);
-    }
-
-    const consulta = await fetchConsulta(adminClient, consultationId);
-
-    if (!consulta) {
-      return jsonResponse({ error: 'Consulta nao encontrada.' }, 404);
-    }
+    const {
+      appUser,
+      consultation: consulta,
+      participantRole,
+    } = await requireConsultationAccess({
+      req,
+      consultationId,
+      client: adminClient,
+    });
 
     if (['finalizada', 'cancelada'].includes(consulta.status)) {
       return jsonResponse({ error: 'Consulta indisponivel para videochamada.' }, 409);
-    }
-
-    const professionalIds = await fetchProfessionalParticipantIds(adminClient, appUser.id);
-    const participantRole = resolveParticipantRole(consulta as Consulta, appUser, professionalIds);
-
-    if (!participantRole) {
-      return jsonResponse({ error: 'Forbidden.' }, 403);
     }
 
     const normalizedRequestedRole = requestedRole === 'host'
@@ -315,12 +194,12 @@ Deno.serve(async (req) => {
       return jsonResponse({ error: 'Role mismatch for this consultation.' }, 403);
     }
 
-    const sessionName = buildZoomSessionName(consulta as Consulta);
-    const sessionKey = buildZoomSessionKey(consulta as Consulta);
+    const sessionName = buildZoomSessionName(consulta);
+    const sessionKey = buildZoomSessionKey(consulta);
     const userIdentity = buildZoomUserIdentity(appUser.id, participantRole);
     const userName = buildZoomDisplayName({
       appUser,
-      consulta: consulta as Consulta,
+      consulta,
       participantRole,
       requestedName: body?.userName,
     });

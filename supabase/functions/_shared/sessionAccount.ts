@@ -1,6 +1,8 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import { AppError } from './errors.ts';
+import { requireAuthenticatedUser } from './auth.ts';
 import {
+  createSupabaseAuthUserLookup,
   createServiceRoleClient,
   getRequiredEnv,
   type SupabaseClient,
@@ -200,4 +202,18 @@ export function assertActiveSessionAccount(appUser: SessionAccountRecord | null)
 
 export function createSessionAccountServiceClient() {
   return createServiceRoleClient();
+}
+
+export async function requireActiveSessionAccount(
+  req: Request,
+  client: SupabaseClient = createSessionAccountServiceClient(),
+) {
+  const authenticatedUser = await requireAuthenticatedUser(
+    req,
+    createSupabaseAuthUserLookup(client),
+  );
+
+  return assertActiveSessionAccount(
+    await loadSessionAccountByAuthUserId(client, authenticatedUser.authUserId),
+  );
 }

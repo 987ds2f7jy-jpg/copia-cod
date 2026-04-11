@@ -289,18 +289,21 @@ export async function requestZoomToken({
   });
 }
 
-export async function requestGroqCompletion({ transcript }) {
+export async function requestGroqCompletion({ consultationId, transcript }) {
   return invokeEdgeFunction('groq-completion', {
     body: {
+      consultationId,
       transcript,
     },
     fallbackMessage: 'Nao foi possivel processar a transcricao com IA.',
   });
 }
 
-export async function requestDeepgramToken() {
+export async function requestDeepgramToken({ consultationId }) {
   return invokeEdgeFunction('deepgram-token', {
-    body: {},
+    body: {
+      consultationId,
+    },
     fallbackMessage: 'Nao foi possivel obter o token de transcricao.',
   });
 }

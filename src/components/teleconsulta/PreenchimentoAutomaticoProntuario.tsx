@@ -34,6 +34,7 @@ type AudioProcessingRefs = {
 };
 
 interface PreenchimentoAutomaticoProntuarioProps {
+  consultationId: string;
   disabled?: boolean;
   onApply: (data: ProntuarioAutomaticoFields) => void;
 }
@@ -208,6 +209,7 @@ function sendAudioChunk(connection: DeepgramConnectionLike | null, chunk: ArrayB
 }
 
 export default function PreenchimentoAutomaticoProntuario({
+  consultationId,
   disabled = false,
   onApply,
 }: PreenchimentoAutomaticoProntuarioProps) {
@@ -251,7 +253,10 @@ export default function PreenchimentoAutomaticoProntuario({
   }, []);
 
   const processTranscriptWithGroq = async (transcript: string) => {
-    const result = await requestGroqCompletion({ transcript });
+    const result = await requestGroqCompletion({
+      consultationId,
+      transcript,
+    });
 
     if (!result?.content) {
       throw new Error('A IA nao retornou um conteudo valido para o prontuario.');
@@ -323,7 +328,9 @@ export default function PreenchimentoAutomaticoProntuario({
       setIsPanelOpen(true);
       setIsListening(true);
 
-      const tokenData = await requestDeepgramToken();
+      const tokenData = await requestDeepgramToken({
+        consultationId,
+      });
 
       if (!tokenData?.key) {
         throw new Error('Nao foi possivel obter o token do Deepgram.');

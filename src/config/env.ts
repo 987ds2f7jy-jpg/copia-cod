@@ -5,8 +5,6 @@ const DEFAULT_BACKEND_FUNCTIONS_URL = "https://uyvxvphfwqzzejbqxmaj.supabase.co/
 const envSchema = z.object({
   VITE_BACKEND_FUNCTIONS_URL: z.string().url().optional(),
   VITE_BACKEND_PUBLISHABLE_KEY: z.string().min(1).optional(),
-  VITE_SUPABASE_URL: z.string().url().optional(),
-  VITE_SUPABASE_PUBLISHABLE_KEY: z.string().min(1).optional(),
   VITE_APP_ENV: z.enum(["development", "staging", "production", "test"]).optional(),
 });
 
@@ -21,12 +19,11 @@ if (!parsedEnv.success) {
 }
 
 const rawEnv = parsedEnv.data;
-const backendFunctionsUrl = rawEnv.VITE_BACKEND_FUNCTIONS_URL
-  || (rawEnv.VITE_SUPABASE_URL ? `${rawEnv.VITE_SUPABASE_URL.replace(/\/$/, "")}/functions/v1` : DEFAULT_BACKEND_FUNCTIONS_URL);
+const backendFunctionsUrl = rawEnv.VITE_BACKEND_FUNCTIONS_URL || DEFAULT_BACKEND_FUNCTIONS_URL;
 
 export const env = {
   edgeFunctionsBaseUrl: backendFunctionsUrl.replace(/\/$/, ""),
-  edgeFunctionsPublishableKey: rawEnv.VITE_BACKEND_PUBLISHABLE_KEY || rawEnv.VITE_SUPABASE_PUBLISHABLE_KEY || "",
+  edgeFunctionsPublishableKey: rawEnv.VITE_BACKEND_PUBLISHABLE_KEY || "",
   appEnv: rawEnv.VITE_APP_ENV ?? (import.meta.env.PROD ? "production" : "development"),
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
