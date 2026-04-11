@@ -63,10 +63,14 @@ export default function Entrar() {
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link to={createPageUrl('Home')} className="mb-6 inline-flex items-center gap-2">
-            <span className="inline-flex h-10 w-10 items-center justify-center rounded-xl bg-emerald-600 text-white">
-              <Stethoscope className="h-5 w-5" />
+            <span className="inline-flex h-10 w-10 overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5">
+              <img
+                src="/rapido-doutor-logo.png"
+                alt="Rápido Doutor"
+                className="h-full w-full object-cover"
+              />
             </span>
-            <span className="text-2xl font-bold text-gray-900">Rapido Doutor</span>
+            <span className="text-2xl font-bold text-gray-900">Rápido Doutor</span>
           </Link>
           <h1 className="text-2xl font-bold text-gray-900">Entrar na sua conta</h1>
           <p className="mt-1 text-gray-600">Bem-vindo de volta.</p>

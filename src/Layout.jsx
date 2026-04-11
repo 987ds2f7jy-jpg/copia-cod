@@ -19,8 +19,12 @@ import { useAuth } from '@/components/AuthContext';
 
 function BrandMark({ className = 'h-8 w-8' }) {
   return (
-    <span className={`${className} inline-flex items-center justify-center rounded-xl bg-emerald-600 text-white`}>
-      <Stethoscope className="h-5 w-5" />
+    <span className={`${className} inline-flex overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5`}>
+      <img
+        src="/rapido-doutor-logo.png"
+        alt="Rápido Doutor"
+        className="h-full w-full object-cover"
+      />
     </span>
   );
 }
