@@ -1,16 +1,121 @@
 project_id = "uyvxvphfwqzzejbqxmaj"
 
+[functions.accept-appointment]
+verify_jwt = false
+
+[functions.accept-queue-entry]
+verify_jwt = false
+
+[functions.answer-question]
+verify_jwt = false
+
 [functions.bootstrap-app-user]
+verify_jwt = false
+
+[functions.cancel-appointment]
+verify_jwt = false
+
+[functions.create-appointment]
+verify_jwt = false
+
+[functions.create-question]
+verify_jwt = false
+
+[functions.create-solicitacao-exame]
+verify_jwt = false
+
+[functions.deactivate-account]
+verify_jwt = false
+
+[functions.deepgram-token]
+verify_jwt = false
+
+[functions.delete-question]
+verify_jwt = false
+
+[functions.delete-solicitacao-exame]
+verify_jwt = false
+
+[functions.delete-uploaded-files]
+verify_jwt = false
+
+[functions.finish-consulta]
+verify_jwt = false
+
+[functions.get-admin-approval-queue]
+verify_jwt = false
+
+[functions.get-finance-dashboard]
+verify_jwt = false
+
+[functions.get-professional-dashboard]
+verify_jwt = false
+
+[functions.get-teleconsulta-context]
+verify_jwt = false
+
+[functions.groq-completion]
+verify_jwt = false
+
+[functions.join-queue]
+verify_jwt = false
+
+[functions.leave-queue]
 verify_jwt = false
 
 [functions.login-app-user]
 verify_jwt = false
 
-[functions.refresh-app-session]
-verify_jwt = false
-
 [functions.read-models]
 verify_jwt = false
 
+[functions.refresh-app-session]
+verify_jwt = false
+
+[functions.register-professional]
+verify_jwt = false
+
+[functions.replace-availability-slots]
+verify_jwt = false
+
+[functions.request-withdrawal]
+verify_jwt = false
+
+[functions.review-professional-application]
+verify_jwt = false
+
+[functions.set-professional-duty]
+verify_jwt = false
+
+[functions.start-consulta-session]
+verify_jwt = false
+
+[functions.submit-appointment-review]
+verify_jwt = false
+
+[functions.submit-consulta-evaluation]
+verify_jwt = false
+
+[functions.update-my-profile]
+verify_jwt = false
+
+[functions.update-solicitacao-exame]
+verify_jwt = false
+
 [functions.upload-file]
+verify_jwt = false
+
+[functions.upsert-office-location]
+verify_jwt = false
+
+[functions.upsert-professional-banking-data]
+verify_jwt = false
+
+[functions.upsert-professional-profile]
+verify_jwt = false
+
+[functions.upsert-prontuario]
+verify_jwt = false
+
+[functions.zoom-token]
 verify_jwt = false
