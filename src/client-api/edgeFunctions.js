@@ -116,6 +116,16 @@ async function executeEdgeFunction(functionName, {
 
 let refreshPromise = null;
 
+function toSessionExpiryMs(session) {
+  const expiresAt = Number(session?.expiresAt ?? 0);
+
+  if (!Number.isFinite(expiresAt) || expiresAt <= 0) {
+    return null;
+  }
+
+  return expiresAt < 1_000_000_000_000 ? expiresAt * 1000 : expiresAt;
+}
+
 async function refreshStoredSessionOnce() {
   const currentSession = getStoredSession();
 
@@ -151,6 +161,26 @@ async function refreshStoredSessionOnce() {
   }
 
   return refreshPromise;
+}
+
+export async function ensureFreshSession({ minValidityMs = 60_000 } = {}) {
+  const currentSession = getStoredSession();
+
+  if (!currentSession?.accessToken) {
+    return null;
+  }
+
+  const expiresAtMs = toSessionExpiryMs(currentSession);
+
+  if (!expiresAtMs) {
+    return currentSession;
+  }
+
+  if ((expiresAtMs - Date.now()) > minValidityMs) {
+    return currentSession;
+  }
+
+  return refreshStoredSessionOnce();
 }
 
 export async function invokeEdgeFunction(functionName, {

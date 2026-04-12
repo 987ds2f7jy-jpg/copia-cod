@@ -6,6 +6,7 @@ import {
   saveStoredSession,
   subscribeToSessionChanges,
 } from '@/client-api/session';
+import { ensureFreshSession } from '@/client-api/edgeFunctions';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
 
@@ -169,6 +170,12 @@ export const authService = {
         return null;
       }
 
+      const readySession = await ensureFreshSession();
+
+      if (!readySession?.accessToken) {
+        return null;
+      }
+
       return await syncAccountFromSession();
     } catch (error) {
       await clearInactiveSession(error, 'restore-signout-inactive');
@@ -244,6 +251,12 @@ export const authService = {
       const session = getStoredSession();
 
       if (!session?.accessToken) {
+        return null;
+      }
+
+      const readySession = await ensureFreshSession();
+
+      if (!readySession?.accessToken) {
         return null;
       }
 

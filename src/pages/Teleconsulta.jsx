@@ -530,7 +530,7 @@ function TeleconsultaInner({ consultationId }) {
                 )}
               </TabsList>
 
-              <TabsContent value="chat" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+              <TabsContent value="chat" className="!mt-0 m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1">
                   <ZoomChatPanel
                     messages={zoomSession.chatMessages}
@@ -541,31 +541,33 @@ function TeleconsultaInner({ consultationId }) {
               </TabsContent>
 
               {isProfissional && (
-                <TabsContent value="prontuario" className="m-0 min-h-0 flex-1 overflow-y-auto p-3">
-                  <div className="mb-3">
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      className="border-gray-600 text-xs text-gray-300 hover:bg-gray-700"
-                      onClick={() => setShowProntuariosAnt(true)}
-                    >
-                      <History className="mr-1 h-3.5 w-3.5" />
-                      Prontuarios anteriores
-                    </Button>
-                  </div>
+                <TabsContent value="prontuario" className="!mt-0 m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+                  <div className="min-h-0 flex-1 overflow-y-auto p-3">
+                    <div className="space-y-3">
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="border-gray-600 text-xs text-gray-300 hover:bg-gray-700"
+                        onClick={() => setShowProntuariosAnt(true)}
+                      >
+                        <History className="mr-1 h-3.5 w-3.5" />
+                        Prontuarios anteriores
+                      </Button>
 
-                  {consulta.symptoms && (
-                    <div className="mb-3 rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
-                      <p className="mb-1 text-xs font-medium text-amber-400">Sintomas do paciente</p>
-                      <p className="text-xs text-gray-300">{consulta.symptoms}</p>
+                      {consulta.symptoms && (
+                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
+                          <p className="mb-1 text-xs font-medium text-amber-400">Sintomas do paciente</p>
+                          <p className="text-xs text-gray-300">{consulta.symptoms}</p>
+                        </div>
+                      )}
+
+                      <ProntuarioForm
+                        consultationId={consulta.id}
+                        initialProntuario={currentProntuario}
+                        canEdit={Boolean(participant?.canUpsertProntuario)}
+                      />
                     </div>
-                  )}
-
-                  <ProntuarioForm
-                    consultationId={consulta.id}
-                    initialProntuario={currentProntuario}
-                    canEdit={Boolean(participant?.canUpsertProntuario)}
-                  />
+                  </div>
                 </TabsContent>
               )}
             </Tabs>

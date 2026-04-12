@@ -339,6 +339,14 @@ export function useZoomSession({
         return;
       }
 
+      const { width: containerWidth, height: containerHeight } = getContainerDimensions(container);
+      if ((containerWidth < 40 || containerHeight < 40) && attempt < 12) {
+        window.setTimeout(() => {
+          void renderVideo(client, targetUserId, attempt + 1);
+        }, 150);
+        return;
+      }
+
       const mediaStream = client.getMediaStream();
       const supportsMultipleVideos = mediaStream.isSupportMultipleVideos?.() !== false;
       const shouldUseLegacyRender = isLikelyMobileZoomClient() || !supportsMultipleVideos;
