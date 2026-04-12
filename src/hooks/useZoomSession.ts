@@ -239,8 +239,10 @@ export function useZoomSession({
     if (!playerContainer) {
       playerContainer = document.createElement('video-player-container');
       playerContainer.style.display = 'block';
+      playerContainer.style.position = 'relative';
       playerContainer.style.width = '100%';
       playerContainer.style.height = '100%';
+      playerContainer.style.overflow = 'hidden';
       host.appendChild(playerContainer);
     }
 
@@ -249,9 +251,13 @@ export function useZoomSession({
     if (!player) {
       player = document.createElement('video-player');
       player.style.display = 'block';
+      player.style.position = 'absolute';
+      player.style.top = '0';
+      player.style.right = '0';
+      player.style.bottom = '0';
+      player.style.left = '0';
       player.style.width = '100%';
       player.style.height = '100%';
-      player.style.aspectRatio = '16 / 9';
       playerContainer.appendChild(player);
     }
 
