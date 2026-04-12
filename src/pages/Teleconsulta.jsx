@@ -70,6 +70,7 @@ function TeleconsultaInner({ consultationId }) {
   const [isLeavingSession, setIsLeavingSession] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState('chat');
   const [pendingProntuarioAutoFill, setPendingProntuarioAutoFill] = useState(null);
+  const [prontuarioMode, setProntuarioMode] = useState('simples');
 
   const autoJoinAttemptRef = useRef(false);
   const autoStartAttemptRef = useRef(false);
@@ -166,15 +167,32 @@ function TeleconsultaInner({ consultationId }) {
     setShowAvaliacao(false);
     setActiveSidebarTab('chat');
     setPendingProntuarioAutoFill(null);
+    setProntuarioMode('simples');
   }, [consultationId]);
 
   const queueProntuarioAutoFill = (fields) => {
+    setProntuarioMode('completo');
     setPendingProntuarioAutoFill({
       key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
       fields,
     });
     setActiveSidebarTab('prontuario');
   };
+
+  useEffect(() => {
+    if (!isProfissional) {
+      return;
+    }
+
+    setProntuarioMode(currentProntuario?.mode || currentProntuario?.modo || 'simples');
+  }, [
+    currentProntuario?.id,
+    currentProntuario?.mode,
+    currentProntuario?.modo,
+    currentProntuario?.updatedAt,
+    currentProntuario?.updated_at,
+    isProfissional,
+  ]);
 
   useEffect(() => {
     if (!consulta?.status) {
@@ -572,11 +590,13 @@ function TeleconsultaInner({ consultationId }) {
                         </div>
                       )}
 
-                      <PreenchimentoAutomaticoProntuario
-                        consultationId={consulta.id}
-                        disabled={!Boolean(participant?.canUpsertProntuario)}
-                        onApply={queueProntuarioAutoFill}
-                      />
+                      {prontuarioMode === 'completo' && (
+                        <PreenchimentoAutomaticoProntuario
+                          consultationId={consulta.id}
+                          disabled={!Boolean(participant?.canUpsertProntuario)}
+                          onApply={queueProntuarioAutoFill}
+                        />
+                      )}
                     </div>
                   </div>
 
@@ -587,6 +607,9 @@ function TeleconsultaInner({ consultationId }) {
                         initialProntuario={currentProntuario}
                         canEdit={Boolean(participant?.canUpsertProntuario)}
                         showAutomaticFill={false}
+                        defaultMode="simples"
+                        mode={prontuarioMode}
+                        onModeChange={setProntuarioMode}
                         externalAutoFill={pendingProntuarioAutoFill}
                       />
                     </div>

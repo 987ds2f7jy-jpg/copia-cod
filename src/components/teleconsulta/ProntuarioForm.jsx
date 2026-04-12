@@ -53,22 +53,34 @@ export default function ProntuarioForm({
   onSaved,
   showAutomaticFill = true,
   externalAutoFill = null,
+  defaultMode = 'completo',
+  mode = null,
+  onModeChange,
 }) {
   const queryClient = useQueryClient();
-  const [modo, setModo] = useState(initialProntuario?.mode || initialProntuario?.modo || 'completo');
+  const [modoInterno, setModoInterno] = useState(initialProntuario?.mode || initialProntuario?.modo || defaultMode);
   const [form, setForm] = useState(() => toProntuarioFormState(initialProntuario));
   const [saved, setSaved] = useState(false);
   const lastExternalAutoFillKeyRef = useRef(null);
+  const modo = mode || modoInterno;
 
   useEffect(() => {
     setForm(toProntuarioFormState(initialProntuario));
-    setModo(initialProntuario?.mode || initialProntuario?.modo || 'completo');
-  }, [initialProntuario?.id, initialProntuario?.updatedAt, initialProntuario?.updated_at]);
+    setModoInterno(initialProntuario?.mode || initialProntuario?.modo || defaultMode);
+  }, [defaultMode, initialProntuario?.id, initialProntuario?.updatedAt, initialProntuario?.updated_at]);
 
   const campos = useMemo(
     () => (modo === 'completo' ? FIELDS_COMPLETO : FIELDS_SIMPLES),
     [modo],
   );
+
+  const updateModo = (nextModo) => {
+    setModoInterno(nextModo);
+
+    if (typeof onModeChange === 'function') {
+      onModeChange(nextModo);
+    }
+  };
 
   const salvar = useMutation({
     mutationFn: () => upsertProntuarioRequest({
@@ -107,7 +119,7 @@ export default function ProntuarioForm({
   const disabled = !consultationId || !canEdit || salvar.isPending;
 
   const applyAutomatico = (autoFilledFields) => {
-    setModo('completo');
+    updateModo('completo');
     setSaved(false);
     setForm((current) => ({
       ...current,
@@ -135,7 +147,7 @@ export default function ProntuarioForm({
 
   return (
     <div className="space-y-3">
-      {showAutomaticFill ? (
+      {showAutomaticFill && modo === 'completo' ? (
         <div className="space-y-3">
           {/* Mantido como fallback padrao para usos fora da teleconsulta principal */}
           <PreenchimentoAutomaticoProntuario
@@ -151,7 +163,7 @@ export default function ProntuarioForm({
           <button
             key={value}
             type="button"
-            onClick={() => setModo(value)}
+            onClick={() => updateModo(value)}
             disabled={!canEdit}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${
               modo === value ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-gray-200'
