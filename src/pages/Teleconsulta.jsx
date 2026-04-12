@@ -26,7 +26,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { toast } from '@/components/ui/use-toast';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
 import ProntuariosAnteriores from '@/components/teleconsulta/ProntuariosAnteriores';
 import AvaliacaoModal from '@/components/teleconsulta/AvaliacaoModal';
@@ -541,7 +541,7 @@ function TeleconsultaInner({ consultationId }) {
                 )}
               </TabsList>
 
-              <TabsContent value="chat" className="!mt-0 m-0 flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+              {activeSidebarTab === 'chat' && (
                 <div className="min-h-0 flex-1">
                   <ZoomChatPanel
                     messages={zoomSession.chatMessages}
@@ -549,10 +549,10 @@ function TeleconsultaInner({ consultationId }) {
                     disabled={!zoomSession.isConnected}
                   />
                 </div>
-              </TabsContent>
+              )}
 
-              {isProfissional && (
-                <TabsContent value="prontuario" className="!mt-0 m-0 flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+              {isProfissional && activeSidebarTab === 'prontuario' && (
+                <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
                   <div className="relative z-10 shrink-0 border-b border-gray-800 bg-gray-900 px-3 py-3">
                     <div className="space-y-3">
                       <Button
@@ -591,7 +591,7 @@ function TeleconsultaInner({ consultationId }) {
                       />
                     </div>
                   </div>
-                </TabsContent>
+                </div>
               )}
             </Tabs>
           </div>
