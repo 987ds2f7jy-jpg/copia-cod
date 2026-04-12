@@ -47,6 +47,24 @@ function buildChatMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
 }
 
+function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
+  return new Promise<T>((resolve, reject) => {
+    const timerId = window.setTimeout(() => {
+      reject(new Error(timeoutMessage));
+    }, timeoutMs);
+
+    promise
+      .then((value) => {
+        window.clearTimeout(timerId);
+        resolve(value);
+      })
+      .catch((error) => {
+        window.clearTimeout(timerId);
+        reject(error);
+      });
+  });
+}
+
 function getZoomConnectionErrorMessage(error: unknown) {
   const rawMessage = String(
     (error as any)?.context?.statusText ||
@@ -81,6 +99,10 @@ function getZoomConnectionErrorMessage(error: unknown) {
     rawMessage.includes('sessao autenticada obrigatoria')
   ) {
     return 'Sua sessao expirou ou ficou invalida. Entre novamente para continuar a consulta.';
+  }
+
+  if (rawMessage.includes('tempo limite') || rawMessage.includes('timeout')) {
+    return 'A conexao com a sala segura demorou demais para responder. Tente novamente.';
   }
 
   return 'Erro ao conectar na consulta por video.';
@@ -334,7 +356,11 @@ export function useZoomSession({
       });
 
       const token = await fetchToken();
-      await client.join(token.sessionName, token.signature, token.userName, token.sessionKey);
+      await withTimeout(
+        client.join(token.sessionName, token.signature, token.userName),
+        20000,
+        'Tempo limite ao conectar com a sala segura do Zoom.',
+      );
 
       const mediaStream = client.getMediaStream();
 
