@@ -29,6 +29,7 @@ function getObjectPosition(banner) {
 export default function HomeHeroCarousel() {
   const [api, setApi] = React.useState(null);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
+  const [isAutoPlayPaused, setIsAutoPlayPaused] = React.useState(false);
   const { data } = useQuery({
     queryKey: ['home-banners', 'hero'],
     queryFn: getHomeBannersRequest,
@@ -57,8 +58,32 @@ export default function HomeHeroCarousel() {
     };
   }, [api]);
 
+  React.useEffect(() => {
+    if (!api || !hasMultipleBanners || isAutoPlayPaused) {
+      return undefined;
+    }
+
+    const intervalId = window.setInterval(() => {
+      if (document.visibilityState !== 'visible') {
+        return;
+      }
+
+      api.scrollNext();
+    }, 10_000);
+
+    return () => {
+      window.clearInterval(intervalId);
+    };
+  }, [api, hasMultipleBanners, isAutoPlayPaused]);
+
   return (
-    <div className="relative">
+    <div
+      className="relative"
+      onMouseEnter={() => setIsAutoPlayPaused(true)}
+      onMouseLeave={() => setIsAutoPlayPaused(false)}
+      onFocusCapture={() => setIsAutoPlayPaused(true)}
+      onBlurCapture={() => setIsAutoPlayPaused(false)}
+    >
       <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-emerald-50">
         <Carousel
           setApi={setApi}
