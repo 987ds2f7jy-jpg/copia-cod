@@ -192,6 +192,10 @@ function ConsultaAgoraInner() {
   const { data: queueStats } = useQuery({
     queryKey: ['queueStats', selectedSpecialty],
     queryFn: async () => {
+      if (!selectedSpecialty) {
+        return null;
+      }
+
       const filters = { status: 'waiting' };
 
       if (selectedSpecialty) {
@@ -201,6 +205,7 @@ function ConsultaAgoraInner() {
       const queue = await entities.Queue.filter(filters);
       return { count: queue.length, estimatedWait: queue.length * 10 };
     },
+    enabled: Boolean(selectedSpecialty),
     refetchInterval: 30000,
   });
 

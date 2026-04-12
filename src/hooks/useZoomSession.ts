@@ -74,6 +74,15 @@ function getZoomConnectionErrorMessage(error: unknown) {
     return 'Acesso negado ao token da consulta. Verifique se este usuario pertence a esta consulta.';
   }
 
+  if (
+    statusCode === 401 ||
+    rawMessage.includes('401') ||
+    rawMessage.includes('invalid jwt') ||
+    rawMessage.includes('sessao autenticada obrigatoria')
+  ) {
+    return 'Sua sessao expirou ou ficou invalida. Entre novamente para continuar a consulta.';
+  }
+
   return 'Erro ao conectar na consulta por video.';
 }
 

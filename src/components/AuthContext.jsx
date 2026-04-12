@@ -11,6 +11,14 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(true);
   const queryClient = useQueryClient();
 
+  const clearPostLoginRedirect = useCallback(() => {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.removeItem('rd_login_next');
+  }, []);
+
   const clearClientState = useCallback(() => {
     setUser(null);
     queryClient.clear();
@@ -90,10 +98,11 @@ export function AuthProvider({ children }) {
       }
     }
 
+    clearPostLoginRedirect();
     await authService.logout();
     clearClientState();
     window.location.href = '/';
-  }, [clearClientState, user]);
+  }, [clearClientState, clearPostLoginRedirect, user]);
 
   const refreshUser = useCallback(async () => {
     const updatedUser = await authService.refreshUser();
@@ -131,10 +140,11 @@ export function AuthProvider({ children }) {
       }
     }
 
+    clearPostLoginRedirect();
     await authService.deactivateAccount();
     clearClientState();
     window.location.href = '/';
-  }, [clearClientState, user]);
+  }, [clearClientState, clearPostLoginRedirect, user]);
 
   const redirectToLogin = useCallback((next) => {
     if (next) {
