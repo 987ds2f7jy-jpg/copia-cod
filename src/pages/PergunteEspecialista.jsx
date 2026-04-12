@@ -111,12 +111,14 @@ function ForumCard({ question, index }) {
                         </Button>
                       </Link>
                     )}
-                    <Link to={createPageUrl('AgendamentoEspecialidade')}>
-                      <Button size="sm" className="w-full text-xs h-7 gradient-primary border-0 text-white mt-1">
-                        <Calendar className="w-3 h-3 mr-1" />
-                        Agendar
-                      </Button>
-                    </Link>
+                    {question.answered_by_public_profile_id && (
+                      <Link to={createPageUrl(`AgendamentoPerfil?professional=${question.answered_by_public_profile_id}`)}>
+                        <Button size="sm" className="w-full text-xs h-7 gradient-primary border-0 text-white mt-1">
+                          <Calendar className="w-3 h-3 mr-1" />
+                          Agendar
+                        </Button>
+                      </Link>
+                    )}
                   </div>
                 </div>
               </div>

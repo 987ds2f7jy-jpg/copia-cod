@@ -89,7 +89,7 @@ export default function Home() {
                     Consulta Agora
                   </Button>
                 </Link>
-                <Link to={createPageUrl('Especialidades')}>
+                <Link to={createPageUrl('AgendamentoEspecialidade')}>
                   <Button size="lg" variant="outline" className="w-full sm:w-auto h-14 px-8 text-base">
                     Agendar Consulta
                     <ArrowRight className="w-5 h-5 ml-2" />
