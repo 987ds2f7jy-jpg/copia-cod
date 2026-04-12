@@ -49,6 +49,13 @@ interface PendingOutgoingMessage {
   sentAt: number;
 }
 
+interface ZoomRenderSurface {
+  mode: 'attach' | 'legacy-canvas' | 'legacy-video';
+  element: HTMLElement;
+  host: HTMLDivElement;
+  resizeObserver?: ResizeObserver;
+}
+
 const CHAT_DEDUPLICATION_WINDOW_MS = 5000;
 
 function buildChatMessageId() {
@@ -154,6 +161,7 @@ export function useZoomSession({
   const pendingOutgoingMessagesRef = useRef<PendingOutgoingMessage[]>([]);
   const seenIncomingMessageIdsRef = useRef<Set<string>>(new Set());
   const recentIncomingMessagesRef = useRef<Array<{ signature: string; timestamp: number }>>([]);
+  const renderSurfacesRef = useRef<Map<number, ZoomRenderSurface>>(new Map());
 
   const [state, setState] = useState<ZoomSessionState>({
     isConnecting: false,
@@ -172,6 +180,58 @@ export function useZoomSession({
   const updateState = useCallback((patch: Partial<ZoomSessionState>) => {
     setState((current) => ({ ...current, ...patch }));
   }, []);
+
+  const getPreferredVideoQuality = useCallback(() => {
+    return prefersSingleVideoLayout ? VideoQuality.Video_180P : VideoQuality.Video_360P;
+  }, [prefersSingleVideoLayout]);
+
+  const getContainerDimensions = useCallback((host: HTMLElement) => {
+    return {
+      width: Math.max(Math.round(host.clientWidth || 0), 1),
+      height: Math.max(Math.round(host.clientHeight || 0), 1),
+    };
+  }, []);
+
+  const createLegacyRenderElement = useCallback((
+    host: HTMLDivElement,
+    useVideoElement: boolean,
+    isSelfView: boolean,
+  ) => {
+    host.innerHTML = '';
+
+    if (useVideoElement) {
+      const videoElement = document.createElement('video');
+      videoElement.autoplay = true;
+      videoElement.playsInline = true;
+      videoElement.muted = isSelfView;
+      videoElement.setAttribute('playsinline', 'true');
+      videoElement.setAttribute('webkit-playsinline', 'true');
+      videoElement.style.display = 'block';
+      videoElement.style.width = '100%';
+      videoElement.style.height = '100%';
+      videoElement.style.objectFit = 'cover';
+      host.appendChild(videoElement);
+
+      return {
+        mode: 'legacy-video' as const,
+        element: videoElement,
+      };
+    }
+
+    const canvasElement = document.createElement('canvas');
+    const { width, height } = getContainerDimensions(host);
+    canvasElement.width = width;
+    canvasElement.height = height;
+    canvasElement.style.display = 'block';
+    canvasElement.style.width = '100%';
+    canvasElement.style.height = '100%';
+    host.appendChild(canvasElement);
+
+    return {
+      mode: 'legacy-canvas' as const,
+      element: canvasElement,
+    };
+  }, [getContainerDimensions]);
 
   const ensureVideoPlayer = useCallback((host: HTMLElement) => {
     let playerContainer = host.querySelector('video-player-container') as HTMLElement | null;
@@ -220,6 +280,41 @@ export function useZoomSession({
     }));
   }, []);
 
+  const releaseRenderSurface = useCallback(async (client: any, targetUserId: number) => {
+    const existingSurface = renderSurfacesRef.current.get(targetUserId);
+    const mediaStream = client.getMediaStream?.();
+
+    if (!existingSurface || !mediaStream) {
+      return;
+    }
+
+    try {
+      if (existingSurface.mode === 'attach') {
+        const detached = await mediaStream.detachVideo(targetUserId, existingSurface.element as any);
+
+        if (Array.isArray(detached)) {
+          detached.forEach((element: any) => element?.remove?.());
+        } else {
+          detached?.remove?.();
+        }
+      } else {
+        mediaStream.stopRenderVideo?.(existingSurface.element as any, targetUserId);
+      }
+    } catch (error) {
+      logUiWarning('zoom', {
+        stage: 'release-video-surface',
+        targetUserId,
+        error: serializeError(error),
+      });
+    } finally {
+      existingSurface.resizeObserver?.disconnect?.();
+      if (existingSurface.host.isConnected) {
+        existingSurface.host.innerHTML = '';
+      }
+      renderSurfacesRef.current.delete(targetUserId);
+    }
+  }, []);
+
   const renderVideo = useCallback(
     async (client: any, targetUserId: number, attempt = 0) => {
       const container = videoElementsRef.current.get(targetUserId);
@@ -233,41 +328,165 @@ export function useZoomSession({
         return;
       }
 
+      const existingSurface = renderSurfacesRef.current.get(targetUserId);
+      if (existingSurface && existingSurface.host === container) {
+        return;
+      }
+
+      const mediaStream = client.getMediaStream();
+      const supportsMultipleVideos = mediaStream.isSupportMultipleVideos?.() !== false;
+      const shouldUseLegacyRender = isLikelyMobileZoomClient() || !supportsMultipleVideos;
+      const isSelfView =
+        currentUserIdRef.current != null &&
+        Number(targetUserId) === Number(currentUserIdRef.current);
+      const preferredQuality = getPreferredVideoQuality();
+
+      if (existingSurface) {
+        await releaseRenderSurface(client, targetUserId);
+      }
+
+      if (shouldUseLegacyRender && mediaStream.renderVideo) {
+        try {
+          const useVideoElement = Boolean(
+            isSelfView && mediaStream.isRenderSelfViewWithVideoElement?.(),
+          );
+          const legacySurface = createLegacyRenderElement(container, useVideoElement, isSelfView);
+
+          if (legacySurface.mode === 'legacy-video') {
+            const result = await mediaStream.renderVideo(
+              legacySurface.element as HTMLVideoElement,
+              targetUserId,
+              undefined,
+              undefined,
+              undefined,
+              undefined,
+              preferredQuality,
+            );
+
+            if (result instanceof Error) {
+              throw result;
+            }
+
+            renderSurfacesRef.current.set(targetUserId, {
+              ...legacySurface,
+              host: container,
+            });
+            return;
+          }
+
+          const canvasElement = legacySurface.element as HTMLCanvasElement;
+          const { width, height } = getContainerDimensions(container);
+
+          canvasElement.width = width;
+          canvasElement.height = height;
+
+          const result = await mediaStream.renderVideo(
+            canvasElement,
+            targetUserId,
+            width,
+            height,
+            0,
+            0,
+            preferredQuality,
+          );
+
+          if (result instanceof Error) {
+            throw result;
+          }
+
+          let resizeObserver: ResizeObserver | undefined;
+
+          if (typeof ResizeObserver !== 'undefined') {
+            resizeObserver = new ResizeObserver((entries) => {
+              const entry = entries[0];
+              if (!entry) {
+                return;
+              }
+
+              const nextWidth = Math.max(Math.round(entry.contentRect.width || 0), 1);
+              const nextHeight = Math.max(Math.round(entry.contentRect.height || 0), 1);
+
+              canvasElement.width = nextWidth;
+              canvasElement.height = nextHeight;
+              mediaStream.updateVideoCanvasDimension?.(canvasElement, nextWidth, nextHeight);
+              mediaStream.adjustRenderedVideoPosition?.(
+                canvasElement,
+                targetUserId,
+                nextWidth,
+                nextHeight,
+                0,
+                0,
+              );
+            });
+
+            resizeObserver.observe(container);
+          }
+
+          renderSurfacesRef.current.set(targetUserId, {
+            ...legacySurface,
+            host: container,
+            resizeObserver,
+          });
+          return;
+        } catch (legacyError) {
+          container.innerHTML = '';
+          logUiWarning('zoom', {
+            stage: 'render-video-legacy',
+            targetUserId,
+            error: serializeError(legacyError),
+          });
+        }
+      }
+
       try {
-        const mediaStream = client.getMediaStream();
         const { playerContainer, player } = ensureVideoPlayer(container);
         const attachedVideo = await mediaStream.attachVideo(
           targetUserId,
-          VideoQuality.Video_360P,
+          preferredQuality,
           player,
         );
 
-        if (attachedVideo instanceof HTMLElement) {
+        if (!(attachedVideo instanceof HTMLElement)) {
+          throw attachedVideo;
+        }
+
+        attachedVideo.style.width = '100%';
+        attachedVideo.style.height = '100%';
+        attachedVideo.style.objectFit = 'cover';
+
+        if (attachedVideo !== player) {
+          playerContainer.innerHTML = '';
+          playerContainer.appendChild(attachedVideo);
+        }
+
+        renderSurfacesRef.current.set(targetUserId, {
+          mode: 'attach',
+          element: attachedVideo,
+          host: container,
+        });
+      } catch (primaryError) {
+        try {
+          const attachedVideo = await mediaStream.attachVideo(
+            targetUserId,
+            preferredQuality,
+          );
+
+          if (!(attachedVideo instanceof HTMLElement)) {
+            throw attachedVideo;
+          }
+
+          const { playerContainer } = ensureVideoPlayer(container);
+          playerContainer.innerHTML = '';
           attachedVideo.style.width = '100%';
           attachedVideo.style.height = '100%';
           attachedVideo.style.objectFit = 'cover';
+          playerContainer.appendChild(attachedVideo);
 
-          if (attachedVideo !== player) {
-            playerContainer.innerHTML = '';
-            playerContainer.appendChild(attachedVideo);
-          }
-        }
-      } catch (primaryError) {
-        try {
-          const mediaStream = client.getMediaStream();
-          const attachedVideo = await mediaStream.attachVideo(
-            targetUserId,
-            VideoQuality.Video_360P,
-          );
-
-          if (attachedVideo instanceof HTMLElement) {
-            const { playerContainer } = ensureVideoPlayer(container);
-            playerContainer.innerHTML = '';
-            attachedVideo.style.width = '100%';
-            attachedVideo.style.height = '100%';
-            attachedVideo.style.objectFit = 'cover';
-            playerContainer.appendChild(attachedVideo);
-          }
+          renderSurfacesRef.current.set(targetUserId, {
+            mode: 'attach',
+            element: attachedVideo,
+            host: container,
+          });
         } catch (fallbackError) {
           logUiWarning('zoom', {
             stage: 'render-video',
@@ -278,10 +497,23 @@ export function useZoomSession({
         }
       }
     },
-    [ensureVideoPlayer],
+    [
+      createLegacyRenderElement,
+      ensureVideoPlayer,
+      getContainerDimensions,
+      getPreferredVideoQuality,
+      releaseRenderSurface,
+    ],
   );
 
   const stopVideo = useCallback(async (client: any, targetUserId: number) => {
+    const existingSurface = renderSurfacesRef.current.get(targetUserId);
+
+    if (existingSurface) {
+      await releaseRenderSurface(client, targetUserId);
+      return;
+    }
+
     try {
       const container = videoElementsRef.current.get(targetUserId);
       const mediaStream = client.getMediaStream();
@@ -305,7 +537,7 @@ export function useZoomSession({
         error: serializeError(error),
       });
     }
-  }, []);
+  }, [releaseRenderSurface]);
 
   const syncParticipants = useCallback((client: any) => {
     const currentUserId = client.getCurrentUserInfo?.()?.userId ?? null;
@@ -332,6 +564,10 @@ export function useZoomSession({
 
   const registerVideoContainer = useCallback((targetUserId: number, element: HTMLDivElement | null) => {
     if (!element) {
+      const client = clientRef.current;
+      if (client) {
+        void releaseRenderSurface(client, targetUserId);
+      }
       videoElementsRef.current.delete(targetUserId);
       return;
     }
@@ -347,7 +583,7 @@ export function useZoomSession({
     if (participant?.bVideoOn) {
       void renderVideo(client, targetUserId);
     }
-  }, [renderVideo]);
+  }, [releaseRenderSurface, renderVideo]);
 
   const sendChatMessage = useCallback(async (text: string) => {
     const client = clientRef.current;
@@ -433,12 +669,12 @@ export function useZoomSession({
       const client = ZoomVideo.createClient();
       clientRef.current = client;
 
-      const prefersSingleVideo = isLikelyMobileZoomClient();
-      setPrefersSingleVideoLayout(prefersSingleVideo);
+      const prefersSingleVideoHint = isLikelyMobileZoomClient();
+      setPrefersSingleVideoLayout(prefersSingleVideoHint);
 
       await client.init('pt-BR', 'Global', {
         patchJsMedia: true,
-        enforceMultipleVideos: !prefersSingleVideo,
+        enforceMultipleVideos: !prefersSingleVideoHint,
         leaveOnPageUnload: true,
         stayAwake: true,
       });
@@ -451,6 +687,9 @@ export function useZoomSession({
       );
 
       const mediaStream = client.getMediaStream();
+      const supportsMultipleVideos = mediaStream.isSupportMultipleVideos?.() !== false;
+      const useSingleVideoLayout = !supportsMultipleVideos || isLikelyMobileZoomClient();
+      setPrefersSingleVideoLayout(useSingleVideoLayout);
 
       try {
         await mediaStream.startAudio();
@@ -464,7 +703,14 @@ export function useZoomSession({
       setIsMuted(Boolean(mediaStream.isAudioMuted?.()));
 
       try {
-        await mediaStream.startVideo();
+        await mediaStream.startVideo(
+          useSingleVideoLayout
+            ? {
+                captureWidth: 640,
+                captureHeight: 360,
+              }
+            : undefined,
+        );
         setIsCameraOn(true);
       } catch (videoError) {
         setIsCameraOn(false);
@@ -508,6 +754,41 @@ export function useZoomSession({
         });
 
         syncParticipants(client);
+      };
+
+      const handlePeerVideoStateChange = (payload: any) => {
+        const changedUserId = Number(payload?.userId);
+
+        if (!Number.isFinite(changedUserId)) {
+          return;
+        }
+
+        if (payload?.action === 'Start') {
+          void renderVideo(client, changedUserId);
+        }
+
+        if (payload?.action === 'Stop') {
+          void stopVideo(client, changedUserId);
+        }
+
+        syncParticipants(client);
+      };
+
+      const handleVideoCapturingChange = (payload: any) => {
+        const currentUserId = client.getCurrentUserInfo?.()?.userId;
+
+        if (!currentUserId) {
+          return;
+        }
+
+        if (payload?.state === 'Started') {
+          void renderVideo(client, currentUserId);
+          return;
+        }
+
+        if (payload?.state === 'Stopped' || payload?.state === 'Failed') {
+          void stopVideo(client, currentUserId);
+        }
       };
 
       const handleChatMessage = (payload: any) => {
@@ -601,12 +882,16 @@ export function useZoomSession({
       client.on('user-added', handleUsersChanged);
       client.on('user-removed', handleUsersChanged);
       client.on('user-updated', handleUserUpdated);
+      client.on('peer-video-state-change', handlePeerVideoStateChange);
+      client.on('video-capturing-change', handleVideoCapturingChange);
       client.on('chat-on-message', handleChatMessage);
 
       listenersRef.current = [
         { event: 'user-added', handler: handleUsersChanged },
         { event: 'user-removed', handler: handleUsersChanged },
         { event: 'user-updated', handler: handleUserUpdated },
+        { event: 'peer-video-state-change', handler: handlePeerVideoStateChange },
+        { event: 'video-capturing-change', handler: handleVideoCapturingChange },
         { event: 'chat-on-message', handler: handleChatMessage },
       ];
     } catch (error) {
@@ -657,6 +942,10 @@ export function useZoomSession({
     }
 
     videoElementsRef.current.clear();
+    renderSurfacesRef.current.forEach((surface) => {
+      surface.resizeObserver?.disconnect?.();
+    });
+    renderSurfacesRef.current.clear();
     currentUserIdRef.current = null;
     pendingOutgoingMessagesRef.current = [];
     seenIncomingMessageIdsRef.current.clear();
@@ -673,6 +962,7 @@ export function useZoomSession({
     setIsMuted(false);
     setIsCameraOn(false);
     setIsScreenSharing(false);
+    setPrefersSingleVideoLayout(false);
   }, [clearListeners, stopVideo]);
 
   const toggleMute = useCallback(async () => {
@@ -709,6 +999,8 @@ export function useZoomSession({
 
     const mediaStream = client.getMediaStream();
     const currentUserId = client.getCurrentUserInfo?.()?.userId;
+    const useSingleVideoLayout =
+      prefersSingleVideoLayout || mediaStream.isSupportMultipleVideos?.() === false;
 
     try {
       if (isCameraOn) {
@@ -719,7 +1011,14 @@ export function useZoomSession({
           await stopVideo(client, currentUserId);
         }
       } else {
-        await mediaStream.startVideo();
+        await mediaStream.startVideo(
+          useSingleVideoLayout
+            ? {
+                captureWidth: 640,
+                captureHeight: 360,
+              }
+            : undefined,
+        );
         setIsCameraOn(true);
 
         if (currentUserId) {
@@ -735,7 +1034,7 @@ export function useZoomSession({
         error: serializeError(error),
       });
     }
-  }, [isCameraOn, renderVideo, stopVideo, syncParticipants, updateState]);
+  }, [isCameraOn, prefersSingleVideoLayout, renderVideo, stopVideo, syncParticipants, updateState]);
 
   const toggleScreenShare = useCallback(async () => {
     const client = clientRef.current;
