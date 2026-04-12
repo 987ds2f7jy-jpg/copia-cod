@@ -25,12 +25,12 @@ import {
 } from '@/client-api/teleconsulta';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
 import ProntuariosAnteriores from '@/components/teleconsulta/ProntuariosAnteriores';
 import AvaliacaoModal from '@/components/teleconsulta/AvaliacaoModal';
+import PreenchimentoAutomaticoProntuario from '@/components/teleconsulta/PreenchimentoAutomaticoProntuario';
 import ZoomChatPanel from '@/components/teleconsulta/ZoomChatPanel';
 import ZoomVideoStage from '@/components/teleconsulta/ZoomVideoStage';
 import { buildZoomDisplayName } from '@/lib/zoom';
@@ -69,6 +69,7 @@ function TeleconsultaInner({ consultationId }) {
   const [showAvaliacao, setShowAvaliacao] = useState(false);
   const [isLeavingSession, setIsLeavingSession] = useState(false);
   const [activeSidebarTab, setActiveSidebarTab] = useState('chat');
+  const [pendingProntuarioAutoFill, setPendingProntuarioAutoFill] = useState(null);
 
   const autoJoinAttemptRef = useRef(false);
   const autoStartAttemptRef = useRef(false);
@@ -164,7 +165,16 @@ function TeleconsultaInner({ consultationId }) {
     lastConsultaStatusRef.current = null;
     setShowAvaliacao(false);
     setActiveSidebarTab('chat');
+    setPendingProntuarioAutoFill(null);
   }, [consultationId]);
+
+  const queueProntuarioAutoFill = (fields) => {
+    setPendingProntuarioAutoFill({
+      key: `${Date.now()}-${Math.random().toString(36).slice(2)}`,
+      fields,
+    });
+    setActiveSidebarTab('prontuario');
+  };
 
   useEffect(() => {
     if (!consulta?.status) {
@@ -427,8 +437,8 @@ function TeleconsultaInner({ consultationId }) {
           </Badge>
         </div>
 
-        <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-          <div className="flex min-h-[360px] flex-1 flex-col gap-3 p-4 pb-5 lg:min-h-0">
+        <div className="relative flex flex-1 flex-col overflow-hidden lg:flex-row">
+          <div className="relative z-0 flex min-h-[360px] min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4 pb-5 lg:min-h-0">
             {(needsSessionInitialization || startConsulta.isPending) && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                 {startConsulta.isPending
@@ -462,7 +472,7 @@ function TeleconsultaInner({ consultationId }) {
               </div>
             )}
 
-            <div className="relative min-h-[42vh] flex-1 lg:min-h-0">
+            <div className="relative z-0 min-h-[42vh] flex-1 overflow-hidden lg:min-h-0">
               <ZoomVideoStage
                 participants={zoomSession.participants}
                 currentUserId={zoomSession.currentUserId}
@@ -515,8 +525,8 @@ function TeleconsultaInner({ consultationId }) {
             </div>
           </div>
 
-          <div className="flex h-[36vh] min-h-[260px] max-h-[360px] flex-col border-t border-gray-800 bg-gray-900 lg:h-auto lg:max-h-none lg:w-96 lg:border-l lg:border-t-0">
-            <Tabs value={activeSidebarTab} onValueChange={setActiveSidebarTab} className="flex min-h-0 flex-1 flex-col">
+          <div className="relative z-10 isolate flex h-[36vh] min-h-[260px] min-w-0 max-h-[360px] flex-col border-t border-gray-800 bg-gray-900 lg:h-auto lg:max-h-none lg:w-96 lg:border-l lg:border-t-0">
+            <Tabs value={activeSidebarTab} onValueChange={setActiveSidebarTab} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
               <TabsList className="m-2 shrink-0 rounded-lg bg-gray-800">
                 <TabsTrigger value="chat" className="flex-1 text-gray-300 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
                   <MessageSquare className="mr-1 h-4 w-4" />
@@ -543,8 +553,8 @@ function TeleconsultaInner({ consultationId }) {
 
               {isProfissional && (
                 <TabsContent value="prontuario" className="!mt-0 m-0 flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
-                  <ScrollArea className="min-h-0 flex-1">
-                    <div className="space-y-3 p-3">
+                  <div className="relative z-10 shrink-0 border-b border-gray-800 bg-gray-900 px-3 py-3">
+                    <div className="space-y-3">
                       <Button
                         variant="outline"
                         size="sm"
@@ -562,13 +572,25 @@ function TeleconsultaInner({ consultationId }) {
                         </div>
                       )}
 
+                      <PreenchimentoAutomaticoProntuario
+                        consultationId={consulta.id}
+                        disabled={!Boolean(participant?.canUpsertProntuario)}
+                        onApply={queueProntuarioAutoFill}
+                      />
+                    </div>
+                  </div>
+
+                  <div className="min-h-0 flex-1 overflow-y-auto">
+                    <div className="p-3">
                       <ProntuarioForm
                         consultationId={consulta.id}
                         initialProntuario={currentProntuario}
                         canEdit={Boolean(participant?.canUpsertProntuario)}
+                        showAutomaticFill={false}
+                        externalAutoFill={pendingProntuarioAutoFill}
                       />
                     </div>
-                  </ScrollArea>
+                  </div>
                 </TabsContent>
               )}
             </Tabs>

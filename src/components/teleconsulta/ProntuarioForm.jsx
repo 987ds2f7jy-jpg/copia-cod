@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { useMutation, useQueryClient } from '@tanstack/react-query';
 import { CheckCircle, Loader2, Save } from 'lucide-react';
 import { upsertProntuarioRequest } from '@/client-api/teleconsulta';
@@ -51,11 +51,14 @@ export default function ProntuarioForm({
   initialProntuario = null,
   canEdit = true,
   onSaved,
+  showAutomaticFill = true,
+  externalAutoFill = null,
 }) {
   const queryClient = useQueryClient();
   const [modo, setModo] = useState(initialProntuario?.mode || initialProntuario?.modo || 'completo');
   const [form, setForm] = useState(() => toProntuarioFormState(initialProntuario));
   const [saved, setSaved] = useState(false);
+  const lastExternalAutoFillKeyRef = useRef(null);
 
   useEffect(() => {
     setForm(toProntuarioFormState(initialProntuario));
@@ -117,13 +120,31 @@ export default function ProntuarioForm({
     }));
   };
 
+  useEffect(() => {
+    if (!externalAutoFill?.key || !externalAutoFill?.fields) {
+      return;
+    }
+
+    if (lastExternalAutoFillKeyRef.current === externalAutoFill.key) {
+      return;
+    }
+
+    lastExternalAutoFillKeyRef.current = externalAutoFill.key;
+    applyAutomatico(externalAutoFill.fields);
+  }, [externalAutoFill]);
+
   return (
     <div className="space-y-3">
-      <PreenchimentoAutomaticoProntuario
-        consultationId={consultationId}
-        disabled={disabled}
-        onApply={applyAutomatico}
-      />
+      {showAutomaticFill ? (
+        <div className="space-y-3">
+          {/* Mantido como fallback padrao para usos fora da teleconsulta principal */}
+          <PreenchimentoAutomaticoProntuario
+            consultationId={consultationId}
+            disabled={disabled}
+            onApply={applyAutomatico}
+          />
+        </div>
+      ) : null}
 
       <div className="flex gap-1 rounded-lg bg-gray-800 p-1">
         {['completo', 'simples'].map((value) => (
