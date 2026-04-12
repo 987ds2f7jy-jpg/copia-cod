@@ -15,6 +15,12 @@ const CORS: CorsOptions = {
 };
 const BUCKET_NAME = 'home-banners';
 const SIGNED_URL_TTL_SECONDS = 60 * 60 * 24;
+const HERO_TRANSFORM = {
+  width: 1440,
+  height: 1680,
+  resize: 'cover',
+  quality: 80,
+} as const;
 
 type HomeBannerRecord = {
   id: string;
@@ -47,7 +53,9 @@ async function createSignedBanner(client: ReturnType<typeof createServiceRoleCli
 
   const { data, error } = await client.storage
     .from(BUCKET_NAME)
-    .createSignedUrl(normalizedPath, SIGNED_URL_TTL_SECONDS);
+    .createSignedUrl(normalizedPath, SIGNED_URL_TTL_SECONDS, {
+      transform: HERO_TRANSFORM,
+    });
 
   if (error || !data?.signedUrl) {
     console.warn(`[${FUNCTION_NAME}] banner:sign-failed`, {
