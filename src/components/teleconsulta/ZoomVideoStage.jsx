@@ -62,6 +62,7 @@ export default function ZoomVideoStage({
   registerVideoContainer,
   selfLabel,
   remoteLabel,
+  allowInsetSelfView = true,
 }) {
   const currentParticipant = participants.find((participant) => participant.userId === currentUserId) || null;
   const remoteParticipants = participants.filter((participant) => participant.userId !== currentUserId);
@@ -86,7 +87,7 @@ export default function ZoomVideoStage({
         </div>
       )}
 
-      {currentParticipant && featuredParticipant?.userId !== currentParticipant.userId && (
+      {allowInsetSelfView && currentParticipant && featuredParticipant?.userId !== currentParticipant.userId && (
         <div className="absolute bottom-4 right-4 h-24 w-36 rounded-xl border-2 border-gray-700 bg-gray-950/80 shadow-lg">
           <ParticipantTile
             participant={currentParticipant}

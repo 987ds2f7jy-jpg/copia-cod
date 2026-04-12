@@ -427,7 +427,7 @@ function TeleconsultaInner({ consultationId }) {
         </div>
 
         <div className="flex flex-1 flex-col overflow-hidden lg:flex-row">
-          <div className="flex min-h-[320px] flex-1 flex-col gap-3 p-4 lg:min-h-0">
+          <div className="flex min-h-[360px] flex-1 flex-col gap-3 p-4 pb-5 lg:min-h-0">
             {(needsSessionInitialization || startConsulta.isPending) && (
               <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
                 {startConsulta.isPending
@@ -461,7 +461,7 @@ function TeleconsultaInner({ consultationId }) {
               </div>
             )}
 
-            <div className="relative flex-1">
+            <div className="relative min-h-[42vh] flex-1 lg:min-h-0">
               <ZoomVideoStage
                 participants={zoomSession.participants}
                 currentUserId={zoomSession.currentUserId}
@@ -470,10 +470,11 @@ function TeleconsultaInner({ consultationId }) {
                 registerVideoContainer={zoomSession.registerVideoContainer}
                 selfLabel="Voce"
                 remoteLabel={isProfissional ? consulta.patientName : `Dr(a). ${consulta.professionalName}`}
+                allowInsetSelfView={!zoomSession.prefersSingleVideoLayout}
               />
             </div>
 
-            <div className="flex items-center justify-center gap-3">
+            <div className="flex items-center justify-center gap-3 pb-[env(safe-area-inset-bottom)]">
               <Button
                 variant="outline"
                 size="icon"
@@ -513,7 +514,7 @@ function TeleconsultaInner({ consultationId }) {
             </div>
           </div>
 
-          <div className="flex flex-col border-t border-gray-800 bg-gray-900 lg:w-96 lg:border-l lg:border-t-0">
+          <div className="flex h-[36vh] min-h-[260px] max-h-[360px] flex-col border-t border-gray-800 bg-gray-900 lg:h-auto lg:max-h-none lg:w-96 lg:border-l lg:border-t-0">
             <Tabs value={activeSidebarTab} onValueChange={setActiveSidebarTab} className="flex min-h-0 flex-1 flex-col">
               <TabsList className="m-2 shrink-0 rounded-lg bg-gray-800">
                 <TabsTrigger value="chat" className="flex-1 text-gray-300 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
@@ -529,7 +530,7 @@ function TeleconsultaInner({ consultationId }) {
                 )}
               </TabsList>
 
-              <TabsContent value="chat" className="m-0 flex h-0 flex-1 flex-col overflow-hidden">
+              <TabsContent value="chat" className="m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1">
                   <ZoomChatPanel
                     messages={zoomSession.chatMessages}

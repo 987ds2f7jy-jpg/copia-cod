@@ -43,8 +43,41 @@ interface ZoomTokenResponse {
   userName: string;
 }
 
+interface PendingOutgoingMessage {
+  id: string;
+  text: string;
+  sentAt: number;
+}
+
+const CHAT_DEDUPLICATION_WINDOW_MS = 5000;
+
 function buildChatMessageId() {
   return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
+function normalizeChatText(value: unknown) {
+  return String(value ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+}
+
+function normalizeChatTimestamp(value: unknown) {
+  const numericValue = Number(value);
+
+  if (!Number.isFinite(numericValue) || numericValue <= 0) {
+    return Date.now();
+  }
+
+  return numericValue < 1_000_000_000_000 ? numericValue * 1000 : numericValue;
+}
+
+function isLikelyMobileZoomClient() {
+  if (typeof window === 'undefined') {
+    return false;
+  }
+
+  const userAgent = window.navigator.userAgent || '';
+  const isTouchMac = window.navigator.platform === 'MacIntel' && window.navigator.maxTouchPoints > 1;
+
+  return /android|iphone|ipad|ipod|mobile/i.test(userAgent) || isTouchMac;
 }
 
 function withTimeout<T>(promise: Promise<T>, timeoutMs: number, timeoutMessage: string) {
@@ -117,6 +150,10 @@ export function useZoomSession({
   const clientRef = useRef<any>(null);
   const videoElementsRef = useRef<Map<number, HTMLDivElement>>(new Map());
   const listenersRef = useRef<Array<{ event: string; handler: (...args: any[]) => void }>>([]);
+  const currentUserIdRef = useRef<number | null>(null);
+  const pendingOutgoingMessagesRef = useRef<PendingOutgoingMessage[]>([]);
+  const seenIncomingMessageIdsRef = useRef<Set<string>>(new Set());
+  const recentIncomingMessagesRef = useRef<Array<{ signature: string; timestamp: number }>>([]);
 
   const [state, setState] = useState<ZoomSessionState>({
     isConnecting: false,
@@ -130,6 +167,7 @@ export function useZoomSession({
   const [isMuted, setIsMuted] = useState(false);
   const [isCameraOn, setIsCameraOn] = useState(false);
   const [isScreenSharing, setIsScreenSharing] = useState(false);
+  const [prefersSingleVideoLayout, setPrefersSingleVideoLayout] = useState(false);
 
   const updateState = useCallback((patch: Partial<ZoomSessionState>) => {
     setState((current) => ({ ...current, ...patch }));
@@ -157,7 +195,10 @@ export function useZoomSession({
       playerContainer.appendChild(player);
     }
 
-    return player;
+    return {
+      playerContainer,
+      player,
+    };
   }, []);
 
   const fetchToken = useCallback(async () => {
@@ -194,28 +235,47 @@ export function useZoomSession({
 
       try {
         const mediaStream = client.getMediaStream();
-        const playerElement = ensureVideoPlayer(container);
+        const { playerContainer, player } = ensureVideoPlayer(container);
         const attachedVideo = await mediaStream.attachVideo(
           targetUserId,
           VideoQuality.Video_360P,
-          playerElement,
+          player,
         );
 
         if (attachedVideo instanceof HTMLElement) {
-          if (attachedVideo !== playerElement && !container.contains(attachedVideo)) {
-            container.innerHTML = '';
+          attachedVideo.style.width = '100%';
+          attachedVideo.style.height = '100%';
+          attachedVideo.style.objectFit = 'cover';
+
+          if (attachedVideo !== player) {
+            playerContainer.innerHTML = '';
+            playerContainer.appendChild(attachedVideo);
+          }
+        }
+      } catch (primaryError) {
+        try {
+          const mediaStream = client.getMediaStream();
+          const attachedVideo = await mediaStream.attachVideo(
+            targetUserId,
+            VideoQuality.Video_360P,
+          );
+
+          if (attachedVideo instanceof HTMLElement) {
+            const { playerContainer } = ensureVideoPlayer(container);
+            playerContainer.innerHTML = '';
             attachedVideo.style.width = '100%';
             attachedVideo.style.height = '100%';
             attachedVideo.style.objectFit = 'cover';
-            container.appendChild(attachedVideo);
+            playerContainer.appendChild(attachedVideo);
           }
+        } catch (fallbackError) {
+          logUiWarning('zoom', {
+            stage: 'render-video',
+            targetUserId,
+            error: serializeError(primaryError),
+            fallbackError: serializeError(fallbackError),
+          });
         }
-      } catch (error) {
-        logUiWarning('zoom', {
-          stage: 'render-video',
-          targetUserId,
-          error: serializeError(error),
-        });
       }
     },
     [ensureVideoPlayer],
@@ -248,9 +308,11 @@ export function useZoomSession({
   }, []);
 
   const syncParticipants = useCallback((client: any) => {
+    const currentUserId = client.getCurrentUserInfo?.()?.userId ?? null;
+    currentUserIdRef.current = currentUserId;
     updateState({
       participants: getClientParticipants(client),
-      currentUserId: client.getCurrentUserInfo?.()?.userId ?? null,
+      currentUserId,
     });
   }, [getClientParticipants, updateState]);
 
@@ -290,6 +352,8 @@ export function useZoomSession({
   const sendChatMessage = useCallback(async (text: string) => {
     const client = clientRef.current;
     const trimmed = text.trim();
+    const optimisticMessageId = buildChatMessageId();
+    const sentAt = Date.now();
 
     if (!client || !trimmed) {
       return;
@@ -306,22 +370,41 @@ export function useZoomSession({
         throw new Error('Chat do Zoom indisponivel nesta sessao.');
       }
 
-      await sendMessage.call(chatClient, trimmed);
+      pendingOutgoingMessagesRef.current = pendingOutgoingMessagesRef.current
+        .filter((message) => sentAt - message.sentAt < CHAT_DEDUPLICATION_WINDOW_MS)
+        .concat({
+          id: optimisticMessageId,
+          text: trimmed,
+          sentAt,
+        });
 
       setState((current) => ({
         ...current,
         chatMessages: [
           ...current.chatMessages,
           {
-            id: buildChatMessageId(),
+            id: optimisticMessageId,
             sender: userName,
             text: trimmed,
-            timestamp: new Date(),
+            timestamp: new Date(sentAt),
             isSelf: true,
           },
         ],
       }));
+
+      await sendMessage.call(chatClient, trimmed);
     } catch (error) {
+      pendingOutgoingMessagesRef.current = pendingOutgoingMessagesRef.current.filter(
+        (message) => message.id !== optimisticMessageId,
+      );
+
+      setState((current) => ({
+        ...current,
+        chatMessages: current.chatMessages.filter(
+          (message) => message.id !== optimisticMessageId,
+        ),
+      }));
+
       updateState({ error: 'Nao foi possivel enviar a mensagem no chat.' });
       logUiWarning('zoom', {
         stage: 'chat-send',
@@ -350,9 +433,14 @@ export function useZoomSession({
       const client = ZoomVideo.createClient();
       clientRef.current = client;
 
+      const prefersSingleVideo = isLikelyMobileZoomClient();
+      setPrefersSingleVideoLayout(prefersSingleVideo);
+
       await client.init('pt-BR', 'Global', {
         patchJsMedia: true,
-        enforceMultipleVideos: true,
+        enforceMultipleVideos: !prefersSingleVideo,
+        leaveOnPageUnload: true,
+        stayAwake: true,
       });
 
       const token = await fetchToken();
@@ -423,46 +511,91 @@ export function useZoomSession({
       };
 
       const handleChatMessage = (payload: any) => {
-        const senderId = payload?.senderId ?? payload?.userId ?? payload?.from;
-        const messageText = payload?.message ?? payload?.text ?? payload?.content ?? '';
+        const messageId = String(payload?.id ?? payload?.msgid ?? '').trim();
+        const senderId =
+          payload?.sender?.userId ??
+          payload?.senderId ??
+          payload?.userId ??
+          payload?.from ??
+          null;
+        const messageText = String(
+          payload?.message ??
+          payload?.text ??
+          payload?.content ??
+          '',
+        ).trim();
+        const timestamp = normalizeChatTimestamp(payload?.timestamp);
+        const senderName =
+          payload?.sender?.name ||
+          payload?.senderName ||
+          payload?.displayName ||
+          payload?.userName ||
+          client.getAllUser?.().find((participant: any) => participant.userId === senderId)?.displayName ||
+          'Participante';
 
         if (!messageText) {
           return;
         }
 
-        setState((current) => {
-          if (
-            senderId != null &&
-            current.currentUserId != null &&
-            Number(senderId) === Number(current.currentUserId)
-          ) {
-            return current;
+        if (messageId) {
+          if (seenIncomingMessageIdsRef.current.has(messageId)) {
+            return;
           }
 
-          const now = Date.now();
-          const isDuplicate = current.chatMessages.some((message) =>
-            message.text === messageText &&
-            Math.abs(now - message.timestamp.getTime()) < 2000,
-          );
+          seenIncomingMessageIdsRef.current.add(messageId);
+        }
 
-          if (isDuplicate) {
-            return current;
+        const currentUserId = currentUserIdRef.current;
+        const normalizedText = normalizeChatText(messageText);
+        let matchedOutgoingMessage: PendingOutgoingMessage | null = null;
+
+        pendingOutgoingMessagesRef.current = pendingOutgoingMessagesRef.current.filter((message) => {
+          if (timestamp - message.sentAt > CHAT_DEDUPLICATION_WINDOW_MS) {
+            return false;
           }
 
-          return {
-            ...current,
-            chatMessages: [
-              ...current.chatMessages,
-              {
-                id: buildChatMessageId(),
-                sender: payload?.senderName || payload?.displayName || payload?.userName || 'Participante',
-                text: messageText,
-                timestamp: new Date(),
-                isSelf: false,
-              },
-            ],
-          };
+          if (!matchedOutgoingMessage && normalizeChatText(message.text) === normalizedText) {
+            matchedOutgoingMessage = message;
+            return false;
+          }
+
+          return true;
         });
+
+        if (
+          matchedOutgoingMessage ||
+          (senderId != null && currentUserId != null && Number(senderId) === Number(currentUserId))
+        ) {
+          return;
+        }
+
+        const messageSignature = `${String(senderId ?? senderName).trim() || 'participant'}::${normalizedText}`;
+        recentIncomingMessagesRef.current = recentIncomingMessagesRef.current.filter(
+          (entry) => timestamp - entry.timestamp < CHAT_DEDUPLICATION_WINDOW_MS,
+        );
+
+        if (recentIncomingMessagesRef.current.some((entry) => entry.signature === messageSignature)) {
+          return;
+        }
+
+        recentIncomingMessagesRef.current.push({
+          signature: messageSignature,
+          timestamp,
+        });
+
+        setState((current) => ({
+          ...current,
+          chatMessages: [
+            ...current.chatMessages,
+            {
+              id: messageId || buildChatMessageId(),
+              sender: senderName,
+              text: messageText,
+              timestamp: new Date(timestamp),
+              isSelf: false,
+            },
+          ],
+        }));
       };
 
       client.on('user-added', handleUsersChanged);
@@ -524,6 +657,10 @@ export function useZoomSession({
     }
 
     videoElementsRef.current.clear();
+    currentUserIdRef.current = null;
+    pendingOutgoingMessagesRef.current = [];
+    seenIncomingMessageIdsRef.current.clear();
+    recentIncomingMessagesRef.current = [];
     setState({
       isConnecting: false,
       isConnected: false,
@@ -636,6 +773,7 @@ export function useZoomSession({
     isMuted,
     isCameraOn,
     isScreenSharing,
+    prefersSingleVideoLayout,
     join,
     leave,
     toggleMute,
