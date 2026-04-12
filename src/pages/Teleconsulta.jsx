@@ -25,6 +25,7 @@ import {
 } from '@/client-api/teleconsulta';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import { toast } from '@/components/ui/use-toast';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import ProntuarioForm from '@/components/teleconsulta/ProntuarioForm';
@@ -530,7 +531,7 @@ function TeleconsultaInner({ consultationId }) {
                 )}
               </TabsList>
 
-              <TabsContent value="chat" className="!mt-0 m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
+              <TabsContent value="chat" className="!mt-0 m-0 flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
                 <div className="min-h-0 flex-1">
                   <ZoomChatPanel
                     messages={zoomSession.chatMessages}
@@ -541,9 +542,9 @@ function TeleconsultaInner({ consultationId }) {
               </TabsContent>
 
               {isProfissional && (
-                <TabsContent value="prontuario" className="!mt-0 m-0 flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="min-h-0 flex-1 overflow-y-auto p-3">
-                    <div className="space-y-3">
+                <TabsContent value="prontuario" className="!mt-0 m-0 flex h-0 min-h-0 flex-1 flex-col overflow-hidden">
+                  <ScrollArea className="min-h-0 flex-1">
+                    <div className="space-y-3 p-3">
                       <Button
                         variant="outline"
                         size="sm"
@@ -567,7 +568,7 @@ function TeleconsultaInner({ consultationId }) {
                         canEdit={Boolean(participant?.canUpsertProntuario)}
                       />
                     </div>
-                  </div>
+                  </ScrollArea>
                 </TabsContent>
               )}
             </Tabs>
