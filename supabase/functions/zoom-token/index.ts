@@ -1,5 +1,6 @@
 import { createClient } from 'npm:@supabase/supabase-js@2.56.0';
 import type { SessionAccountRecord } from '../_shared/sessionAccount.ts';
+import { toAppError } from '../_shared/errors.ts';
 import {
   requireConsultationAccess,
   type ConsultationRecord,
@@ -234,7 +235,20 @@ Deno.serve(async (req) => {
       roleType,
     });
   } catch (error) {
-    console.error('[zoom-token]', error);
-    return jsonResponse({ error: 'Nao foi possivel gerar a sessao da consulta.' }, 500);
+    const appError = toAppError(error);
+
+    console.error('[zoom-token]', {
+      code: appError.code,
+      message: appError.message,
+      details: appError.details,
+    });
+
+    return jsonResponse({
+      error: {
+        code: appError.code,
+        message: appError.message,
+        details: appError.details,
+      },
+    }, appError.status);
   }
 });

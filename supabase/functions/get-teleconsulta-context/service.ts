@@ -52,7 +52,7 @@ function buildParticipantContext({
     role,
     isParticipant: true,
     professionalProfileId,
-    canStartSession: !closed,
+    canStartSession: role === 'professional' && !closed,
     canFinishSession: role === 'professional' && !closed,
     canUpsertProntuario: role === 'professional' && !closed,
     canSubmitEvaluation: role === 'patient' && consultationStatus === 'finalizada',

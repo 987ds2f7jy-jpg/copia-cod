@@ -76,6 +76,14 @@ export async function startConsultaSession({
     });
   }
 
+  if (participantRole !== 'professional') {
+    throw new AppError({
+      status: 403,
+      code: 'CONSULTATION_START_FORBIDDEN',
+      message: 'Apenas o profissional pode iniciar a sessao da consulta.',
+    });
+  }
+
   const startedAt = consultation.inicio_at || new Date().toISOString();
   const roomPayload = buildConsultaRoomPayload(consultation);
   const requiresConsultationUpdate =

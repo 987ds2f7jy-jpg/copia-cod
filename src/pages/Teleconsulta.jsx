@@ -67,6 +67,7 @@ function TeleconsultaInner({ consultationId }) {
   const [showProntuariosAnt, setShowProntuariosAnt] = useState(false);
   const [showAvaliacao, setShowAvaliacao] = useState(false);
   const [isLeavingSession, setIsLeavingSession] = useState(false);
+  const [activeSidebarTab, setActiveSidebarTab] = useState('chat');
 
   const autoJoinAttemptRef = useRef(false);
   const autoStartAttemptRef = useRef(false);
@@ -87,6 +88,10 @@ function TeleconsultaInner({ consultationId }) {
   const participant = teleconsultaQuery.data?.participant || null;
   const currentProntuario = teleconsultaQuery.data?.currentProntuario || null;
   const currentEvaluation = teleconsultaQuery.data?.currentEvaluation || null;
+  const isProntuarioReady = Boolean(
+    String(currentProntuario?.motivoConsulta || currentProntuario?.motivo_consulta || '').trim() &&
+    String(currentProntuario?.recomendacoes || '').trim(),
+  );
 
   const isParticipant = Boolean(participant?.isParticipant);
   const isProfissional = participant?.role === 'professional';
@@ -133,6 +138,16 @@ function TeleconsultaInner({ consultationId }) {
       });
     },
     onError: (error) => {
+      if (['PRONTUARIO_REQUIRED', 'PRONTUARIO_REQUIRED_FIELDS_MISSING'].includes(error?.code)) {
+        setActiveSidebarTab('prontuario');
+        toast({
+          title: 'Preencha o prontuario antes de encerrar',
+          description: error?.message || 'Revise, salve o prontuario e tente finalizar novamente.',
+          variant: 'destructive',
+        });
+        return;
+      }
+
       toast({
         title: 'Falha ao finalizar a consulta',
         description: error?.message || 'Nao foi possivel finalizar a consulta.',
@@ -147,6 +162,7 @@ function TeleconsultaInner({ consultationId }) {
     evaluationPromptedRef.current = false;
     lastConsultaStatusRef.current = null;
     setShowAvaliacao(false);
+    setActiveSidebarTab('chat');
   }, [consultationId]);
 
   useEffect(() => {
@@ -181,17 +197,20 @@ function TeleconsultaInner({ consultationId }) {
     }
   }, [consulta?.status, currentEvaluation, isPaciente, zoomSession.leave]);
 
+  const isZoomRoomReady = Boolean(
+    consulta &&
+    consulta.status === 'em_atendimento' &&
+    consulta.roomId &&
+    consulta.roomToken &&
+    consulta.startedAt,
+  );
+
   const needsSessionInitialization = Boolean(
     consulta &&
     participant?.canStartSession &&
     consulta.status !== 'finalizada' &&
     consulta.status !== 'cancelada' &&
-    (
-      consulta.status === 'aguardando' ||
-      !consulta.roomId ||
-      !consulta.roomToken ||
-      !consulta.startedAt
-    )
+    !isZoomRoomReady
   );
 
   useEffect(() => {
@@ -206,6 +225,7 @@ function TeleconsultaInner({ consultationId }) {
   const canJoinZoom = Boolean(
     consulta &&
     isParticipant &&
+    isZoomRoomReady &&
     consulta.status !== 'finalizada' &&
     consulta.status !== 'cancelada' &&
     !isLeavingSession &&
@@ -255,6 +275,16 @@ function TeleconsultaInner({ consultationId }) {
         participant?.canFinishSession &&
         !['finalizada', 'cancelada'].includes(consulta.status)
       ) {
+        if (!isProntuarioReady) {
+          setActiveSidebarTab('prontuario');
+          toast({
+            title: 'Prontuario obrigatorio para finalizar',
+            description: 'Preencha motivo da consulta e recomendacoes, salve o prontuario e tente novamente.',
+            variant: 'destructive',
+          });
+          return;
+        }
+
         await finishConsulta.mutateAsync();
       }
 
@@ -406,6 +436,12 @@ function TeleconsultaInner({ consultationId }) {
               </div>
             )}
 
+            {isPaciente && !isZoomRoomReady && !startConsulta.isPending && (
+              <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+                Aguardando o profissional iniciar a sala segura para liberar a videochamada.
+              </div>
+            )}
+
             {zoomSession.error && (
               <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
                 <div className="flex items-start justify-between gap-3">
@@ -478,7 +514,7 @@ function TeleconsultaInner({ consultationId }) {
           </div>
 
           <div className="flex flex-col border-t border-gray-800 bg-gray-900 lg:w-96 lg:border-l lg:border-t-0">
-            <Tabs defaultValue="chat" className="flex min-h-0 flex-1 flex-col">
+            <Tabs value={activeSidebarTab} onValueChange={setActiveSidebarTab} className="flex min-h-0 flex-1 flex-col">
               <TabsList className="m-2 shrink-0 rounded-lg bg-gray-800">
                 <TabsTrigger value="chat" className="flex-1 text-gray-300 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
                   <MessageSquare className="mr-1 h-4 w-4" />

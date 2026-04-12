@@ -334,7 +334,7 @@ export function useZoomSession({
       });
 
       const token = await fetchToken();
-      await client.join(token.sessionName, token.signature, token.userName);
+      await client.join(token.sessionName, token.signature, token.userName, token.sessionKey);
 
       const mediaStream = client.getMediaStream();
 

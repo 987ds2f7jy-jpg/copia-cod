@@ -19,7 +19,7 @@ function assertProntuarioReady(prontuario: Awaited<ReturnType<FinishConsultaRepo
     throw new AppError({
       status: 409,
       code: 'PRONTUARIO_REQUIRED',
-      message: 'A medical record is required before finishing the consultation.',
+      message: 'Preencha e salve o prontuario antes de finalizar a consulta.',
     });
   }
 
@@ -27,7 +27,7 @@ function assertProntuarioReady(prontuario: Awaited<ReturnType<FinishConsultaRepo
     throw new AppError({
       status: 409,
       code: 'PRONTUARIO_REQUIRED_FIELDS_MISSING',
-      message: 'Medical record must contain at least reason and recommendations before finishing.',
+      message: 'O prontuario precisa conter ao menos motivo da consulta e recomendacoes antes da finalizacao.',
     });
   }
 }
