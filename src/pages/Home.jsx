@@ -337,7 +337,11 @@ export default function Home() {
                     </Button>
                   </Link>
                   <Link to={createPageUrl('CadastroProfissional')}>
-                    <Button size="lg" variant="outline" className="w-full sm:w-auto border-white text-white hover:bg-white/10 h-14 px-8">
+                    <Button
+                      size="lg"
+                      variant="outline"
+                      className="w-full sm:w-auto border-white/70 bg-white/12 text-white shadow-sm backdrop-blur-sm hover:bg-white/20 hover:text-white h-14 px-8"
+                    >
                       Sou Profissional
                     </Button>
                   </Link>
