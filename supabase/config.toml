@@ -69,6 +69,9 @@ verify_jwt = false
 [functions.read-models]
 verify_jwt = false
 
+[functions.read-home-banners]
+verify_jwt = false
+
 [functions.refresh-app-session]
 verify_jwt = false
 

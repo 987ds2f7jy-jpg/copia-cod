@@ -4,9 +4,10 @@ import { createPageUrl } from '@/utils';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent } from "@/components/ui/card";
+import HomeHeroCarousel from '@/components/home/HomeHeroCarousel';
 import { 
   Search, Clock, MessageSquare, Shield, Star, 
-  ArrowRight, CheckCircle, Stethoscope, Heart,
+  ArrowRight, Stethoscope, Heart,
   Brain, Bone, Eye, Baby, UserRound, ClipboardList
 } from 'lucide-react';
 
@@ -121,9 +122,8 @@ export default function Home() {
               transition={{ duration: 0.6, delay: 0.2 }}
               className="relative hidden lg:block"
             >
-              <div className="relative">
-                <img 
-                  src="https://images.unsplash.com/photo-1559839734-2b71ea197ec2?w=600&h=700&fit=crop"
+              <HomeHeroCarousel />
+              {/*
                   alt="Médica sorrindo"
                   className="rounded-3xl shadow-2xl w-full object-cover"
                 />
@@ -137,6 +137,7 @@ export default function Home() {
                   </div>
                 </div>
               </div>
+              */}
             </motion.div>
           </div>
         </div>

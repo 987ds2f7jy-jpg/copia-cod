@@ -34,8 +34,12 @@ async function parseResponsePayload(response) {
 }
 
 function resolveAuthToken(authMode) {
-  if (authMode === 'none' || authMode === 'anon') {
+  if (authMode === 'none') {
     return '';
+  }
+
+  if (authMode === 'anon') {
+    return env.edgeFunctionsPublishableKey;
   }
 
   const session = getStoredSession();
