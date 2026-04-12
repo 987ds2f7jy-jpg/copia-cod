@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
+import { getMyActiveConsultationRequest } from '@/client-api/teleconsulta';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -12,7 +14,7 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, UserPlus, Shield
+  ArrowLeft, Shield, Video
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
@@ -40,13 +42,64 @@ const BOTTOM_NAV = [
   { name: 'Perfil', page: 'Perfil', icon: User },
 ];
 
+function ActiveConsultationBanner({ activeConsultation, onResume }) {
+  const consultationStatus = String(activeConsultation?.consultation?.status || '').trim();
+  const consultationType = String(activeConsultation?.consultation?.consultationType || '').trim();
+  const counterpartName = activeConsultation?.counterpartName || 'o outro participante';
+  const counterpartLabel = activeConsultation?.participantRole === 'professional'
+    ? counterpartName
+    : `Dr(a). ${counterpartName}`;
+  const title = consultationStatus === 'em_atendimento'
+    ? 'Voce tem uma consulta em andamento.'
+    : 'Voce tem uma consulta aguardando retorno.';
+
+  let description = `A consulta com ${counterpartLabel} continua disponivel para retomada.`;
+
+  if (consultationStatus === 'aguardando' && consultationType === 'plantao') {
+    description = `O atendimento imediato com ${counterpartLabel} ainda esta reservado para voce.`;
+  } else if (activeConsultation?.needsProfessionalStart) {
+    description = `A consulta com ${counterpartLabel} ainda aguarda a abertura da sala segura pelo profissional.`;
+  } else if (activeConsultation?.roomReady) {
+    description = `A sala segura com ${counterpartLabel} ja esta pronta para reconexao.`;
+  }
+
+  return (
+    <div className="border-b border-emerald-100 bg-emerald-50/90">
+      <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
+        <div className="min-w-0">
+          <p className="text-sm font-semibold text-emerald-900">{title}</p>
+          <p className="text-sm text-emerald-700">{description}</p>
+        </div>
+
+        <Button
+          size="sm"
+          className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
+          onClick={onResume}
+        >
+          <Video className="h-4 w-4" />
+          Retomar consulta
+        </Button>
+      </div>
+    </div>
+  );
+}
+
 function LayoutInner({ children, currentPageName }) {
   const navigate = useNavigate();
+  const location = useLocation();
   const { user, logout } = useAuth();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
   const isRootPage = ROOT_PAGES.includes(currentPageName);
+
+  const { data: activeConsultation } = useQuery({
+    queryKey: ['myActiveConsultation', user?.id],
+    queryFn: () => getMyActiveConsultationRequest(),
+    enabled: Boolean(user?.id),
+    staleTime: 10_000,
+    refetchInterval: 15_000,
+  });
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);
@@ -69,6 +122,25 @@ function LayoutInner({ children, currentPageName }) {
   if (hideLayoutPages.includes(currentPageName)) {
     return <>{children}</>;
   }
+
+  const storedActiveConsultationId = typeof window !== 'undefined'
+    ? window.sessionStorage.getItem('rd_last_active_consultation')
+    : null;
+  const activeConsultationPath = activeConsultation?.resumeUrl ||
+    (activeConsultation?.consultation?.id ? `/consulta/${activeConsultation.consultation.id}` : null);
+  const activeConsultationStatus = String(activeConsultation?.consultation?.status || '').trim();
+  const activeConsultationType = String(activeConsultation?.consultation?.consultationType || '').trim();
+  const canResumeConsultation = Boolean(
+    activeConsultationPath &&
+    !location.pathname.startsWith('/consulta/') &&
+    (
+      activeConsultationStatus === 'em_atendimento' ||
+      activeConsultationStatus === 'in_progress' ||
+      activeConsultation?.roomReady ||
+      (activeConsultationStatus === 'aguardando' && activeConsultationType === 'plantao') ||
+      storedActiveConsultationId === activeConsultation?.consultation?.id
+    )
+  );
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -248,6 +320,12 @@ function LayoutInner({ children, currentPageName }) {
 
       {/* Main Content */}
       <main className="pt-14 lg:pt-20 pb-20 lg:pb-0">
+        {canResumeConsultation && (
+          <ActiveConsultationBanner
+            activeConsultation={activeConsultation}
+            onResume={() => navigate(activeConsultationPath)}
+          />
+        )}
         <PageTransition>{children}</PageTransition>
       </main>
 

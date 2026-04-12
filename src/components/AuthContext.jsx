@@ -21,6 +21,9 @@ export function AuthProvider({ children }) {
 
   const clearClientState = useCallback(() => {
     setUser(null);
+    if (typeof window !== 'undefined') {
+      window.sessionStorage.removeItem('rd_last_active_consultation');
+    }
     queryClient.clear();
   }, [queryClient]);
 

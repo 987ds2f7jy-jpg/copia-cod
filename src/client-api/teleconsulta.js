@@ -172,6 +172,26 @@ function normalizeTeleconsultaContext(result) {
   };
 }
 
+function normalizeActiveConsultation(result) {
+  const consultation = normalizeConsultation(result?.consultation);
+
+  return {
+    hasActiveConsultation: Boolean(result?.hasActiveConsultation && consultation?.id),
+    consultation,
+    participantRole: result?.participantRole === 'professional'
+      ? 'professional'
+      : result?.participantRole === 'patient'
+        ? 'patient'
+        : null,
+    resumeUrl: consultation?.id
+      ? String(result?.resumeUrl || `/consulta/${consultation.id}`).trim()
+      : null,
+    roomReady: Boolean(result?.roomReady),
+    needsProfessionalStart: Boolean(result?.needsProfessionalStart),
+    counterpartName: String(result?.counterpartName ?? '').trim() || null,
+  };
+}
+
 export async function getTeleconsultaContextRequest({
   consultationId = null,
   patientId = null,
@@ -193,6 +213,15 @@ export async function getTeleconsultaContextRequest({
   });
 
   return normalizeTeleconsultaContext(result);
+}
+
+export async function getMyActiveConsultationRequest() {
+  const result = await invokeEdgeFunction('get-my-active-consultation', {
+    body: {},
+    fallbackMessage: 'Nao foi possivel identificar consulta ativa para retomada.',
+  });
+
+  return normalizeActiveConsultation(result);
 }
 
 export async function startConsultaSessionRequest({ consultationId }) {
@@ -309,6 +338,7 @@ export async function requestDeepgramToken({ consultationId }) {
 }
 
 const teleconsultaApi = {
+  getMyActiveConsultationRequest,
   getTeleconsultaContextRequest,
   startConsultaSessionRequest,
   upsertProntuarioRequest,

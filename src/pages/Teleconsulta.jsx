@@ -83,8 +83,16 @@ function TeleconsultaInner({ consultationId }) {
       consultationId,
       historyLimit: 20,
     }),
-    enabled: Boolean(consultationId && user?.id),
-    refetchInterval: 5000,
+    enabled: Boolean(consultationId && user?.id && !isLeavingSession),
+    refetchInterval: (query) => {
+      const status = query.state.data?.consultation?.status;
+
+      if (isLeavingSession || ['finalizada', 'cancelada'].includes(status)) {
+        return false;
+      }
+
+      return 5000;
+    },
   });
 
   const consulta = teleconsultaQuery.data?.consultation || null;
@@ -117,6 +125,14 @@ function TeleconsultaInner({ consultationId }) {
     await queryClient.invalidateQueries({ queryKey: ['teleconsulta-context', consultationId] });
   };
 
+  const refreshActiveConsultation = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    await queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user.id] });
+  };
+
   const startConsulta = useMutation({
     mutationFn: () => startConsultaSessionRequest({ consultationId }),
     onSuccess: async () => {
@@ -136,6 +152,7 @@ function TeleconsultaInner({ consultationId }) {
     mutationFn: () => finishConsultaRequest({ consultationId }),
     onSuccess: async () => {
       await refreshContext();
+      await refreshActiveConsultation();
       toast({
         title: 'Consulta finalizada com sucesso.',
       });
@@ -225,6 +242,35 @@ function TeleconsultaInner({ consultationId }) {
       });
     }
   }, [consulta?.status, currentEvaluation, isPaciente, zoomSession.leave]);
+
+  useEffect(() => {
+    if (!['finalizada', 'cancelada'].includes(consulta?.status)) {
+      return;
+    }
+
+    void queryClient.cancelQueries({ queryKey: ['teleconsulta-context', consultationId] });
+  }, [consulta?.status, consultationId, queryClient]);
+
+  useEffect(() => {
+    if (typeof window === 'undefined' || !consulta?.id || !isParticipant) {
+      return;
+    }
+
+    if (['finalizada', 'cancelada'].includes(consulta.status)) {
+      window.sessionStorage.removeItem('rd_last_active_consultation');
+      return;
+    }
+
+    window.sessionStorage.setItem('rd_last_active_consultation', consulta.id);
+  }, [consulta?.id, consulta?.status, isParticipant]);
+
+  useEffect(() => {
+    if (!user?.id || !['finalizada', 'cancelada'].includes(consulta?.status)) {
+      return;
+    }
+
+    void queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user.id] });
+  }, [consulta?.status, queryClient, user?.id]);
 
   const isZoomRoomReady = Boolean(
     consulta &&
@@ -317,6 +363,8 @@ function TeleconsultaInner({ consultationId }) {
         await finishConsulta.mutateAsync();
       }
 
+      await queryClient.cancelQueries({ queryKey: ['teleconsulta-context', consultationId] });
+      await refreshActiveConsultation();
       await zoomSession.leave();
       navigate(getDashboardPath(participant?.role));
     } catch {
