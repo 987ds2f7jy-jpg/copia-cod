@@ -23,6 +23,7 @@ export function AuthProvider({ children }) {
     setUser(null);
     if (typeof window !== 'undefined') {
       window.sessionStorage.removeItem('rd_last_active_consultation');
+      window.sessionStorage.removeItem('rd_consulta_agora_auto_resume');
     }
     queryClient.clear();
   }, [queryClient]);

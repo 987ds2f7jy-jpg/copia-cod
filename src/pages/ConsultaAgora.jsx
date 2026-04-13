@@ -32,6 +32,57 @@ const SPECIALTIES = [
   { id: 'psiquiatria', name: 'Psiquiatria' },
 ];
 
+const CONSULTA_AGORA_AUTO_RESUME_KEY = 'rd_consulta_agora_auto_resume';
+const CONSULTA_AGORA_AUTO_RESUME_TTL_MS = 2 * 60 * 60 * 1000;
+
+function readConsultaAgoraAutoResumeState() {
+  if (typeof window === 'undefined') {
+    return null;
+  }
+
+  const rawValue = window.sessionStorage.getItem(CONSULTA_AGORA_AUTO_RESUME_KEY);
+  if (!rawValue) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(rawValue);
+    const expiresAt = Number(parsed?.expiresAt ?? 0);
+
+    if (!Number.isFinite(expiresAt) || expiresAt <= Date.now()) {
+      window.sessionStorage.removeItem(CONSULTA_AGORA_AUTO_RESUME_KEY);
+      return null;
+    }
+
+    return {
+      queueId: String(parsed?.queueId ?? '').trim() || null,
+      expiresAt,
+    };
+  } catch {
+    window.sessionStorage.removeItem(CONSULTA_AGORA_AUTO_RESUME_KEY);
+    return null;
+  }
+}
+
+function saveConsultaAgoraAutoResumeState(queueId = null) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.sessionStorage.setItem(CONSULTA_AGORA_AUTO_RESUME_KEY, JSON.stringify({
+    queueId: String(queueId ?? '').trim() || null,
+    expiresAt: Date.now() + CONSULTA_AGORA_AUTO_RESUME_TTL_MS,
+  }));
+}
+
+function clearConsultaAgoraAutoResumeState() {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.sessionStorage.removeItem(CONSULTA_AGORA_AUTO_RESUME_KEY);
+}
+
 function buildProfessionalKey(profile) {
   return profile?.user_id || profile?.professional_profile_id || profile?.id || '';
 }
@@ -67,6 +118,9 @@ function ConsultaAgoraInner() {
   const [selectedSpecialty, setSelectedSpecialty] = useState('');
   const [symptoms, setSymptoms] = useState('');
   const [queueEntry, setQueueEntry] = useState(null);
+  const [shouldAutoResumeAfterQueue, setShouldAutoResumeAfterQueue] = useState(
+    () => Boolean(readConsultaAgoraAutoResumeState()),
+  );
 
   const { data: activeConsultation } = useMyActiveConsultation({
     enabled: Boolean(user?.id),
@@ -84,12 +138,17 @@ function ConsultaAgoraInner() {
   }, [activeConsultation]);
 
   useEffect(() => {
-    if (step !== 'queue' || !activePlantaoConsultation?.resumeUrl) {
+    if (
+      !activePlantaoConsultation?.resumeUrl ||
+      !(step === 'queue' || shouldAutoResumeAfterQueue)
+    ) {
       return;
     }
 
+    clearConsultaAgoraAutoResumeState();
+    setShouldAutoResumeAfterQueue(false);
     navigate(activePlantaoConsultation.resumeUrl, { replace: true });
-  }, [activePlantaoConsultation?.resumeUrl, navigate, step]);
+  }, [activePlantaoConsultation?.resumeUrl, navigate, shouldAutoResumeAfterQueue, step]);
 
   const selectedSpecialtyLabel = useMemo(
     () => SPECIALTIES.find((specialty) => specialty.id === selectedSpecialty)?.name || '',
@@ -154,6 +213,8 @@ function ConsultaAgoraInner() {
       }
 
       if (currentQueue) {
+        saveConsultaAgoraAutoResumeState(currentQueue.id);
+        setShouldAutoResumeAfterQueue(true);
         setQueueEntry(currentQueue);
         setStep('queue');
       } else {
@@ -227,6 +288,8 @@ function ConsultaAgoraInner() {
       return result.queueEntry;
     },
     onSuccess: (nextQueueEntry) => {
+      saveConsultaAgoraAutoResumeState(nextQueueEntry?.id);
+      setShouldAutoResumeAfterQueue(true);
       setQueueEntry(nextQueueEntry);
       setStep('queue');
       clearSpecificExamRedirect();
@@ -237,6 +300,8 @@ function ConsultaAgoraInner() {
   const leaveQueue = useMutation({
     mutationFn: (id) => leaveQueueEntry({ queueId: id }),
     onSuccess: () => {
+      clearConsultaAgoraAutoResumeState();
+      setShouldAutoResumeAfterQueue(false);
       setQueueEntry(null);
       setStep('form');
       clearSpecificExamRedirect();
@@ -294,6 +359,8 @@ function ConsultaAgoraInner() {
       });
 
       if (['in_progress', 'em_atendimento'].includes(currentQueue.status)) {
+        saveConsultaAgoraAutoResumeState(currentQueue.id);
+        setShouldAutoResumeAfterQueue(true);
         void queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user.id] });
       }
     }, 2500);
