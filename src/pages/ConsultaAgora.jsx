@@ -83,6 +83,14 @@ function ConsultaAgoraInner() {
       : null;
   }, [activeConsultation]);
 
+  useEffect(() => {
+    if (step !== 'queue' || !activePlantaoConsultation?.resumeUrl) {
+      return;
+    }
+
+    navigate(activePlantaoConsultation.resumeUrl, { replace: true });
+  }, [activePlantaoConsultation?.resumeUrl, navigate, step]);
+
   const selectedSpecialtyLabel = useMemo(
     () => SPECIALTIES.find((specialty) => specialty.id === selectedSpecialty)?.name || '',
     [selectedSpecialty],
