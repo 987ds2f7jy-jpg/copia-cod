@@ -172,11 +172,27 @@ function normalizeTeleconsultaContext(result) {
   };
 }
 
+export function buildEmptyActiveConsultation() {
+  return {
+    hasActiveConsultation: false,
+    consultation: null,
+    participantRole: null,
+    resumeUrl: null,
+    roomReady: false,
+    needsProfessionalStart: false,
+    counterpartName: null,
+  };
+}
+
 function normalizeActiveConsultation(result) {
   const consultation = normalizeConsultation(result?.consultation);
 
+  if (!consultation?.id) {
+    return buildEmptyActiveConsultation();
+  }
+
   return {
-    hasActiveConsultation: Boolean(result?.hasActiveConsultation && consultation?.id),
+    hasActiveConsultation: Boolean(result?.hasActiveConsultation),
     consultation,
     participantRole: result?.participantRole === 'professional'
       ? 'professional'

@@ -24,15 +24,19 @@ export function createServiceRoleClient() {
 
 export function createSupabaseAuthUserLookup(client: SupabaseClient): AuthenticatedUserLookup {
   return async (accessToken: string) => {
-    const { data, error } = await client.auth.getUser(accessToken);
+    try {
+      const { data, error } = await client.auth.getUser(accessToken);
 
-    if (error || !data?.user?.id) {
+      if (error || !data?.user?.id) {
+        return null;
+      }
+
+      return {
+        authUserId: data.user.id,
+        email: data.user.email ?? null,
+      };
+    } catch {
       return null;
     }
-
-    return {
-      authUserId: data.user.id,
-      email: data.user.email ?? null,
-    };
   };
 }

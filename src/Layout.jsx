@@ -1,8 +1,6 @@
 import React, { useState, useEffect } from 'react';
-import { useQuery } from '@tanstack/react-query';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { createPageUrl } from '@/utils';
-import { getMyActiveConsultationRequest } from '@/client-api/teleconsulta';
 import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
@@ -18,6 +16,7 @@ import {
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
+import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 
 function BrandMark({ className = 'h-8 w-8' }) {
   return (
@@ -93,13 +92,7 @@ function LayoutInner({ children, currentPageName }) {
 
   const isRootPage = ROOT_PAGES.includes(currentPageName);
 
-  const { data: activeConsultation } = useQuery({
-    queryKey: ['myActiveConsultation', user?.id],
-    queryFn: () => getMyActiveConsultationRequest(),
-    enabled: Boolean(user?.id),
-    staleTime: 10_000,
-    refetchInterval: 15_000,
-  });
+  const { data: activeConsultation } = useMyActiveConsultation();
 
   useEffect(() => {
     const handleScroll = () => setIsScrolled(window.scrollY > 10);

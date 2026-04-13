@@ -22,6 +22,8 @@ import {
   normalizeConsultaAgoraSpecialty,
   readSpecificExamRedirect,
 } from '@/lib/solicitacoesExames';
+import ResumeConsultationCard from '@/components/teleconsulta/ResumeConsultationCard';
+import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 
 const SPECIALTIES = [
   { id: 'clinico_geral', name: 'Clinico Geral' },
@@ -66,6 +68,21 @@ function ConsultaAgoraInner() {
   const [symptoms, setSymptoms] = useState('');
   const [queueEntry, setQueueEntry] = useState(null);
 
+  const { data: activeConsultation } = useMyActiveConsultation({
+    enabled: Boolean(user?.id),
+    refetchInterval: step === 'queue' ? 5000 : 15000,
+  });
+
+  const activePlantaoConsultation = useMemo(() => {
+    if (!activeConsultation?.hasActiveConsultation) {
+      return null;
+    }
+
+    return activeConsultation.consultation?.consultationType === 'plantao'
+      ? activeConsultation
+      : null;
+  }, [activeConsultation]);
+
   const selectedSpecialtyLabel = useMemo(
     () => SPECIALTIES.find((specialty) => specialty.id === selectedSpecialty)?.name || '',
     [selectedSpecialty],
@@ -97,19 +114,6 @@ function ConsultaAgoraInner() {
     }
   }, [searchParams, selectedSpecialty, step, symptoms]);
 
-  const findActivePlantaoConsulta = async (patientId) => {
-    if (!patientId) {
-      return null;
-    }
-
-    const consultas = await entities.Consulta.filter({ paciente_id: patientId }, '-created_date', 20);
-
-    return consultas.find((consulta) =>
-      consulta.tipo_consulta === 'plantao' &&
-      ['aguardando', 'em_atendimento'].includes(consulta.status)
-    ) || null;
-  };
-
   const findCurrentQueueEntry = async (patientId, queueId) => {
     if (queueId) {
       const directMatch = await entities.Queue.filter({ id: queueId, patient_id: patientId }, undefined, 1);
@@ -136,16 +140,6 @@ function ConsultaAgoraInner() {
     let active = true;
 
     const restoreFlow = async () => {
-      const activeConsulta = await findActivePlantaoConsulta(user.id);
-      if (!active) {
-        return;
-      }
-
-      if (activeConsulta) {
-        navigate(`/consulta/${activeConsulta.id}`);
-        return;
-      }
-
       const currentQueue = await findCurrentQueueEntry(user.id);
       if (!active) {
         return;
@@ -165,7 +159,7 @@ function ConsultaAgoraInner() {
     return () => {
       active = false;
     };
-  }, [user?.id, navigate]);
+  }, [user?.id]);
 
   const { data: onDutyProfessionals = [] } = useQuery({
     queryKey: ['onDutyProfessionals'],
@@ -255,16 +249,12 @@ function ConsultaAgoraInner() {
       setQueueEntry(event.data);
 
       if (['in_progress', 'em_atendimento'].includes(event.data.status)) {
-        findActivePlantaoConsulta(user?.id).then((activeConsulta) => {
-          if (activeConsulta) {
-            navigate(`/consulta/${activeConsulta.id}`);
-          }
-        });
+        void queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user?.id] });
       }
     });
 
     return () => unsubscribe();
-  }, [queueEntry?.id, user?.id, navigate]);
+  }, [queryClient, queueEntry?.id, user?.id]);
 
   useEffect(() => {
     if (!user?.id || !queueEntry?.id) {
@@ -272,14 +262,6 @@ function ConsultaAgoraInner() {
     }
 
     const intervalId = window.setInterval(async () => {
-      const activeConsulta = await findActivePlantaoConsulta(user.id);
-
-      if (activeConsulta) {
-        window.clearInterval(intervalId);
-        navigate(`/consulta/${activeConsulta.id}`);
-        return;
-      }
-
       const currentQueue = await findCurrentQueueEntry(user.id, queueEntry.id);
 
       if (!currentQueue || currentQueue.status === 'cancelled') {
@@ -302,10 +284,14 @@ function ConsultaAgoraInner() {
 
         return hasChanged ? currentQueue : previous;
       });
+
+      if (['in_progress', 'em_atendimento'].includes(currentQueue.status)) {
+        void queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user.id] });
+      }
     }, 2500);
 
     return () => window.clearInterval(intervalId);
-  }, [queueEntry?.id, user?.id, navigate]);
+  }, [queryClient, queueEntry?.id, user?.id]);
 
   const handleJoinQueue = () => {
     if (!user || !selectedSpecialty || !hasAvailableProfessionals) {
@@ -335,6 +321,16 @@ function ConsultaAgoraInner() {
           <p className="text-gray-600">Conecte-se com um medico disponivel em minutos</p>
         </div>
 
+        {activePlantaoConsultation && (
+          <div className="mb-6">
+            <ResumeConsultationCard
+              activeConsultation={activePlantaoConsultation}
+              onResume={() => navigate(activePlantaoConsultation.resumeUrl)}
+            />
+          </div>
+        )}
+
+        {!activePlantaoConsultation && (
         <AnimatePresence mode="wait">
           {step === 'form' && (
             <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
@@ -473,6 +469,7 @@ function ConsultaAgoraInner() {
             </motion.div>
           )}
         </AnimatePresence>
+        )}
 
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
           <Card className="border-0 shadow-sm">

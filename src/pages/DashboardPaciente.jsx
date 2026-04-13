@@ -30,6 +30,8 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import ResumeConsultationCard from '@/components/teleconsulta/ResumeConsultationCard';
+import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 
 function DashboardPacienteInner() {
   const queryClient = useQueryClient();
@@ -38,6 +40,9 @@ function DashboardPacienteInner() {
   const [reviewModal, setReviewModal] = useState({ open: false, appointment: null });
   const [reviewData, setReviewData] = useState({ rating: 5, comment: '' });
   const [cancellingId, setCancellingId] = useState(null);
+  const { data: activeConsultation } = useMyActiveConsultation({
+    enabled: Boolean(user?.id),
+  });
 
   const { data: appointments = [], isLoading } = useQuery({
     queryKey: ['patientAppointments', user?.id],
@@ -280,6 +285,15 @@ function DashboardPacienteInner() {
           </h1>
           <p className="text-muted-foreground">Gerencie suas consultas e agendamentos</p>
         </div>
+
+        {activeConsultation?.hasActiveConsultation && (
+          <div className="mb-8">
+            <ResumeConsultationCard
+              activeConsultation={activeConsultation}
+              onResume={() => navigate(activeConsultation.resumeUrl)}
+            />
+          </div>
+        )}
 
         {/* Quick Actions */}
         <div className="grid sm:grid-cols-3 gap-4 mb-8">

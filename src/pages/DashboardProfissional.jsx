@@ -44,6 +44,8 @@ import {
   setProfessionalPublicDuty,
 } from '@/lib/professionals';
 import { getProfessionalDashboardRequest } from '@/client-api/professionalDashboard';
+import ResumeConsultationCard from '@/components/teleconsulta/ResumeConsultationCard';
+import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 
 // ─── Helpers ─────────────────────────────────────────────────────────────────
 const today = () => format(new Date(), 'yyyy-MM-dd');
@@ -109,6 +111,9 @@ function DashboardProfissionalInner() {
   const didResetDutyOnSessionRef = useRef(false);
   const activeDutyProfileIdRef = useRef(null);
   const activeDutyStatusRef = useRef(false);
+  const { data: activeConsultation } = useMyActiveConsultation({
+    enabled: Boolean(user?.id),
+  });
 
   // Load professional profile — via React Query for proper loading/error states
   const { data: professional, isLoading: loadingProfessional, isError: profError } = useQuery({
@@ -488,6 +493,13 @@ function DashboardProfissionalInner() {
 
       {activeTab === 'dashboard' && (
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6">
+
+        {activeConsultation?.hasActiveConsultation && (
+          <ResumeConsultationCard
+            activeConsultation={activeConsultation}
+            onResume={() => navigate(activeConsultation.resumeUrl)}
+          />
+        )}
 
         {/* KPI Grid */}
         <div className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">

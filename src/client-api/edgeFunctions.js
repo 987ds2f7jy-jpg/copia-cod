@@ -193,6 +193,14 @@ export async function invokeEdgeFunction(functionName, {
   authMode = 'session',
   retryOnUnauthorized = true,
 }) {
+  if ((authMode === 'session' || authMode === 'optional') && getStoredSession()?.accessToken) {
+    try {
+      await ensureFreshSession();
+    } catch {
+      // Let the request flow continue so the regular unauthorized retry can still run.
+    }
+  }
+
   try {
     return await executeEdgeFunction(functionName, {
       body,

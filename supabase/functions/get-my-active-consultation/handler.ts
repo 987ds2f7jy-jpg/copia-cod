@@ -1,4 +1,5 @@
 import { requireAuthenticatedUser } from '../_shared/auth.ts';
+import { isAppError } from '../_shared/errors.ts';
 import {
   createRequestId,
   ensureMethod,
@@ -12,6 +13,18 @@ import { getMyActiveConsultation } from './service.ts';
 
 const FUNCTION_NAME = 'get-my-active-consultation';
 const CORS: CorsOptions = { allowedMethods: ['POST'] };
+
+function buildEmptyActiveConsultationResult() {
+  return {
+    hasActiveConsultation: false,
+    consultation: null,
+    participantRole: null,
+    resumeUrl: null,
+    roomReady: false,
+    needsProfessionalStart: false,
+    counterpartName: null,
+  };
+}
 
 export async function handleGetMyActiveConsultationRequest(req: Request) {
   const preflightResponse = handlePreflight(req, CORS);
@@ -38,6 +51,20 @@ export async function handleGetMyActiveConsultationRequest(req: Request) {
 
     return successResponse(result, requestId, { status: 200, cors: CORS });
   } catch (error) {
+    if (
+      (isAppError(error) && [
+        'AUTH_REQUIRED',
+        'AUTH_TOKEN_INVALID',
+        'AUTH_USER_INVALID',
+      ].includes(error.code)) ||
+      (error instanceof Error && String(error.message || '').trim().toLowerCase() === 'invalid jwt')
+    ) {
+      return successResponse(buildEmptyActiveConsultationResult(), requestId, {
+        status: 200,
+        cors: CORS,
+      });
+    }
+
     return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: CORS });
   }
 }
