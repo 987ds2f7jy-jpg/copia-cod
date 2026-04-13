@@ -81,6 +81,27 @@ async function findProfessionalByAppUserId(client: SupabaseClient, appUserId: st
   return decorateProfessionalProfile(client, (data as Record<string, unknown> | null) || null);
 }
 
+async function listProfessionalIdsByAppUserId(client: SupabaseClient, appUserId: string) {
+  const { data, error } = await client
+    .from('professional_profiles')
+    .select('id')
+    .eq('user_id', appUserId)
+    .order('created_date', { ascending: false });
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PROFESSIONAL_PROFILE_IDS_LOOKUP_FAILED',
+      message: 'Unable to load professional profile ids.',
+      details: error.message,
+    });
+  }
+
+  return ((data as Array<{ id: string | null }> | null) || [])
+    .map((row) => normalizeString(row?.id))
+    .filter(Boolean);
+}
+
 async function findPublicProfileByProfessionalId(client: SupabaseClient, professionalId: string) {
   const { data, error } = await client
     .from('professional_public_profiles')
@@ -122,11 +143,15 @@ async function listAvailabilitySlots(client: SupabaseClient, professionalId: str
   return (data as Record<string, unknown>[] | null) || [];
 }
 
-async function listAppointments(client: SupabaseClient, professionalId: string, limit: number) {
+async function listAppointments(client: SupabaseClient, professionalIds: string[], limit: number) {
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await client
     .from('appointments')
     .select('*')
-    .eq('professional_id', professionalId)
+    .in('professional_id', professionalIds)
     .order('date', { ascending: false })
     .limit(limit);
 
@@ -225,11 +250,15 @@ async function listPendingQuestionsAll(client: SupabaseClient, limit: number) {
   return (data as Record<string, unknown>[] | null) || [];
 }
 
-async function listAnsweredQuestions(client: SupabaseClient, professionalId: string, limit: number) {
+async function listAnsweredQuestions(client: SupabaseClient, professionalIds: string[], limit: number) {
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await client
     .from('questions')
     .select('*')
-    .eq('answered_by_professional_id', professionalId)
+    .in('answered_by_professional_id', professionalIds)
     .order('answered_at', { ascending: false })
     .limit(limit);
 
@@ -245,11 +274,15 @@ async function listAnsweredQuestions(client: SupabaseClient, professionalId: str
   return (data as Record<string, unknown>[] | null) || [];
 }
 
-async function listReviews(client: SupabaseClient, professionalId: string, limit: number) {
+async function listReviews(client: SupabaseClient, professionalIds: string[], limit: number) {
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await client
     .from('reviews')
     .select('*')
-    .eq('professional_id', professionalId)
+    .in('professional_id', professionalIds)
     .order('created_date', { ascending: false })
     .limit(limit);
 
@@ -268,15 +301,16 @@ async function listReviews(client: SupabaseClient, professionalId: string, limit
 function createGetProfessionalDashboardRepository(client: SupabaseClient): GetProfessionalDashboardRepository {
   return {
     findProfessionalByAppUserId: (appUserId) => findProfessionalByAppUserId(client, appUserId),
+    listProfessionalIdsByAppUserId: (appUserId) => listProfessionalIdsByAppUserId(client, appUserId),
     findPublicProfileByProfessionalId: (professionalId) => findPublicProfileByProfessionalId(client, professionalId),
     listAvailabilitySlots: (professionalId) => listAvailabilitySlots(client, professionalId),
-    listAppointments: (professionalId, limit) => listAppointments(client, professionalId, limit),
+    listAppointments: (professionalIds, limit) => listAppointments(client, professionalIds, limit),
     listQueueAll: (professionalId, limit) => listQueueAll(client, professionalId, limit),
     listQueueWaitingBySpecialty: ({ specialty, limit }) => listQueueWaitingBySpecialty(client, specialty, limit),
     listPendingQuestions: ({ specialty, limit }) => listPendingQuestions(client, specialty, limit),
     listPendingQuestionsAll: (limit) => listPendingQuestionsAll(client, limit),
-    listAnsweredQuestions: ({ professionalId, limit }) => listAnsweredQuestions(client, professionalId, limit),
-    listReviews: (professionalId, limit) => listReviews(client, professionalId, limit),
+    listAnsweredQuestions: ({ professionalIds, limit }) => listAnsweredQuestions(client, professionalIds, limit),
+    listReviews: (professionalIds, limit) => listReviews(client, professionalIds, limit),
   };
 }
 

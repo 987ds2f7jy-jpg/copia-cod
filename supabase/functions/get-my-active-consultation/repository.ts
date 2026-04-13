@@ -97,6 +97,28 @@ async function listActiveConsultationsByColumn(
   );
 }
 
+async function listActiveConsultationsByColumnValues(
+  client: SupabaseClient,
+  column: string,
+  values: Array<string | null | undefined>,
+) {
+  const normalizedValues = values
+    .map((value) => String(value ?? '').trim())
+    .filter(Boolean);
+
+  if (normalizedValues.length === 0) {
+    return [];
+  }
+
+  if (normalizedValues.length === 1) {
+    return listActiveConsultationsByColumn(client, column, normalizedValues[0]);
+  }
+
+  return runActiveConsultationQuery(
+    createBaseActiveConsultationQuery(client).in(column, normalizedValues),
+  );
+}
+
 function createGetMyActiveConsultationRepository(client: SupabaseClient): GetMyActiveConsultationRepository {
   return {
     async findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null> {
@@ -104,8 +126,7 @@ function createGetMyActiveConsultationRepository(client: SupabaseClient): GetMyA
         .from('professional_profiles')
         .select('id, user_id, full_name, specialty')
         .eq('user_id', appUserId)
-        .order('created_date', { ascending: false })
-        .limit(1);
+        .order('created_date', { ascending: false });
 
       if (error) {
         throw new AppError({
@@ -116,7 +137,8 @@ function createGetMyActiveConsultationRepository(client: SupabaseClient): GetMyA
         });
       }
 
-      const row = (data?.[0] || null) as ProfessionalRow | null;
+      const rows = (data as ProfessionalRow[] | null) || [];
+      const row = rows[0] || null;
 
       if (!row?.id) {
         return null;
@@ -124,6 +146,7 @@ function createGetMyActiveConsultationRepository(client: SupabaseClient): GetMyA
 
       return {
         profileId: row.id,
+        profileIds: rows.map((item) => item.id).filter(Boolean),
         appUserId: row.user_id || null,
         fullName: row.full_name || '',
         specialty: row.specialty || '',
@@ -135,12 +158,72 @@ function createGetMyActiveConsultationRepository(client: SupabaseClient): GetMyA
       return listActiveConsultationsByColumn(client, 'paciente_id', appUserId);
     },
 
-    async listActiveConsultationsForProfessional({ appUserId, professionalProfileId }) {
+    async listActiveConsultationsForProfessional({ appUserId, professionalProfileIds }) {
       return mergeActiveConsultations(await Promise.all([
         listActiveConsultationsByColumn(client, 'profissional_user_id', appUserId),
         listActiveConsultationsByColumn(client, 'profissional_id', appUserId),
-        listActiveConsultationsByColumn(client, 'profissional_id', professionalProfileId),
+        listActiveConsultationsByColumnValues(client, 'profissional_id', professionalProfileIds),
       ]));
+    },
+
+    async closeExpiredConsultation({ consultationId, finishedAt }) {
+      const { error } = await client
+        .from('consultas')
+        .update({
+          status: 'finalizada',
+          fim_at: finishedAt,
+        })
+        .eq('id', consultationId)
+        .in('status', ACTIVE_CONSULTATION_STATUSES);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_CLOSE_FAILED',
+          message: 'Unable to close expired telemedicine consultation.',
+          details: error.message,
+        });
+      }
+    },
+
+    async completeAppointmentsByConsultationId(consultationId: string) {
+      const { error } = await client
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('consulta_id', consultationId)
+        .not('status', 'in', '(completed,cancelled,CONCLUIDO,CANCELADO)');
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_APPOINTMENTS_CLOSE_FAILED',
+          message: 'Unable to reconcile expired appointment records.',
+          details: error.message,
+        });
+      }
+    },
+
+    async completeQueueEntriesByConsultation(consultation: ActiveConsultationRow) {
+      if (consultation.tipo_consulta !== 'plantao') {
+        return;
+      }
+
+      const { error } = await client
+        .from('queues')
+        .update({ status: 'completed' })
+        .eq('patient_id', consultation.paciente_id)
+        .eq('assigned_professional_id', consultation.profissional_id)
+        .eq('specialty', consultation.especialidade || '')
+        .in('status', ['assigned', 'waiting', 'in_progress', 'em_atendimento']);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_QUEUE_CLOSE_FAILED',
+          message: 'Unable to reconcile expired queue entries.',
+          details: error.message,
+        });
+      }
     },
   };
 }

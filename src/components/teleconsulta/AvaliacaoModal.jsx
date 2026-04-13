@@ -26,6 +26,7 @@ export default function AvaliacaoModal({
   const [nota, setNota] = useState(existingEvaluation?.rating || existingEvaluation?.nota || 5);
   const [comentario, setComentario] = useState(existingEvaluation?.comment || existingEvaluation?.comentario || '');
   const [done, setDone] = useState(Boolean(existingEvaluation));
+  const [submittedNow, setSubmittedNow] = useState(false);
 
   useEffect(() => {
     if (!open) {
@@ -35,7 +36,20 @@ export default function AvaliacaoModal({
     setNota(existingEvaluation?.rating || existingEvaluation?.nota || 5);
     setComentario(existingEvaluation?.comment || existingEvaluation?.comentario || '');
     setDone(Boolean(existingEvaluation));
+    setSubmittedNow(false);
   }, [existingEvaluation?.id, open]);
+
+  useEffect(() => {
+    if (!open || !done || !submittedNow || typeof onSubmitted !== 'function') {
+      return undefined;
+    }
+
+    const timeoutId = window.setTimeout(() => {
+      onSubmitted();
+    }, 1400);
+
+    return () => window.clearTimeout(timeoutId);
+  }, [done, onSubmitted, open, submittedNow]);
 
   const salvar = useMutation({
     mutationFn: () => submitConsultaEvaluationRequest({
@@ -45,7 +59,12 @@ export default function AvaliacaoModal({
     }),
     onSuccess: async () => {
       setDone(true);
+      setSubmittedNow(true);
       await queryClient.invalidateQueries({ queryKey: ['teleconsulta-context', consultationId] });
+      toast({
+        title: 'Feedback enviado com sucesso.',
+        description: 'Obrigado pela sua avaliação.',
+      });
     },
     onError: (error) => {
       toast({
@@ -73,12 +92,14 @@ export default function AvaliacaoModal({
         <DialogContent className="text-center">
           <CheckCircle className="mx-auto mb-3 h-12 w-12 text-emerald-500" />
           <h3 className="text-lg font-semibold text-gray-900">Obrigado pela avaliacao!</h3>
-          <p className="mb-4 text-sm text-gray-500">Seu feedback e muito importante.</p>
+          <p className="mb-4 text-sm text-gray-500">
+            {submittedNow ? 'Seu feedback foi enviado. Redirecionando...' : 'Seu feedback e muito importante.'}
+          </p>
           <Button
             onClick={handleClose}
             className="w-full bg-emerald-600 text-white hover:bg-emerald-700"
           >
-            Voltar ao inicio
+            {submittedNow ? 'Ir agora' : 'Voltar ao inicio'}
           </Button>
         </DialogContent>
       </Dialog>

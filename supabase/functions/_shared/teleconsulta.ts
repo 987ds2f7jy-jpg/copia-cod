@@ -54,11 +54,15 @@ export type PatientSummaryRow = {
 
 export type ProfessionalIdentityRow = {
   profileId: string;
+  profileIds: string[];
   appUserId: string | null;
   fullName: string;
   specialty: string;
   source: 'professional_profiles';
 };
+
+export const ACTIVE_CONSULTATION_MAX_DURATION_MINUTES = 90;
+const ACTIVE_CONSULTATION_MAX_DURATION_MS = ACTIVE_CONSULTATION_MAX_DURATION_MINUTES * 60 * 1000;
 
 function toSafeString(value: unknown) {
   return String(value ?? '').trim();
@@ -86,17 +90,25 @@ export function resolveConsultaParticipantRole({
   consulta,
   appUserId,
   professionalProfileId,
+  professionalProfileIds,
 }: {
   consulta: ConsultationRow;
   appUserId: string;
   professionalProfileId?: string | null;
+  professionalProfileIds?: string[] | null;
 }) {
+  const normalizedProfileIds = new Set(
+    [professionalProfileId, ...(professionalProfileIds || [])]
+      .map((value) => toSafeString(value))
+      .filter(Boolean),
+  );
+
   if (consulta.paciente_id === appUserId) {
     return 'patient' as const;
   }
 
   if (
-    professionalProfileId === consulta.profissional_id ||
+    normalizedProfileIds.has(toSafeString(consulta.profissional_id)) ||
     consulta.profissional_user_id === appUserId ||
     consulta.profissional_id === appUserId
   ) {
@@ -123,6 +135,51 @@ export function calculateDurationMinutes(startedAt?: string | null, finishedAt?:
   }
 
   return Math.max(0, Math.round((finished.getTime() - started.getTime()) / 60000));
+}
+
+export function getConsultaStartTimestamp(consulta: {
+  inicio_at?: string | null;
+}) {
+  const startedAt = toSafeString(consulta.inicio_at);
+
+  if (!startedAt) {
+    return null;
+  }
+
+  const timestamp = Date.parse(startedAt);
+  return Number.isFinite(timestamp) ? timestamp : null;
+}
+
+export function getConsultaExpirationDate(consulta: {
+  inicio_at?: string | null;
+}) {
+  const startedAt = getConsultaStartTimestamp(consulta);
+
+  if (startedAt == null) {
+    return null;
+  }
+
+  return new Date(startedAt + ACTIVE_CONSULTATION_MAX_DURATION_MS);
+}
+
+export function isConsultaExpiredForResume(
+  consulta: {
+    status?: string | null;
+    inicio_at?: string | null;
+  },
+  now = Date.now(),
+) {
+  if (isConsultaClosed(consulta.status)) {
+    return false;
+  }
+
+  const startedAt = getConsultaStartTimestamp(consulta);
+
+  if (startedAt == null) {
+    return false;
+  }
+
+  return now - startedAt > ACTIVE_CONSULTATION_MAX_DURATION_MS;
 }
 
 export function mapConsultationRecord(row: ConsultationRow) {

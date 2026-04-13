@@ -59,11 +59,13 @@ export async function getProfessionalDashboard({
   }
 
   const professionalId = String(professional.id);
+  const professionalIds = await repository.listProfessionalIdsByAppUserId(appUserId);
+  const visibleProfessionalIds = professionalIds.length > 0 ? professionalIds : [professionalId];
   const publicProfile = await repository.findPublicProfileByProfessionalId(professionalId);
 
   const [availabilitySlots, appointments, queueAll] = await Promise.all([
     repository.listAvailabilitySlots(professionalId),
-    repository.listAppointments(professionalId, appointmentsLimit),
+    repository.listAppointments(visibleProfessionalIds, appointmentsLimit),
     repository.listQueueAll(professionalId, 100),
   ]);
 
@@ -77,8 +79,8 @@ export async function getProfessionalDashboard({
       ? repository.listPendingQuestions({ specialty: String(professional.specialty), limit: 50 })
       : Promise.resolve([]),
     includeQuestions ? repository.listPendingQuestionsAll(50) : Promise.resolve([]),
-    includeQuestions ? repository.listAnsweredQuestions({ professionalId, limit: 50 }) : Promise.resolve([]),
-    includeReviews ? repository.listReviews(professionalId, 100) : Promise.resolve([]),
+    includeQuestions ? repository.listAnsweredQuestions({ professionalIds: visibleProfessionalIds, limit: 50 }) : Promise.resolve([]),
+    includeReviews ? repository.listReviews(visibleProfessionalIds, 100) : Promise.resolve([]),
   ]);
 
   const mergedPending = [...pendingQuestionsBySpecialty, ...pendingQuestionsAll];

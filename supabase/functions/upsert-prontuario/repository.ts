@@ -72,8 +72,7 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
         .from('professional_profiles')
         .select('id, user_id, full_name, specialty')
         .eq('user_id', appUserId)
-        .order('created_date', { ascending: false })
-        .limit(1);
+        .order('created_date', { ascending: false });
 
       if (error) {
         throw new AppError({
@@ -84,7 +83,8 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
         });
       }
 
-      const row = (data?.[0] || null) as ProfessionalRow | null;
+      const rows = (data as ProfessionalRow[] | null) || [];
+      const row = rows[0] || null;
 
       if (!row?.id) {
         return null;
@@ -92,6 +92,7 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
 
       return {
         profileId: row.id,
+        profileIds: rows.map((item) => item.id).filter(Boolean),
         appUserId: row.user_id || null,
         fullName: row.full_name || '',
         specialty: row.specialty || '',

@@ -1,5 +1,7 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  getConsultaExpirationDate,
+  isConsultaExpiredForResume,
   isConsultaClosed,
   mapConsultaEvaluationRecord,
   mapConsultationRecord,
@@ -159,6 +161,28 @@ export async function getTeleconsultaContext({
     });
   }
 
+  const expiredForResume = isConsultaExpiredForResume(consultation);
+
+  if (expiredForResume) {
+    try {
+      const finishedAt = getConsultaExpirationDate(consultation)?.toISOString() || new Date().toISOString();
+
+      await Promise.all([
+        repository.closeExpiredConsultation({
+          consultationId: consultation.id,
+          finishedAt,
+        }),
+        repository.completeAppointmentsByConsultationId(consultation.id),
+        repository.completeQueueEntriesByConsultation(consultation),
+      ]);
+    } catch (error) {
+      console.warn('[get-teleconsulta-context] expired-consultation-reconciliation-failed', {
+        consultationId: consultation.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
+    }
+  }
+
   const professionalIdentity = appUser.role === 'professional'
     ? await repository.findProfessionalIdentityByAppUserId(appUser.id)
     : null;
@@ -167,6 +191,7 @@ export async function getTeleconsultaContext({
     consulta: consultation,
     appUserId: appUser.id,
     professionalProfileId: professionalIdentity?.profileId || null,
+    professionalProfileIds: professionalIdentity?.profileIds || [],
   });
 
   if (!participantRole) {
@@ -194,12 +219,20 @@ export async function getTeleconsultaContext({
   ]);
 
   return {
-    consultation: mapConsultationRecord(consultation),
+    consultation: mapConsultationRecord(
+      expiredForResume
+        ? {
+          ...consultation,
+          status: 'finalizada',
+          fim_at: consultation.fim_at || getConsultaExpirationDate(consultation)?.toISOString() || new Date().toISOString(),
+        }
+        : consultation,
+    ),
     participant: buildParticipantContext({
       appUserId: appUser.id,
       role: participantRole,
       professionalProfileId: professionalIdentity?.profileId || null,
-      consultationStatus: consultation.status || '',
+      consultationStatus: expiredForResume ? 'finalizada' : (consultation.status || ''),
     }),
     currentProntuario: currentProntuario ? mapProntuarioRecord(currentProntuario) : null,
     recentProntuarios: recentProntuarios.map(mapProntuarioRecord),

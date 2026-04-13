@@ -44,6 +44,12 @@ export type GetTeleconsultaContextRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findConsultationById(consultationId: string): Promise<ConsultationRow | null>;
   findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null>;
+  closeExpiredConsultation(params: {
+    consultationId: string;
+    finishedAt: string;
+  }): Promise<void>;
+  completeAppointmentsByConsultationId(consultationId: string): Promise<void>;
+  completeQueueEntriesByConsultation(consultation: ConsultationRow): Promise<void>;
   findProntuarioByConsultationId(consultationId: string): Promise<ProntuarioRow | null>;
   listPatientProntuarios(params: {
     patientId: string;

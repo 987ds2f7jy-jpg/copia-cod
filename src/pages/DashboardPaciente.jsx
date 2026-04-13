@@ -32,6 +32,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import ResumeConsultationCard from '@/components/teleconsulta/ResumeConsultationCard';
 import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
+import { isStaleActiveAppointment } from '@/lib/appointments';
 
 function DashboardPacienteInner() {
   const queryClient = useQueryClient();
@@ -105,12 +106,16 @@ function DashboardPacienteInner() {
   const upcomingAppointments = appointments.filter(a => {
     const dateStr = a.scheduled_datetime?.slice(0, 10) || a.date;
     const activeStatuses = ['pending', 'accepted', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO'];
-    return activeStatuses.includes(a.status) && (dateStr >= todayStr || a.status === 'in_progress');
+    return activeStatuses.includes(a.status) && (
+      dateStr >= todayStr ||
+      (a.status === 'in_progress' && !isStaleActiveAppointment(a))
+    );
   });
   const pastAppointments = appointments.filter(a => {
     const dateStr = a.scheduled_datetime?.slice(0, 10) || a.date;
     return ['completed', 'CONCLUIDO', 'EXPIRADO'].includes(a.status) || 
-      (dateStr < todayStr && !['accepted', 'in_progress', 'cancelled', 'CANCELADO', 'SOLICITADO', 'CONFIRMADO'].includes(a.status));
+      (dateStr < todayStr && !['accepted', 'in_progress', 'cancelled', 'CANCELADO', 'SOLICITADO', 'CONFIRMADO'].includes(a.status)) ||
+      isStaleActiveAppointment(a);
   });
   const cancelledAppointments = appointments.filter(a => ['cancelled', 'CANCELADO'].includes(a.status));
 

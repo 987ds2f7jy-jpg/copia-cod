@@ -19,15 +19,16 @@ export type GetProfessionalDashboardResult = {
 
 export type GetProfessionalDashboardRepository = {
   findProfessionalByAppUserId(appUserId: string): Promise<Record<string, unknown> | null>;
+  listProfessionalIdsByAppUserId(appUserId: string): Promise<string[]>;
   findPublicProfileByProfessionalId(professionalId: string): Promise<Record<string, unknown> | null>;
   listAvailabilitySlots(professionalId: string): Promise<Record<string, unknown>[]>;
-  listAppointments(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
+  listAppointments(professionalIds: string[], limit: number): Promise<Record<string, unknown>[]>;
   listQueueAll(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
   listQueueWaitingBySpecialty(params: { specialty: string; limit: number }): Promise<Record<string, unknown>[]>;
   listPendingQuestions(params: { specialty: string; limit: number }): Promise<Record<string, unknown>[]>;
   listPendingQuestionsAll(limit: number): Promise<Record<string, unknown>[]>;
-  listAnsweredQuestions(params: { professionalId: string; limit: number }): Promise<Record<string, unknown>[]>;
-  listReviews(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
+  listAnsweredQuestions(params: { professionalIds: string[]; limit: number }): Promise<Record<string, unknown>[]>;
+  listReviews(professionalIds: string[], limit: number): Promise<Record<string, unknown>[]>;
 };
 
 export type GetProfessionalDashboardCommand = {

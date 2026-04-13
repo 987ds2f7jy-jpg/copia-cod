@@ -37,8 +37,10 @@ export async function getFinanceDashboard({
   }
 
   const professionalId = String(professional.id);
+  const professionalIds = await repository.listProfessionalIdsByAppUserId(appUserId);
+  const visibleProfessionalIds = professionalIds.length > 0 ? professionalIds : [professionalId];
   const [appointments, saques, bankingData] = await Promise.all([
-    repository.listAppointments(professionalId, appointmentsLimit),
+    repository.listAppointments(visibleProfessionalIds, appointmentsLimit),
     repository.listSaques(professionalId, saquesLimit),
     repository.getBankingData(professionalId),
   ]);

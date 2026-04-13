@@ -12,7 +12,8 @@ export type GetFinanceDashboardResult = {
 
 export type GetFinanceDashboardRepository = {
   findProfessionalByAppUserId(appUserId: string): Promise<Record<string, unknown> | null>;
-  listAppointments(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
+  listProfessionalIdsByAppUserId(appUserId: string): Promise<string[]>;
+  listAppointments(professionalIds: string[], limit: number): Promise<Record<string, unknown>[]>;
   listSaques(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
   getBankingData(professionalId: string): Promise<Record<string, unknown> | null>;
 };

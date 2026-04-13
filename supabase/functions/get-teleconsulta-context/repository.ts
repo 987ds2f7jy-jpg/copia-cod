@@ -70,8 +70,7 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
         .from('professional_profiles')
         .select('id, user_id, full_name, specialty')
         .eq('user_id', appUserId)
-        .order('created_date', { ascending: false })
-        .limit(1);
+        .order('created_date', { ascending: false });
 
       if (error) {
         throw new AppError({
@@ -82,7 +81,8 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
         });
       }
 
-      const row = (data?.[0] || null) as ProfessionalRow | null;
+      const rows = (data as ProfessionalRow[] | null) || [];
+      const row = rows[0] || null;
 
       if (!row?.id) {
         return null;
@@ -90,11 +90,72 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
 
       return {
         profileId: row.id,
+        profileIds: rows.map((item) => item.id).filter(Boolean),
         appUserId: row.user_id || null,
         fullName: row.full_name || '',
         specialty: row.specialty || '',
         source: 'professional_profiles',
       };
+    },
+
+    async closeExpiredConsultation({ consultationId, finishedAt }) {
+      const { error } = await client
+        .from('consultas')
+        .update({
+          status: 'finalizada',
+          fim_at: finishedAt,
+        })
+        .eq('id', consultationId)
+        .in('status', ['aguardando', 'em_atendimento', 'in_progress']);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_CLOSE_FAILED',
+          message: 'Unable to close expired telemedicine consultation.',
+          details: error.message,
+        });
+      }
+    },
+
+    async completeAppointmentsByConsultationId(consultationId: string) {
+      const { error } = await client
+        .from('appointments')
+        .update({ status: 'completed' })
+        .eq('consulta_id', consultationId)
+        .not('status', 'in', '(completed,cancelled,CONCLUIDO,CANCELADO)');
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_APPOINTMENTS_CLOSE_FAILED',
+          message: 'Unable to reconcile expired appointment records.',
+          details: error.message,
+        });
+      }
+    },
+
+    async completeQueueEntriesByConsultation(consultation: ConsultationRow) {
+      if (consultation.tipo_consulta !== 'plantao') {
+        return;
+      }
+
+      const { error } = await client
+        .from('queues')
+        .update({ status: 'completed' })
+        .eq('patient_id', consultation.paciente_id)
+        .eq('assigned_professional_id', consultation.profissional_id)
+        .eq('specialty', consultation.especialidade || '')
+        .in('status', ['assigned', 'waiting', 'in_progress', 'em_atendimento']);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'EXPIRED_CONSULTATION_QUEUE_CLOSE_FAILED',
+          message: 'Unable to reconcile expired queue entries.',
+          details: error.message,
+        });
+      }
     },
 
     async findProntuarioByConsultationId(consultationId: string): Promise<ProntuarioRow | null> {

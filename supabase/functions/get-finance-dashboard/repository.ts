@@ -29,11 +29,36 @@ async function findProfessionalByAppUserId(client: SupabaseClient, appUserId: st
   return (data as Record<string, unknown> | null) || null;
 }
 
-async function listAppointments(client: SupabaseClient, professionalId: string, limit: number) {
+async function listProfessionalIdsByAppUserId(client: SupabaseClient, appUserId: string) {
+  const { data, error } = await client
+    .from('professional_profiles')
+    .select('id')
+    .eq('user_id', appUserId)
+    .order('created_date', { ascending: false });
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PROFESSIONAL_PROFILE_IDS_LOOKUP_FAILED',
+      message: 'Unable to load professional profile ids.',
+      details: error.message,
+    });
+  }
+
+  return ((data as Array<{ id: string | null }> | null) || [])
+    .map((row) => String(row?.id || '').trim())
+    .filter(Boolean);
+}
+
+async function listAppointments(client: SupabaseClient, professionalIds: string[], limit: number) {
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
   const { data, error } = await client
     .from('appointments')
     .select('*')
-    .eq('professional_id', professionalId)
+    .in('professional_id', professionalIds)
     .order('date', { ascending: false })
     .limit(limit);
 
@@ -93,7 +118,8 @@ async function getBankingData(client: SupabaseClient, professionalId: string) {
 function createGetFinanceDashboardRepository(client: SupabaseClient): GetFinanceDashboardRepository {
   return {
     findProfessionalByAppUserId: (appUserId) => findProfessionalByAppUserId(client, appUserId),
-    listAppointments: (professionalId, limit) => listAppointments(client, professionalId, limit),
+    listProfessionalIdsByAppUserId: (appUserId) => listProfessionalIdsByAppUserId(client, appUserId),
+    listAppointments: (professionalIds, limit) => listAppointments(client, professionalIds, limit),
     listSaques: (professionalId, limit) => listSaques(client, professionalId, limit),
     getBankingData: (professionalId) => getBankingData(client, professionalId),
   };

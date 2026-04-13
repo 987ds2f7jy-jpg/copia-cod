@@ -102,6 +102,26 @@ export async function submitConsultaEvaluation({
     professionalId: consultation.profissional_id,
   });
 
+  let appointment = null;
+
+  try {
+    appointment = await repository.findAppointmentByConsultationId(consultation.id);
+  } catch (error) {
+    console.warn('[submit-consulta-evaluation] appointment-lookup-failed', {
+      requestId,
+      consultationId: consultation.id,
+      error: error instanceof Error ? error.message : String(error),
+    });
+  }
+
+  if (appointment?.id && appointment.patient_id !== appUser.id) {
+    throw new AppError({
+      status: 409,
+      code: 'APPOINTMENT_PATIENT_MISMATCH',
+      message: 'Related appointment does not belong to the authenticated patient.',
+    });
+  }
+
   const evaluation = await repository.createConsultaEvaluation({
     consultationId: consultation.id,
     patientId: appUser.id,
@@ -110,60 +130,60 @@ export async function submitConsultaEvaluation({
     comment: input.comment,
   });
 
-  const appointment = await repository.findAppointmentByConsultationId(consultation.id);
   let reviewSynced = false;
   let reviewStats: SubmitConsultaEvaluationResult['reviewStats'] = null;
 
   if (appointment?.id) {
-    if (!APPOINTMENT_COMPLETED_STATUSES.has(String(appointment.status || '')) && !APPOINTMENT_CANCELLED_STATUSES.has(String(appointment.status || ''))) {
-      await repository.updateAppointmentStatus({
-        appointmentId: appointment.id,
-        status: 'completed',
-      });
-    }
+    try {
+      if (!APPOINTMENT_COMPLETED_STATUSES.has(String(appointment.status || '')) && !APPOINTMENT_CANCELLED_STATUSES.has(String(appointment.status || ''))) {
+        await repository.updateAppointmentStatus({
+          appointmentId: appointment.id,
+          status: 'completed',
+        });
+      }
 
-    if (appointment.patient_id !== appUser.id) {
-      throw new AppError({
-        status: 409,
-        code: 'APPOINTMENT_PATIENT_MISMATCH',
-        message: 'Related appointment does not belong to the authenticated patient.',
-      });
-    }
-
-    if (appointment.professional_id) {
-      const existingReview = await repository.findExistingReview({
-        appointmentId: appointment.id,
-        patientId: appUser.id,
-      });
-
-      if (!existingReview?.id) {
-        await repository.createReview({
+      if (appointment.professional_id) {
+        const existingReview = await repository.findExistingReview({
           appointmentId: appointment.id,
           patientId: appUser.id,
-          patientName: appUser.fullName || appUser.email || 'Paciente',
-          professionalId: appointment.professional_id,
-          rating: input.rating,
-          comment: input.comment,
         });
 
-        const allReviews = await repository.listReviewsByProfessionalId(appointment.professional_id);
-        const totalReviews = allReviews.length;
-        const averageRating = totalReviews > 0
-          ? roundRating(allReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / totalReviews)
-          : 0;
+        if (!existingReview?.id) {
+          await repository.createReview({
+            appointmentId: appointment.id,
+            patientId: appUser.id,
+            patientName: appUser.fullName || appUser.email || 'Paciente',
+            professionalId: appointment.professional_id,
+            rating: input.rating,
+            comment: input.comment,
+          });
 
-        await repository.updateProfessionalReviewStats({
-          professionalId: appointment.professional_id,
-          averageRating,
-          totalReviews,
-        });
+          const allReviews = await repository.listReviewsByProfessionalId(appointment.professional_id);
+          const totalReviews = allReviews.length;
+          const averageRating = totalReviews > 0
+            ? roundRating(allReviews.reduce((sum, item) => sum + Number(item.rating || 0), 0) / totalReviews)
+            : 0;
 
-        reviewSynced = true;
-        reviewStats = {
-          averageRating,
-          totalReviews,
-        };
+          await repository.updateProfessionalReviewStats({
+            professionalId: appointment.professional_id,
+            averageRating,
+            totalReviews,
+          });
+
+          reviewSynced = true;
+          reviewStats = {
+            averageRating,
+            totalReviews,
+          };
+        }
       }
+    } catch (error) {
+      console.warn('[submit-consulta-evaluation] review-sync-failed', {
+        requestId,
+        consultationId: consultation.id,
+        appointmentId: appointment.id,
+        error: error instanceof Error ? error.message : String(error),
+      });
     }
   }
 

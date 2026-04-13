@@ -10,8 +10,14 @@ export type GetMyActiveConsultationRepository = {
   listActiveConsultationsForPatient(appUserId: string): Promise<ActiveConsultationRow[]>;
   listActiveConsultationsForProfessional(params: {
     appUserId: string;
-    professionalProfileId: string | null;
+    professionalProfileIds: string[];
   }): Promise<ActiveConsultationRow[]>;
+  closeExpiredConsultation(params: {
+    consultationId: string;
+    finishedAt: string;
+  }): Promise<void>;
+  completeAppointmentsByConsultationId(consultationId: string): Promise<void>;
+  completeQueueEntriesByConsultation(consultation: ActiveConsultationRow): Promise<void>;
 };
 
 export type GetMyActiveConsultationResult = {

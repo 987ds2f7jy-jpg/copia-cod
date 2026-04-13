@@ -66,6 +66,7 @@ export async function upsertProntuario({
     consulta: consultation,
     appUserId: appUser.id,
     professionalProfileId: professionalIdentity?.profileId || null,
+    professionalProfileIds: professionalIdentity?.profileIds || [],
   });
 
   if (participantRole !== 'professional') {

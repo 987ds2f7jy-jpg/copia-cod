@@ -1,4 +1,6 @@
 import {
+  getConsultaExpirationDate,
+  isConsultaExpiredForResume,
   mapConsultationRecord,
   resolveConsultaParticipantRole,
 } from '../_shared/teleconsulta.ts';
@@ -98,10 +100,37 @@ export async function getMyActiveConsultation({
     ? await repository.listActiveConsultationsForPatient(appUser.id)
     : await repository.listActiveConsultationsForProfessional({
       appUserId: appUser.id,
-      professionalProfileId: professionalIdentity?.profileId || null,
+      professionalProfileIds: professionalIdentity?.profileIds || [],
     });
 
-  const consultation = pickBestActiveConsultation(activeConsultations);
+  const expiredConsultations = activeConsultations.filter((row) => isConsultaExpiredForResume(row));
+
+  if (expiredConsultations.length > 0) {
+    await Promise.all(expiredConsultations.map(async (consultationRow) => {
+      try {
+        const finishedAt = getConsultaExpirationDate(consultationRow)?.toISOString() || new Date().toISOString();
+
+        await Promise.all([
+          repository.closeExpiredConsultation({
+            consultationId: consultationRow.id,
+            finishedAt,
+          }),
+          repository.completeAppointmentsByConsultationId(consultationRow.id),
+          repository.completeQueueEntriesByConsultation(consultationRow),
+        ]);
+      } catch (error) {
+        console.warn('[get-my-active-consultation] expired-consultation-reconciliation-failed', {
+          requestId,
+          consultationId: consultationRow.id,
+          error: error instanceof Error ? error.message : String(error),
+        });
+      }
+    }));
+  }
+
+  const validConsultations = activeConsultations.filter((row) => !isConsultaExpiredForResume(row));
+
+  const consultation = pickBestActiveConsultation(validConsultations);
 
   if (!consultation?.id) {
     return buildEmptyResult();
@@ -111,17 +140,18 @@ export async function getMyActiveConsultation({
     consulta: consultation,
     appUserId: appUser.id,
     professionalProfileId: professionalIdentity?.profileId || null,
+    professionalProfileIds: professionalIdentity?.profileIds || [],
   });
 
   if (!participantRole) {
     return buildEmptyResult();
   }
 
-  if (activeConsultations.length > 1) {
+  if (validConsultations.length > 1) {
     console.warn('[get-my-active-consultation] multiple-active-consultations', {
       requestId,
       appUserId: appUser.id,
-      consultationIds: activeConsultations.map((row) => row.id),
+      consultationIds: validConsultations.map((row) => row.id),
       selectedConsultationId: consultation.id,
     });
   }

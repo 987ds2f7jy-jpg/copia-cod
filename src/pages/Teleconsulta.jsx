@@ -133,6 +133,20 @@ function TeleconsultaInner({ consultationId }) {
     await queryClient.invalidateQueries({ queryKey: ['myActiveConsultation', user.id] });
   };
 
+  const refreshDashboardQueries = async () => {
+    if (!user?.id) {
+      return;
+    }
+
+    await Promise.all([
+      queryClient.invalidateQueries({ queryKey: ['patientAppointments', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['patientReviews', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['profAppts'] }),
+      queryClient.invalidateQueries({ queryKey: ['myProfessionalProfile', user.id] }),
+      queryClient.invalidateQueries({ queryKey: ['myPublicProfile'] }),
+    ]);
+  };
+
   const startConsulta = useMutation({
     mutationFn: () => startConsultaSessionRequest({ consultationId }),
     onSuccess: async () => {
@@ -153,6 +167,7 @@ function TeleconsultaInner({ consultationId }) {
     onSuccess: async () => {
       await refreshContext();
       await refreshActiveConsultation();
+      await refreshDashboardQueries();
       toast({
         title: 'Consulta finalizada com sucesso.',
       });
@@ -365,6 +380,7 @@ function TeleconsultaInner({ consultationId }) {
 
       await queryClient.cancelQueries({ queryKey: ['teleconsulta-context', consultationId] });
       await refreshActiveConsultation();
+      await refreshDashboardQueries();
       await zoomSession.leave();
       navigate(getDashboardPath(participant?.role));
     } catch {
