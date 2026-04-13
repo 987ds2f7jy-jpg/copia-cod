@@ -4,6 +4,7 @@ import { Switch } from "@/components/ui/switch";
 import { Badge } from "@/components/ui/badge";
 import { Zap, Users, Clock, TrendingUp, DollarSign, AlertCircle } from 'lucide-react';
 import { canWorkOnDuty } from '@/lib/professionals';
+import { isCompletedAppointmentStatus, isDutyAppointmentRecord } from '@/lib/appointments';
 
 const fmt = (v) => `R$ ${Number(v || 0).toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`;
 
@@ -11,8 +12,8 @@ export default function PlantaoBlock({ professional, isOnDuty = false, canToggle
   const podeAtualPlantao = canWorkOnDuty(professional?.specialty);
 
   const instantAppts = appointments.filter(a =>
-    (a.appointment_type === 'instant' || a.tipo_consulta === 'plantao') &&
-    ['completed', 'CONCLUIDO', 'finalizada'].includes(a.status)
+    isDutyAppointmentRecord(a) &&
+    (isCompletedAppointmentStatus(a.status) || a.status === 'finalizada')
   );
   const revenue = instantAppts.reduce((s, a) => s + (a.price || a.preco || 0), 0);
   const queueCompleted = queueAll.filter(a => ['completed', 'in_progress', 'finalizada', 'em_atendimento'].includes(a.status));

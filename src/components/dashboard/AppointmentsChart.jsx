@@ -3,6 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Legend } from 'recharts';
 import { subDays, subMonths, format, eachDayOfInterval, eachMonthOfInterval } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { isCancelledAppointmentStatus, isDutyAppointmentRecord } from '@/lib/appointments';
 
 export default function AppointmentsChart({ appointments }) {
   const [view, setView] = useState('week');
@@ -10,8 +11,16 @@ export default function AppointmentsChart({ appointments }) {
 
   const buildData = (items) => items.map(item => ({
     ...item,
-    agendado: appointments.filter(a => a.date?.startsWith(item.key) && a.appointment_type !== 'instant' && a.status !== 'cancelled').length,
-    plantao: appointments.filter(a => a.date?.startsWith(item.key) && a.appointment_type === 'instant' && a.status !== 'cancelled').length,
+    agendado: appointments.filter(a =>
+      a.date?.startsWith(item.key) &&
+      !isDutyAppointmentRecord(a) &&
+      !isCancelledAppointmentStatus(a.status)
+    ).length,
+    plantao: appointments.filter(a =>
+      a.date?.startsWith(item.key) &&
+      isDutyAppointmentRecord(a) &&
+      !isCancelledAppointmentStatus(a.status)
+    ).length,
   }));
 
   const weekData = buildData(
