@@ -194,6 +194,17 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
         .single();
 
       if (error) {
+        // Handle unique constraint violation (PostgreSQL error code 23505)
+        // This occurs when two concurrent requests try to book the same professional at the same time
+        if (error.code === '23505') {
+          throw new AppError({
+            status: 409,
+            code: 'APPOINTMENT_SLOT_ALREADY_BOOKED',
+            message: 'Selected slot is no longer available.',
+            details: 'Another appointment was just created for this time slot.',
+          });
+        }
+
         throw new AppError({
           status: 500,
           code: 'APPOINTMENT_CREATE_FAILED',
