@@ -101,26 +101,21 @@ export async function joinQueue({
     });
   }
 
-  const waitingCount = await repository.countWaitingQueueBySpecialty(input.specialty);
-  const position = waitingCount + 1;
-  const estimatedWaitTime = position * 10;
-
   console.info('[join-queue] request:start', {
     requestId,
     patientId: appUser.id,
     specialty: normalizedSpecialty,
-    position,
   });
 
-  const queueEntry = await repository.createQueueEntry({
+  // Use atomic RPC function to ensure unique queue positions
+  // This prevents race condition when multiple concurrent requests join queue
+  const queueEntry = await repository.createQueueEntryAtomic({
     patientId: appUser.id,
     patientName: appUser.fullName,
     patientEmail: appUser.email,
     specialty: input.specialty,
     symptoms: input.symptoms,
     priorityLevel: input.priorityLevel,
-    position,
-    estimatedWaitTime,
     solicitacaoExameId: input.solicitacaoExameId,
   });
 

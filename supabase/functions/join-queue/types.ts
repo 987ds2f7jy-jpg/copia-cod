@@ -66,15 +66,13 @@ export type JoinQueueRepository = {
   findCurrentActiveQueueEntry(patientId: string): Promise<QueueRecord | null>;
   listOnDutyPublicProfiles(): Promise<PublicProfileRecord[]>;
   countWaitingQueueBySpecialty(specialty: string): Promise<number>;
-  createQueueEntry(params: {
+  createQueueEntryAtomic(params: {
     patientId: string;
     patientName: string;
     patientEmail: string;
     specialty: string;
     symptoms: string;
     priorityLevel: string;
-    position: number;
-    estimatedWaitTime: number;
     solicitacaoExameId: string;
   }): Promise<QueueRecord>;
 };

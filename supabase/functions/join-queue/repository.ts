@@ -208,6 +208,39 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
 
       return row;
     },
+
+    async createQueueEntryAtomic(params): Promise<QueueRecord> {
+      const { data, error } = await client.rpc('add_to_queue_atomic', {
+        p_patient_id: params.patientId,
+        p_patient_name: params.patientName,
+        p_patient_email: params.patientEmail,
+        p_specialty: params.specialty,
+        p_symptoms: params.symptoms,
+        p_priority_level: params.priorityLevel,
+        p_solicitacao_exame_id: params.solicitacaoExameId,
+      });
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'QUEUE_CREATE_ATOMIC_FAILED',
+          message: 'Unable to create queue entry.',
+          details: error.message,
+        });
+      }
+
+      const row = (data as QueueRecord[] | null)?.[0];
+
+      if (!row?.id) {
+        throw new AppError({
+          status: 500,
+          code: 'INVALID_QUEUE_RESPONSE',
+          message: 'Queue creation returned an invalid response.',
+        });
+      }
+
+      return row;
+    },
   };
 }
 
