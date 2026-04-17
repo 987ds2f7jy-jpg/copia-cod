@@ -30,13 +30,15 @@ export default function HomeHeroCarousel() {
   const [api, setApi] = React.useState(null);
   const [selectedIndex, setSelectedIndex] = React.useState(0);
   const [isAutoPlayPaused, setIsAutoPlayPaused] = React.useState(false);
-  const { data } = useQuery({
+  const { data, isLoading, isFetched } = useQuery({
     queryKey: ['home-banners', 'hero'],
     queryFn: getHomeBannersRequest,
     staleTime: 15 * 60 * 1000,
   });
 
-  const banners = Array.isArray(data) && data.length > 0 ? data : FALLBACK_BANNERS;
+  const resolvedBanners = Array.isArray(data) && data.length > 0 ? data : null;
+  const shouldShowFallback = isFetched && !resolvedBanners;
+  const banners = resolvedBanners ?? (shouldShowFallback ? FALLBACK_BANNERS : []);
   const hasMultipleBanners = banners.length > 1;
 
   React.useEffect(() => {
@@ -85,32 +87,39 @@ export default function HomeHeroCarousel() {
       onBlurCapture={() => setIsAutoPlayPaused(false)}
     >
       <div className="relative overflow-hidden rounded-3xl shadow-2xl bg-emerald-50">
-        <Carousel
-          setApi={setApi}
-          opts={{
-            loop: hasMultipleBanners,
-            align: 'start',
-          }}
-          className="w-full"
-        >
-          <CarouselContent className="-ml-0">
-            {banners.map((banner, index) => (
-              <CarouselItem key={banner.id} className="pl-0">
-                <div className="aspect-[6/7] w-full overflow-hidden">
-                  <img
-                    src={banner.imageUrl}
-                    alt={banner.altText || banner.title || 'Banner da home'}
-                    className="h-full w-full object-cover"
-                    style={{ objectPosition: getObjectPosition(banner) }}
-                    loading={index === 0 ? 'eager' : 'lazy'}
-                    fetchPriority={index === 0 ? 'high' : 'auto'}
-                    draggable={false}
-                  />
-                </div>
-              </CarouselItem>
-            ))}
-          </CarouselContent>
-        </Carousel>
+        {isLoading && banners.length === 0 ? (
+          <div className="relative aspect-[6/7] w-full overflow-hidden bg-gradient-to-br from-emerald-100 via-white to-teal-100">
+            <div className="absolute inset-0 bg-[radial-gradient(circle_at_top_right,rgba(16,185,129,0.22),transparent_38%),radial-gradient(circle_at_bottom_left,rgba(20,184,166,0.18),transparent_34%)]" />
+            <div className="absolute inset-0 animate-pulse bg-white/20" aria-hidden="true" />
+          </div>
+        ) : (
+          <Carousel
+            setApi={setApi}
+            opts={{
+              loop: hasMultipleBanners,
+              align: 'start',
+            }}
+            className="w-full"
+          >
+            <CarouselContent className="-ml-0">
+              {banners.map((banner, index) => (
+                <CarouselItem key={banner.id} className="pl-0">
+                  <div className="aspect-[6/7] w-full overflow-hidden">
+                    <img
+                      src={banner.imageUrl}
+                      alt={banner.altText || banner.title || 'Banner da home'}
+                      className="h-full w-full object-cover"
+                      style={{ objectPosition: getObjectPosition(banner) }}
+                      loading={index === 0 ? 'eager' : 'lazy'}
+                      fetchPriority={index === 0 ? 'high' : 'auto'}
+                      draggable={false}
+                    />
+                  </div>
+                </CarouselItem>
+              ))}
+            </CarouselContent>
+          </Carousel>
+        )}
 
         {hasMultipleBanners && (
           <>
