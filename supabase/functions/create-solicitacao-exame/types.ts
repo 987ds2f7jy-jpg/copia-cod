@@ -1,5 +1,6 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
 import type { AppUserRecord } from '../_shared/appUsers.ts';
+import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
 
 export type JsonValue =
   | string
@@ -56,6 +57,16 @@ export type SolicitacaoExameRecord = {
   arquivos: string[] | null;
   arquivos_urls: string[] | null;
   queue_id: string | null;
+  service_code: string | null;
+  price_source: string | null;
+  quoted_gross_price: number | null;
+  quoted_platform_fee_percent: number | null;
+  quoted_platform_fee_amount: number | null;
+  quoted_professional_net_amount: number | null;
+  pricing_rule_id: string | null;
+  fee_rule_id: string | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
   created_date: string;
   updated_at: string;
 };
@@ -82,6 +93,7 @@ export type CreateSolicitacaoExameParams = {
   arquivos: string[];
   arquivosUrls: string[];
   queueId: string;
+  pricing: ResolvedServicePricing;
 };
 
 export type CreateSolicitacaoExameResult = {
@@ -93,6 +105,7 @@ export type ErrorResponse = ApiErrorResponse;
 
 export type CreateSolicitacaoExameRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
+  resolveServicePricing(input: ResolveServicePricingInput): Promise<ResolvedServicePricing>;
   createSolicitacaoExame(params: CreateSolicitacaoExameParams): Promise<SolicitacaoExameRecord>;
 };
 

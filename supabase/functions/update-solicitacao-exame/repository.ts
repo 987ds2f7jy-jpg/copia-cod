@@ -40,9 +40,48 @@ function selectSolicitacaoExameColumns() {
     arquivos,
     arquivos_urls,
     queue_id,
+    service_code,
+    price_source,
+    quoted_gross_price,
+    quoted_platform_fee_percent,
+    quoted_platform_fee_amount,
+    quoted_professional_net_amount,
+    pricing_rule_id,
+    fee_rule_id,
+    payment_status,
+    current_payment_charge_id,
     created_date,
     updated_at
   `;
+}
+
+function mapSolicitacaoUpdateError(error: { message?: string; details?: string }) {
+  const code = String(error.message || '').trim();
+
+  if (code === 'SOLICITACAO_EXAME_PAYMENT_REQUIRED') {
+    return new AppError({
+      status: 402,
+      code,
+      message: 'Exam/service request payment must be confirmed before workflow updates.',
+      details: error.details,
+    });
+  }
+
+  if (code === 'SOLICITACAO_EXAME_PAYMENT_CHARGE_REQUIRED') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Exam/service request is missing the active payment charge required for workflow updates.',
+      details: error.details,
+    });
+  }
+
+  return new AppError({
+    status: 500,
+    code: 'SOLICITACAO_EXAME_UPDATE_FAILED',
+    message: 'Unable to update exam request.',
+    details: error.message,
+  });
 }
 
 function createUpdateSolicitacaoExameRepository(client: SupabaseClient): UpdateSolicitacaoExameRepository {
@@ -93,12 +132,7 @@ function createUpdateSolicitacaoExameRepository(client: SupabaseClient): UpdateS
         .single();
 
       if (error) {
-        throw new AppError({
-          status: 500,
-          code: 'SOLICITACAO_EXAME_UPDATE_FAILED',
-          message: 'Unable to update exam request.',
-          details: error.message,
-        });
+        throw mapSolicitacaoUpdateError(error);
       }
 
       const row = data as SolicitacaoExameRecord | null;

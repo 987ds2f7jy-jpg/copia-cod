@@ -1,5 +1,6 @@
 import { AppError } from '../_shared/errors.ts';
 import type { AppUserRecord } from '../_shared/appUsers.ts';
+import { getSolicitacaoExameServiceCode } from '../_shared/pricing/service-codes.ts';
 import type {
   CreateSolicitacaoExameCommand,
   CreateSolicitacaoExameRepository,
@@ -142,13 +143,26 @@ export async function createSolicitacaoExame({
       });
   }
 
+  const serviceCode = getSolicitacaoExameServiceCode(input.tipo);
+
+  if (!serviceCode) {
+    throw new AppError({
+      status: 422,
+      code: 'SOLICITACAO_EXAME_SERVICE_NOT_PRICED',
+      message: 'Exam request type is not supported for pricing.',
+      details: { tipo: input.tipo },
+    });
+  }
+
   const dadosSaude = informacoesSaude;
   const arquivosUrls = arquivos;
+  const pricing = await repository.resolveServicePricing({ serviceCode });
 
   console.info('[create-solicitacao-exame] request:start', {
     requestId,
     patientId: appUser.id,
     tipo: input.tipo,
+    serviceCode,
     fluxoDestino,
     especialidadeDestino,
   });
@@ -175,6 +189,7 @@ export async function createSolicitacaoExame({
     arquivos,
     arquivosUrls,
     queueId,
+    pricing,
   });
 
   console.info('[create-solicitacao-exame] request:success', {
@@ -182,6 +197,8 @@ export async function createSolicitacaoExame({
     solicitacaoExameId: solicitacaoExame.id,
     patientId: solicitacaoExame.paciente_id,
     tipo: solicitacaoExame.tipo,
+    serviceCode: solicitacaoExame.service_code,
+    quotedGrossPrice: solicitacaoExame.quoted_gross_price,
   });
 
   return {

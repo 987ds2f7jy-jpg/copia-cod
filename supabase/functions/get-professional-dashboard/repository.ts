@@ -152,6 +152,7 @@ async function listAppointments(client: SupabaseClient, professionalIds: string[
     .from('appointments')
     .select('*')
     .in('professional_id', professionalIds)
+    .or('payment_status.eq.paid,payment_required.eq.false')
     .order('date', { ascending: false })
     .limit(limit);
 
@@ -193,6 +194,7 @@ async function listQueueWaitingBySpecialty(client: SupabaseClient, specialty: st
     .select('*')
     .eq('specialty', specialty)
     .eq('status', 'waiting')
+    .eq('payment_status', 'paid')
     .order('created_date', { ascending: true })
     .limit(limit);
 

@@ -1,4 +1,5 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
+import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
 
 export type CreateAppointmentInput = {
   professionalProfileId: string | null;
@@ -49,6 +50,16 @@ export type AppointmentRecord = {
   time: string | null;
   status: string | null;
   price: number | null;
+  service_code: string | null;
+  price_source: string | null;
+  gross_price: number | null;
+  platform_fee_percent: number | null;
+  platform_fee_amount: number | null;
+  professional_net_amount: number | null;
+  pricing_rule_id: string | null;
+  fee_rule_id: string | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
   symptoms: string | null;
   accepted_at: string | null;
   consulta_id: string | null;
@@ -75,6 +86,7 @@ export type ErrorResponse = ApiErrorResponse;
 export type CreateAppointmentRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findProfessionalTargetById(profileId: string): Promise<ProfessionalTargetRecord | null>;
+  resolveServicePricing(input: ResolveServicePricingInput): Promise<ResolvedServicePricing>;
   listAvailabilitySlots(profileId: string): Promise<AvailabilitySlotRecord[]>;
   hasActiveAppointmentConflict(params: {
     professionalId: string;
@@ -93,6 +105,7 @@ export type CreateAppointmentRepository = {
     time: string;
     status: string;
     price: number;
+    pricing: ResolvedServicePricing;
     symptoms: string;
   }): Promise<AppointmentRecord>;
 };

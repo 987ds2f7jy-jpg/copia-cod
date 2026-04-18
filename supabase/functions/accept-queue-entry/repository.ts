@@ -192,6 +192,48 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
+  if (
+    code === 'QUEUE_PRICING_SNAPSHOT_REQUIRED' ||
+    code === 'QUEUE_PRICE_SOURCE_INVALID' ||
+    code === 'QUEUE_PRICE_SNAPSHOT_INVALID' ||
+    code === 'QUEUE_FEE_SNAPSHOT_INVALID' ||
+    code === 'QUEUE_PAYMENT_STATUS_REQUIRED'
+  ) {
+    return new AppError({
+      status: 422,
+      code,
+      message: 'Queue pricing snapshot is incomplete or invalid.',
+      details,
+    });
+  }
+
+  if (code === 'QUEUE_PAYMENT_REQUIRED') {
+    return new AppError({
+      status: 402,
+      code,
+      message: 'Queue entry payment must be confirmed before acceptance.',
+      details,
+    });
+  }
+
+  if (code === 'QUEUE_PAYMENT_CHARGE_REQUIRED') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Queue entry is missing the active payment charge required for acceptance.',
+      details,
+    });
+  }
+
+  if (code === 'SOLICITACAO_EXAME_NOT_FOUND_FOR_QUEUE') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Queue references an exam request that no longer exists.',
+      details,
+    });
+  }
+
   if (code === 'PROFESSIONAL_APP_USER_REQUIRED' || code === 'PROFESSIONAL_PROFILE_REQUIRED') {
     return new AppError({
       status: 500,

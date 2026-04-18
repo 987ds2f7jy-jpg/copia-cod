@@ -1,5 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
+import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -111,6 +113,10 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
       return loadProfessionalTarget(client, profileId);
     },
 
+    async resolveServicePricing(input) {
+      return resolveServicePricing(client, input);
+    },
+
     async listAvailabilitySlots(profileId: string): Promise<AvailabilitySlotRecord[]> {
       const { data, error } = await client
         .from('availability_slots')
@@ -171,6 +177,16 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           time: params.time,
           status: params.status,
           price: params.price,
+          service_code: params.pricing.serviceCode,
+          price_source: params.pricing.priceSource,
+          gross_price: params.pricing.grossPrice,
+          platform_fee_percent: params.pricing.platformFeePercent,
+          platform_fee_amount: params.pricing.platformFeeAmount,
+          professional_net_amount: params.pricing.professionalNetAmount,
+          pricing_rule_id: params.pricing.pricingRuleId,
+          fee_rule_id: params.pricing.feeRuleId,
+          pricing_estimated: false,
+          payment_status: 'payment_pending',
           symptoms: params.symptoms,
         })
         .select(`
@@ -187,6 +203,16 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           time,
           status,
           price,
+          service_code,
+          price_source,
+          gross_price,
+          platform_fee_percent,
+          platform_fee_amount,
+          professional_net_amount,
+          pricing_rule_id,
+          fee_rule_id,
+          payment_status,
+          current_payment_charge_id,
           symptoms,
           accepted_at,
           consulta_id
@@ -212,7 +238,17 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
         });
       }
 
-      return row;
+      const paymentCharge = await createPaymentCharge(client, {
+        ownerType: 'appointment',
+        ownerId: row.id,
+        amount: Number(row.gross_price),
+        currency: 'BRL',
+      });
+
+      return {
+        ...row,
+        current_payment_charge_id: paymentCharge.paymentChargeId,
+      };
     },
   };
 }

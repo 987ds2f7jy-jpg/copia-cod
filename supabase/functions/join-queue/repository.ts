@@ -1,5 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
+import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -94,7 +96,17 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           position,
           estimated_wait_time,
           assigned_professional_id,
-          solicitacao_exame_id
+          solicitacao_exame_id,
+          service_code,
+          price_source,
+          quoted_gross_price,
+          quoted_platform_fee_percent,
+          quoted_platform_fee_amount,
+          quoted_professional_net_amount,
+          pricing_rule_id,
+          fee_rule_id,
+          payment_status,
+          current_payment_charge_id
         `)
         .eq('patient_id', patientId)
         .in('status', ['waiting', 'in_progress', 'em_atendimento'])
@@ -137,6 +149,10 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
       }));
     },
 
+    async resolveServicePricing(input) {
+      return resolveServicePricing(client, input);
+    },
+
     async countWaitingQueueBySpecialty(specialty: string): Promise<number> {
       const { count, error } = await client
         .from('queues')
@@ -170,6 +186,15 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           position: params.position,
           estimated_wait_time: params.estimatedWaitTime,
           solicitacao_exame_id: params.solicitacaoExameId,
+          service_code: params.pricing.serviceCode,
+          price_source: params.pricing.priceSource,
+          quoted_gross_price: params.pricing.grossPrice,
+          quoted_platform_fee_percent: params.pricing.platformFeePercent,
+          quoted_platform_fee_amount: params.pricing.platformFeeAmount,
+          quoted_professional_net_amount: params.pricing.professionalNetAmount,
+          pricing_rule_id: params.pricing.pricingRuleId,
+          fee_rule_id: params.pricing.feeRuleId,
+          payment_status: 'payment_pending',
         })
         .select(`
           id,
@@ -183,7 +208,17 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           position,
           estimated_wait_time,
           assigned_professional_id,
-          solicitacao_exame_id
+          solicitacao_exame_id,
+          service_code,
+          price_source,
+          quoted_gross_price,
+          quoted_platform_fee_percent,
+          quoted_platform_fee_amount,
+          quoted_professional_net_amount,
+          pricing_rule_id,
+          fee_rule_id,
+          payment_status,
+          current_payment_charge_id
         `)
         .single();
 
@@ -206,7 +241,17 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
         });
       }
 
-      return row;
+      const paymentCharge = await createPaymentCharge(client, {
+        ownerType: 'queue',
+        ownerId: row.id,
+        amount: Number(row.quoted_gross_price),
+        currency: 'BRL',
+      });
+
+      return {
+        ...row,
+        current_payment_charge_id: paymentCharge.paymentChargeId,
+      };
     },
   };
 }

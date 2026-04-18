@@ -155,6 +155,36 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
+  if (
+    code === 'APPOINTMENT_PRICING_SNAPSHOT_REQUIRED' ||
+    code === 'APPOINTMENT_PRICE_SNAPSHOT_INVALID'
+  ) {
+    return new AppError({
+      status: 422,
+      code,
+      message: 'Appointment pricing snapshot is incomplete or invalid.',
+      details,
+    });
+  }
+
+  if (code === 'APPOINTMENT_PAYMENT_REQUIRED') {
+    return new AppError({
+      status: 402,
+      code,
+      message: 'Appointment payment must be confirmed before acceptance.',
+      details,
+    });
+  }
+
+  if (code === 'APPOINTMENT_PAYMENT_CHARGE_REQUIRED') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Appointment is missing the active payment charge required for acceptance.',
+      details,
+    });
+  }
+
   return new AppError({
     status: 500,
     code,

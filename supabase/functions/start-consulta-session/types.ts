@@ -14,11 +14,20 @@ export type ConsultationLifecycleRecord = ConsultationRow;
 export type AppointmentLinkRecord = {
   id: string;
   status: string | null;
+  payment_required: boolean | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
+  gross_price: number | null;
+  platform_fee_percent: number | null;
+  platform_fee_amount: number | null;
+  professional_net_amount: number | null;
 };
 
 export type QueueLinkRecord = {
   id: string;
   status: string | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
 };
 
 export type StartConsultaSessionResult = {

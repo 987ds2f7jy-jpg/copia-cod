@@ -1,5 +1,10 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  assertPaymentReadyForOperation,
+  mapAppointmentPaymentGuardSnapshot,
+  mapPaymentContext,
+} from '../_shared/payments/payment-guards.ts';
+import {
   getConsultaExpirationDate,
   isConsultaExpiredForResume,
   isConsultaClosed,
@@ -106,6 +111,7 @@ export async function getTeleconsultaContext({
         patient,
         latestProntuario: latestProntuariosByPatient.get(patient.id) || null,
       })),
+      payment: null,
     };
   }
 
@@ -140,6 +146,7 @@ export async function getTeleconsultaContext({
         })
         : null,
       patientSummaries: [],
+      payment: null,
     };
   }
 
@@ -202,6 +209,16 @@ export async function getTeleconsultaContext({
     });
   }
 
+  const paymentOwner = await repository.findPaymentOwnerByConsultationId(consultation.id);
+
+  if (!isConsultaClosed(consultation.status) && !expiredForResume) {
+    assertPaymentReadyForOperation({
+      owner: paymentOwner?.id ? mapAppointmentPaymentGuardSnapshot(paymentOwner) : null,
+      operation: 'get_teleconsulta_context',
+      fallbackGrossPrice: consultation.preco,
+    });
+  }
+
   const [currentProntuario, recentProntuarios, patient, currentEvaluation] = await Promise.all([
     repository.findProntuarioByConsultationId(consultation.id),
     repository.listPatientProntuarios({
@@ -244,5 +261,8 @@ export async function getTeleconsultaContext({
       })
       : null,
     patientSummaries: [],
+    payment: mapPaymentContext(
+      paymentOwner?.id ? mapAppointmentPaymentGuardSnapshot(paymentOwner) : null,
+    ),
   };
 }

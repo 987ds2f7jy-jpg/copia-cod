@@ -8,6 +8,29 @@ import type {
   ProntuarioRow,
 } from '../_shared/teleconsulta.ts';
 
+export type TeleconsultaPaymentContext = {
+  ownerType: 'appointment' | 'queue' | 'solicitacao_exame';
+  ownerId: string;
+  paymentRequired: boolean;
+  paymentStatus: string;
+  currentPaymentChargeId: string;
+  grossPrice: number;
+  platformFeePercent: number;
+  platformFeeAmount: number;
+  professionalNetAmount: number;
+};
+
+export type AppointmentPaymentRecord = {
+  id: string;
+  payment_required: boolean | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
+  gross_price: number | null;
+  platform_fee_percent: number | null;
+  platform_fee_amount: number | null;
+  professional_net_amount: number | null;
+};
+
 export type GetTeleconsultaContextInput = {
   consultationId: string | null;
   patientId: string | null;
@@ -35,6 +58,7 @@ export type TeleconsultaContextResult = {
   currentEvaluation: ReturnType<typeof import('../_shared/teleconsulta.ts').mapConsultaEvaluationRecord> | null;
   patientSummary: ReturnType<typeof import('../_shared/teleconsulta.ts').mapPatientSummaryRecord> | null;
   patientSummaries: Array<ReturnType<typeof import('../_shared/teleconsulta.ts').mapPatientSummaryRecord>>;
+  payment: TeleconsultaPaymentContext | null;
 };
 
 export type GetTeleconsultaContextSuccessResponse = ApiSuccess<TeleconsultaContextResult>;
@@ -44,6 +68,7 @@ export type GetTeleconsultaContextRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findConsultationById(consultationId: string): Promise<ConsultationRow | null>;
   findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null>;
+  findPaymentOwnerByConsultationId(consultationId: string): Promise<AppointmentPaymentRecord | null>;
   closeExpiredConsultation(params: {
     consultationId: string;
     finishedAt: string;

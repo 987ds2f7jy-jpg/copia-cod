@@ -1,5 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  assertPaymentReadyForOperation,
+  mapAppointmentPaymentGuardSnapshot,
+} from '../_shared/payments/payment-guards.ts';
+import {
   buildConsultaRoomPayload,
   isConsultaClosed,
   mapConsultationRecord,
@@ -85,6 +89,17 @@ export async function startConsultaSession({
     });
   }
 
+  const [appointment, queue] = await Promise.all([
+    repository.findAppointmentByConsultationId(consultation.id),
+    repository.findQueueEntryByConsultation(consultation),
+  ]);
+
+  assertPaymentReadyForOperation({
+    owner: appointment?.id ? mapAppointmentPaymentGuardSnapshot(appointment) : null,
+    operation: 'start_consulta_session',
+    fallbackGrossPrice: consultation.preco,
+  });
+
   const startedAt = consultation.inicio_at || new Date().toISOString();
   const roomPayload = buildConsultaRoomPayload(consultation);
   const requiresConsultationUpdate =
@@ -109,11 +124,6 @@ export async function startConsultaSession({
       roomToken: roomPayload.roomToken,
     })
     : consultation;
-
-  const [appointment, queue] = await Promise.all([
-    repository.findAppointmentByConsultationId(consultation.id),
-    repository.findQueueEntryByConsultation(updatedConsultation),
-  ]);
 
   const nextAppointment = appointment?.id && !APPOINTMENT_FINAL_STATUSES.has(String(appointment.status || ''))
     ? await repository.updateAppointmentStatus({

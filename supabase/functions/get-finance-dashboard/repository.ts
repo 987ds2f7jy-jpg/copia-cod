@@ -59,6 +59,7 @@ async function listAppointments(client: SupabaseClient, professionalIds: string[
     .from('appointments')
     .select('*')
     .in('professional_id', professionalIds)
+    .eq('payment_status', 'paid')
     .order('date', { ascending: false })
     .limit(limit);
 

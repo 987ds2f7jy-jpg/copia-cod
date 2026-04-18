@@ -319,6 +319,29 @@ function enforceServerFilters(entity: string, filters: Record<string, unknown>) 
     };
   }
 
+  if (
+    entity === 'Queue' &&
+    normalizeString(filters.status) === 'waiting' &&
+    normalizeString(filters.specialty) &&
+    !normalizeString(filters.patient_id)
+  ) {
+    return {
+      ...filters,
+      payment_status: 'paid',
+    };
+  }
+
+  if (
+    entity === 'Appointment' &&
+    normalizeString(filters.status) === 'SOLICITADO' &&
+    !normalizeString(filters.patient_id)
+  ) {
+    return {
+      ...filters,
+      payment_status: 'paid',
+    };
+  }
+
   return filters;
 }
 

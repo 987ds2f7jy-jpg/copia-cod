@@ -1,5 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  assertPaymentReadyForOperation,
+  mapAppointmentPaymentGuardSnapshot,
+} from '../_shared/payments/payment-guards.ts';
+import {
   buildConsultaRoomPayload,
   isConsultaClosed,
   mapConsultationRecord,
@@ -91,6 +95,18 @@ export async function upsertProntuario({
     professionalId: consultation.profissional_id,
   });
 
+  const [appointment, queue, existingProntuario] = await Promise.all([
+    repository.findAppointmentByConsultationId(consultation.id),
+    repository.findQueueEntryByConsultation(consultation),
+    repository.findProntuarioByConsultationId(consultation.id),
+  ]);
+
+  assertPaymentReadyForOperation({
+    owner: appointment?.id ? mapAppointmentPaymentGuardSnapshot(appointment) : null,
+    operation: 'upsert_prontuario',
+    fallbackGrossPrice: consultation.preco,
+  });
+
   const roomPayload = buildConsultaRoomPayload(consultation);
   const startedAt = consultation.inicio_at || new Date().toISOString();
   const requiresSessionUpdate =
@@ -108,12 +124,6 @@ export async function upsertProntuario({
       roomToken: roomPayload.roomToken,
     })
     : consultation;
-
-  const [appointment, queue, existingProntuario] = await Promise.all([
-    repository.findAppointmentByConsultationId(consultation.id),
-    repository.findQueueEntryByConsultation(activeConsultation),
-    repository.findProntuarioByConsultationId(consultation.id),
-  ]);
 
   if (appointment?.id && !APPOINTMENT_FINAL_STATUSES.has(String(appointment.status || ''))) {
     await repository.updateAppointmentStatus({

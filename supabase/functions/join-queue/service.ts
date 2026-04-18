@@ -1,27 +1,17 @@
 import { AppError } from '../_shared/errors.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
+import {
+  getOnDutyServiceCodeForSpecialty,
+  normalizePricingSpecialty,
+} from '../_shared/pricing/service-codes.ts';
 import type {
   JoinQueueCommand,
   JoinQueueRepository,
   JoinQueueResult,
 } from './types.ts';
 
-const SPECIALTY_ALIASES: Record<string, string> = {
-  psicologia_clinica: 'psicologia',
-};
-
-function normalizeSpecialty(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_');
-}
-
 function normalizePlantaoSpecialty(value: string) {
-  const normalized = normalizeSpecialty(value);
-  return SPECIALTY_ALIASES[normalized] || normalized;
+  return normalizePricingSpecialty(value);
 }
 
 export async function joinQueue({
@@ -86,6 +76,17 @@ export async function joinQueue({
   }
 
   const normalizedSpecialty = normalizePlantaoSpecialty(input.specialty);
+  const serviceCode = getOnDutyServiceCodeForSpecialty(input.specialty);
+
+  if (!serviceCode) {
+    throw new AppError({
+      status: 422,
+      code: 'DUTY_SPECIALTY_NOT_PRICED',
+      message: 'Selected on-duty specialty is not supported for pricing.',
+      details: { specialty: input.specialty, normalizedSpecialty },
+    });
+  }
+
   const availableProfiles = await repository.listOnDutyPublicProfiles();
   const hasAvailableProfessionals = availableProfiles.some((profile) =>
     profile.isOnDuty &&
@@ -104,11 +105,13 @@ export async function joinQueue({
   const waitingCount = await repository.countWaitingQueueBySpecialty(input.specialty);
   const position = waitingCount + 1;
   const estimatedWaitTime = position * 10;
+  const pricing = await repository.resolveServicePricing({ serviceCode });
 
   console.info('[join-queue] request:start', {
     requestId,
     patientId: appUser.id,
     specialty: normalizedSpecialty,
+    serviceCode,
     position,
   });
 
@@ -122,6 +125,7 @@ export async function joinQueue({
     position,
     estimatedWaitTime,
     solicitacaoExameId: input.solicitacaoExameId,
+    pricing,
   });
 
   console.info('[join-queue] request:success', {
@@ -129,6 +133,8 @@ export async function joinQueue({
     queueId: queueEntry.id,
     patientId: queueEntry.patient_id,
     position: queueEntry.position,
+    serviceCode: queueEntry.service_code,
+    quotedGrossPrice: queueEntry.quoted_gross_price,
   });
 
   return {

@@ -1,6 +1,8 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { findAppUserByAuthUserId } from '../_shared/appUsers.ts';
 import { AppError } from '../_shared/errors.ts';
+import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
+import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -16,6 +18,10 @@ function createCreateSolicitacaoExameRepository(client: SupabaseClient): CreateS
   return {
     async findAppUserByAuthUserId(authUserId: string) {
       return findAppUserByAuthUserId(client, authUserId);
+    },
+
+    async resolveServicePricing(input) {
+      return resolveServicePricing(client, input);
     },
 
     async createSolicitacaoExame(params: CreateSolicitacaoExameParams): Promise<SolicitacaoExameRecord> {
@@ -46,6 +52,15 @@ function createCreateSolicitacaoExameRepository(client: SupabaseClient): CreateS
           arquivos: params.arquivos,
           arquivos_urls: params.arquivosUrls,
           queue_id: params.queueId,
+          service_code: params.pricing.serviceCode,
+          price_source: params.pricing.priceSource,
+          quoted_gross_price: params.pricing.grossPrice,
+          quoted_platform_fee_percent: params.pricing.platformFeePercent,
+          quoted_platform_fee_amount: params.pricing.platformFeeAmount,
+          quoted_professional_net_amount: params.pricing.professionalNetAmount,
+          pricing_rule_id: params.pricing.pricingRuleId,
+          fee_rule_id: params.pricing.feeRuleId,
+          payment_status: 'payment_pending',
         })
         .select(`
           id,
@@ -73,6 +88,16 @@ function createCreateSolicitacaoExameRepository(client: SupabaseClient): CreateS
           arquivos,
           arquivos_urls,
           queue_id,
+          service_code,
+          price_source,
+          quoted_gross_price,
+          quoted_platform_fee_percent,
+          quoted_platform_fee_amount,
+          quoted_professional_net_amount,
+          pricing_rule_id,
+          fee_rule_id,
+          payment_status,
+          current_payment_charge_id,
           created_date,
           updated_at
         `)
@@ -97,7 +122,17 @@ function createCreateSolicitacaoExameRepository(client: SupabaseClient): CreateS
         });
       }
 
-      return row;
+      const paymentCharge = await createPaymentCharge(client, {
+        ownerType: 'solicitacao_exame',
+        ownerId: row.id,
+        amount: Number(row.quoted_gross_price),
+        currency: 'BRL',
+      });
+
+      return {
+        ...row,
+        current_payment_charge_id: paymentCharge.paymentChargeId,
+      };
     },
   };
 }

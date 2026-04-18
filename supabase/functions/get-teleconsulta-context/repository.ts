@@ -14,6 +14,7 @@ import type {
   ProntuarioRow,
 } from '../_shared/teleconsulta.ts';
 import type { GetTeleconsultaContextRepository } from './types.ts';
+import type { AppointmentPaymentRecord } from './types.ts';
 
 type ProfessionalRow = {
   id: string;
@@ -96,6 +97,35 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
         specialty: row.specialty || '',
         source: 'professional_profiles',
       };
+    },
+
+    async findPaymentOwnerByConsultationId(consultationId: string): Promise<AppointmentPaymentRecord | null> {
+      const { data, error } = await client
+        .from('appointments')
+        .select(`
+          id,
+          payment_required,
+          payment_status,
+          current_payment_charge_id,
+          gross_price,
+          platform_fee_percent,
+          platform_fee_amount,
+          professional_net_amount
+        `)
+        .eq('consulta_id', consultationId)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'CONSULTATION_PAYMENT_LOOKUP_FAILED',
+          message: 'Unable to load consultation payment state.',
+          details: error.message,
+        });
+      }
+
+      return ((data?.[0] as AppointmentPaymentRecord | undefined) || null);
     },
 
     async closeExpiredConsultation({ consultationId, finishedAt }) {

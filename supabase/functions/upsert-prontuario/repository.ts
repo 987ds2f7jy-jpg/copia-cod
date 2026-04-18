@@ -266,7 +266,17 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
     async findAppointmentByConsultationId(consultationId: string): Promise<AppointmentLinkRecord | null> {
       const { data, error } = await client
         .from('appointments')
-        .select('id, status')
+        .select(`
+          id,
+          status,
+          payment_required,
+          payment_status,
+          current_payment_charge_id,
+          gross_price,
+          platform_fee_percent,
+          platform_fee_amount,
+          professional_net_amount
+        `)
         .eq('consulta_id', consultationId)
         .order('updated_at', { ascending: false })
         .limit(1);
@@ -288,7 +298,17 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
         .from('appointments')
         .update({ status })
         .eq('id', appointmentId)
-        .select('id, status')
+        .select(`
+          id,
+          status,
+          payment_required,
+          payment_status,
+          current_payment_charge_id,
+          gross_price,
+          platform_fee_percent,
+          platform_fee_amount,
+          professional_net_amount
+        `)
         .single();
 
       if (error) {
@@ -310,7 +330,7 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
 
       const { data, error } = await client
         .from('queues')
-        .select('id, status')
+        .select('id, status, payment_status, current_payment_charge_id')
         .eq('patient_id', consultation.paciente_id)
         .eq('assigned_professional_id', consultation.profissional_id)
         .eq('specialty', consultation.especialidade || '')
@@ -335,7 +355,7 @@ function createUpsertProntuarioRepository(client: SupabaseClient): UpsertProntua
         .from('queues')
         .update({ status })
         .eq('id', queueId)
-        .select('id, status')
+        .select('id, status, payment_status, current_payment_charge_id')
         .single();
 
       if (error) {

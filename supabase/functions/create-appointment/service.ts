@@ -1,5 +1,11 @@
 import { AppError } from '../_shared/errors.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
+import {
+  PROFILE_PRIORITY_SERVICE_CODE,
+  PROFILE_STANDARD_SERVICE_CODE,
+  SPECIALTY_REQUEST_SERVICE_CODE,
+} from '../_shared/pricing/service-codes.ts';
+import type { ServiceCode } from '../_shared/pricing/types.ts';
 import type {
   CreateAppointmentCommand,
   CreateAppointmentRepository,
@@ -192,7 +198,8 @@ export async function createAppointment({
   let specialty = input.specialty.trim();
   let appointmentType = 'ESPECIALIDADE';
   let status = 'SOLICITADO';
-  let price = 0;
+  let serviceCode: ServiceCode = SPECIALTY_REQUEST_SERVICE_CODE;
+  let pricingProfessionalProfileId: string | null = null;
 
   if (input.professionalProfileId) {
     const professional = await repository.findProfessionalTargetById(input.professionalProfileId);
@@ -240,7 +247,8 @@ export async function createAppointment({
     specialty = professional.specialty;
     appointmentType = input.priority ? 'priority' : 'PERFIL';
     status = input.priority ? 'SOLICITADO' : 'CONFIRMADO';
-    price = input.priority ? professional.pricePriority : professional.priceStandard;
+    serviceCode = input.priority ? PROFILE_PRIORITY_SERVICE_CODE : PROFILE_STANDARD_SERVICE_CODE;
+    pricingProfessionalProfileId = professional.profileId;
   } else {
     specialty = input.specialty.trim();
 
@@ -254,14 +262,21 @@ export async function createAppointment({
 
     appointmentType = 'ESPECIALIDADE';
     status = 'SOLICITADO';
-    price = 0;
+    serviceCode = SPECIALTY_REQUEST_SERVICE_CODE;
   }
+
+  const pricing = await repository.resolveServicePricing({
+    serviceCode,
+    professionalProfileId: pricingProfessionalProfileId,
+  });
+  const price = pricing.grossPrice;
 
   console.info('[create-appointment] request:start', {
     requestId,
     patientId: appUser.id,
     professionalId,
     appointmentType,
+    serviceCode,
     scheduledDatetime,
     specialty: normalizeSpecialty(specialty),
   });
@@ -279,6 +294,7 @@ export async function createAppointment({
     time: input.time,
     status,
     price,
+    pricing,
     symptoms: input.symptoms,
   });
 
@@ -288,6 +304,8 @@ export async function createAppointment({
     patientId: appointment.patient_id,
     professionalId: appointment.professional_id,
     status: appointment.status,
+    serviceCode: appointment.service_code,
+    grossPrice: appointment.gross_price,
   });
 
   return {

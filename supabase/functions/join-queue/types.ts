@@ -1,4 +1,5 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
+import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
 
 export type JoinQueueInput = {
   specialty: string;
@@ -29,6 +30,16 @@ export type QueueRecord = {
   estimated_wait_time: number | null;
   assigned_professional_id: string | null;
   solicitacao_exame_id: string | null;
+  service_code: string | null;
+  price_source: string | null;
+  quoted_gross_price: number | null;
+  quoted_platform_fee_percent: number | null;
+  quoted_platform_fee_amount: number | null;
+  quoted_professional_net_amount: number | null;
+  pricing_rule_id: string | null;
+  fee_rule_id: string | null;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
 };
 
 export type PlantaoConsultaRecord = {
@@ -65,6 +76,7 @@ export type JoinQueueRepository = {
   findActivePlantaoConsultaByPatientId(patientId: string): Promise<PlantaoConsultaRecord | null>;
   findCurrentActiveQueueEntry(patientId: string): Promise<QueueRecord | null>;
   listOnDutyPublicProfiles(): Promise<PublicProfileRecord[]>;
+  resolveServicePricing(input: ResolveServicePricingInput): Promise<ResolvedServicePricing>;
   countWaitingQueueBySpecialty(specialty: string): Promise<number>;
   createQueueEntry(params: {
     patientId: string;
@@ -76,6 +88,7 @@ export type JoinQueueRepository = {
     position: number;
     estimatedWaitTime: number;
     solicitacaoExameId: string;
+    pricing: ResolvedServicePricing;
   }): Promise<QueueRecord>;
 };
 
