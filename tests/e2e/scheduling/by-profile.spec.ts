@@ -53,10 +53,11 @@ const hasProfId = !!TEST_PROF_ID;
 // ---------------------------------------------------------------------------
 rdTest.describe('by-profile — guards de acesso', () => {
 
+  rdTest.use({ storageState: AUTH_STATE.patient });
+
   rdTest('sem ?professional= exibe "Profissional não encontrado"', async ({
     page, goto,
   }) => {
-    rdTest.use({ storageState: AUTH_STATE.patient });
     await goto(ROUTES.agendamentoPerfil);
 
     await expect(
@@ -65,7 +66,6 @@ rdTest.describe('by-profile — guards de acesso', () => {
   });
 
   rdTest('ID inválido exibe "Profissional não encontrado"', async ({ page, goto }) => {
-    rdTest.use({ storageState: AUTH_STATE.patient });
     await goto(`${ROUTES.agendamentoPerfil}?professional=id-invalido-e2e-test`);
 
     await expect(
@@ -168,8 +168,7 @@ rdTest.describe('by-profile — com paciente autenticado', () => {
 
     // Selecionar data futura válida no calendário
     await page.waitForSelector('table[role="grid"]', { timeout: 8_000 });
-    const enabledDay = page.locator('table[role="grid"] button[name]')
-      .filter({ hasNotAttribute: 'disabled' })
+    const enabledDay = page.locator('table[role="grid"] button[name]:not([disabled])')
       .first();
     await enabledDay.click();
 
@@ -201,8 +200,7 @@ rdTest.describe('by-profile — com paciente autenticado', () => {
     ).toBeVisible({ timeout: 12_000 });
 
     await page.waitForSelector('table[role="grid"]', { timeout: 8_000 });
-    const enabledDay = page.locator('table[role="grid"] button[name]')
-      .filter({ hasNotAttribute: 'disabled' })
+    const enabledDay = page.locator('table[role="grid"] button[name]:not([disabled])')
       .first();
     await enabledDay.click();
 
@@ -290,8 +288,7 @@ rdTest.describe('by-profile — com paciente autenticado', () => {
     ).toBeVisible({ timeout: 12_000 });
 
     await page.waitForSelector('table[role="grid"]', { timeout: 8_000 });
-    const enabledDay = page.locator('table[role="grid"] button[name]')
-      .filter({ hasNotAttribute: 'disabled' })
+    const enabledDay = page.locator('table[role="grid"] button[name]:not([disabled])')
       .first();
     await enabledDay.click();
 

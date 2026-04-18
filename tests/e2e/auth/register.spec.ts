@@ -47,16 +47,16 @@ rdTest.describe('register — paciente (estrutura)', () => {
       page.getByRole('heading', { name: 'Criar Conta de Paciente' })
     ).toBeVisible();
     await expect(page.getByText('Dados pessoais')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Criar conta' })).toBeVisible();
+    await expect(page.locator('form').getByRole('button', { name: 'Criar conta' })).toBeVisible();
   });
 
   rdTest('link "Entrar" navega para /Entrar', async ({ page }) => {
-    await page.getByRole('link', { name: 'Entrar' }).click();
+    await page.locator('main').getByRole('link', { name: 'Entrar' }).click();
     await expect(page).toHaveURL(/\/Entrar/, { timeout: 8_000 });
   });
 
   rdTest('submit vazio exibe erros de campo obrigatório @critical', async ({ page }) => {
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     // CadastroPaciente.jsx: validate() seta erros por campo
     // Ao menos um erro deve aparecer
@@ -71,10 +71,10 @@ rdTest.describe('register — paciente (estrutura)', () => {
   rdTest('CPF inválido (sequência repetida) exibe erro @critical', async ({ page }) => {
     await page.getByLabel('Nome completo').fill('Teste E2E');
     await page.getByLabel('Email').fill('teste-e2e-cpf@example.com');
-    await page.getByLabel(/senha/i).fill('senha123');
+    await page.getByLabel('Senha').fill('senha123');
     await page.getByPlaceholder('000.000.000-00').fill('111.111.111-11');
 
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page.getByText(/CPF inválido|cpf invalido/i)).toBeVisible({ timeout: 5_000 });
     await expect(page).toHaveURL(/CadastroPaciente/);
@@ -83,15 +83,15 @@ rdTest.describe('register — paciente (estrutura)', () => {
   rdTest('senha com menos de 6 caracteres exibe erro de validação @critical', async ({
     page,
   }) => {
-    await page.getByLabel(/senha/i).fill('abc');
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.getByLabel('Senha').fill('abc');
+    await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page.getByText(/6 caracteres/i)).toBeVisible({ timeout: 5_000 });
   });
 
   rdTest('email inválido exibe erro de formato', async ({ page }) => {
     await page.getByLabel('Email').fill('nao-e-email');
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page.getByText(/email inválido|email invalido/i)).toBeVisible({ timeout: 5_000 });
   });
@@ -118,7 +118,7 @@ rdTest.describe('register — paciente (caminho feliz)', () => {
 
     await page.getByLabel('Nome completo').fill('Paciente Teste E2E');
     await page.getByLabel('Email').fill(uniqueEmail);
-    await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await page.getByLabel('Senha').fill('senha-e2e-123');
     await page.getByPlaceholder('000.000.000-00').fill('123.456.789-09'); // CPF matematicamente válido
     await page.getByPlaceholder('(11) 99999-9999').fill('(11) 99999-9999');
     await page.getByLabel(/data de nascimento/i).fill('1990-01-15');
@@ -127,7 +127,7 @@ rdTest.describe('register — paciente (caminho feliz)', () => {
     await page.getByRole('combobox').click();
     await page.getByRole('option', { name: 'Masculino' }).click();
 
-    await page.getByRole('button', { name: 'Criar conta' }).click();
+    await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     // authService.register() → salva sessão → redireciona
     await expect(page).toHaveURL(/DashboardPaciente/, { timeout: 20_000 });

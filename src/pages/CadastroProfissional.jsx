@@ -269,12 +269,12 @@ export default function CadastroProfissional() {
               <CardHeader><CardTitle>Criar sua Conta</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
-                  <Label>Email</Label>
-                  <Input type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="mt-1" />
+                  <Label htmlFor="professional-email">Email</Label>
+                  <Input id="professional-email" type="email" value={email} onChange={e => setEmail(e.target.value)} placeholder="seu@email.com" className="mt-1" />
                 </div>
                 <div>
-                  <Label>Senha (mínimo 6 caracteres)</Label>
-                  <Input type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="mt-1" />
+                  <Label htmlFor="professional-password">Senha (mínimo 6 caracteres)</Label>
+                  <Input id="professional-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="mt-1" />
                 </div>
                 <p className="text-sm text-gray-500">
                   Já tem conta?{' '}

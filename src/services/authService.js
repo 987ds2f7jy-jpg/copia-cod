@@ -72,7 +72,21 @@ function ensureActiveUser(user) {
 }
 
 function normalizeAccountError(error, fallbackMessage) {
-  return normalizeError(error, fallbackMessage);
+  const normalized = normalizeError(error, fallbackMessage);
+
+  if (normalized.code === 'AUTH_CREDENTIALS_INVALID') {
+    return new AppError({
+      message: 'Credenciais invalidas.',
+      userMessage: 'Email ou senha invalidos.',
+      code: normalized.code,
+      status: normalized.status,
+      details: normalized.details,
+      hint: normalized.hint,
+      cause: normalized.cause,
+    });
+  }
+
+  return normalized;
 }
 
 function mapRegisterPayload(registrationData) {

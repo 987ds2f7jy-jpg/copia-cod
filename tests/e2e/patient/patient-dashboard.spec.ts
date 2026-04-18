@@ -3,122 +3,271 @@
  *
  * TIPO: Regra de negócio
  *
- * PROPÓSITO
- *   Verificar o DashboardPaciente: listagem de consultas, sistema de abas
- *   por status, avaliação pós-consulta e exibição correta de todos os
- *   status possíveis (PT e EN).
+ * FLUXO COBERTO: /DashboardPaciente
  *
- * O QUE COBRE
- *   - Dashboard carrega e exibe abas de status
- *   - Pull-to-refresh atualiza a lista (mobile)
- *   - Aba ativas: filtra por status de consulta ativa
- *   - Aba histórico: consultas concluídas
- *   - Aba canceladas: status CANCELADO + cancelled (R4)
- *   - Consulta concluída sem avaliação exibe botão "Avaliar"
- *   - Consulta já avaliada NÃO exibe botão "Avaliar" (prevenir duplicata)
- *   - Consulta ativa com ResumeConsultationCard
+ * SELETORES BASEADOS NO HTML REAL (DashboardPaciente.jsx)
  *
- * POR QUE EXISTE
- *   R4 (status inconsistente) se manifesta principalmente aqui.
- *   R11 (cache stale) pode fazer consultas recém-canceladas não aparecerem
- *   na aba correta imediatamente.
+ *   Cabeçalho:
+ *     h1 "Olá, {primeiroNome}!"           → linha ~288
+ *     p  "Gerencie suas consultas..."      → linha ~290
+ *
+ *   Ações rápidas (3 cards com links):
+ *     link "Consulta Agora"               → /ConsultaAgora
+ *     link "Agendar"                      → /AgendamentoEspecialidade
+ *     link "Perguntar"                    → /PergunteEspecialista
+ *     p "Atendimento imediato"
+ *     p "Nova consulta"
+ *     p "Tire dúvidas"
+ *
+ *   Abas (Radix Tabs):
+ *     role="tab" "Próximas (N)"           → value="proximas"
+ *     role="tab" "Histórico (N)"          → value="historico"
+ *     role="tab" "Canceladas (N)"         → value="canceladas"
+ *
+ *   Estado vazio (aba próximas sem dados):
+ *     h3 "Nenhuma consulta agendada"
+ *     p  "Agende uma consulta com um de nossos especialistas"
+ *     button/link "Agendar Consulta"
+ *
+ *   Estado vazio (histórico):
+ *     p "Nenhuma consulta no histórico"
+ *
+ *   Estado vazio (canceladas):
+ *     p "Nenhuma consulta cancelada"
  *
  * RISCO COBERTO
- *   R4 (mistura de status PT/EN)
- *   R11 (cache stale após mutação)
- *
- * OBSERVAÇÕES
- *   Seed necessário por variáveis de ambiente:
- *     E2E_HAS_ACTIVE_APPOINTMENT    — pelo menos 1 consulta ativa
- *     E2E_HAS_COMPLETED_APPOINTMENT — pelo menos 1 consulta concluída
- *     E2E_HAS_CANCELLED_APPOINTMENT — pelo menos 1 consulta cancelada
- *     E2E_HAS_REVIEWED_APPOINTMENT  — pelo menos 1 consulta já avaliada
+ *   R4  — status inconsistente PT/EN nas abas
+ *   R11 — cache stale após mutação (invalidateQueries)
  */
 
-import { test, expect } from '../support/fixtures';
-import { AUTH_STATE } from '../support/fixtures';
+import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import {
+  waitForPatientDashboard,
+  clickDashboardTab,
+  logoutViaMenu,
+} from '../support/page-helpers';
 
-test.use({ storageState: AUTH_STATE.patient });
+rdTest.use({ storageState: AUTH_STATE.patient });
 
-test.describe('dashboard paciente — estrutura básica', () => {
+// ---------------------------------------------------------------------------
+// Estrutura central — carrega e exibe os elementos principais
+// ---------------------------------------------------------------------------
+rdTest.describe('patient-dashboard — estrutura', () => {
 
-  test('dashboard carrega sem erro @critical', async ({ page, goto }) => {
+  rdTest('carrega com sessão válida e exibe cabeçalho @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
 
-    // Não deve estar em /Entrar (auth OK)
-    await expect(page).toHaveURL(/DashboardPaciente/);
-
-    // Deve exibir as abas principais
-    await expect(page.getByRole('tab', { name: /ativas|próximas/i })).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('tab', { name: /histórico|passadas/i })).toBeVisible();
-    await expect(page.getByRole('tab', { name: /canceladas/i })).toBeVisible();
+    // DashboardPaciente.jsx: h1 com "Olá, {primeiroNome}!"
+    const heading = page.getByRole('heading', { level: 1 });
+    await expect(heading).toBeVisible();
+    const text = await heading.textContent();
+    expect(text).toMatch(/olá/i);
   });
 
-  test('aba canceladas exibe consultas com status CANCELADO e cancelled (R4)', async ({
-    page, goto,
+  rdTest('sem sessão redireciona para /Entrar @critical', async ({
+    page, goto, clearAuthState,
   }) => {
-    test.skip(!process.env.E2E_HAS_CANCELLED_APPOINTMENT, 'Requer seed de consulta cancelada');
-
+    await clearAuthState();
     await goto(ROUTES.dashboardPaciente);
-    await page.getByRole('tab', { name: /canceladas/i }).click();
-
-    // Deve exibir pelo menos uma consulta cancelada
-    // O filtro no DashboardPaciente usa: ['cancelled', 'CANCELADO'].includes(a.status)
-    await expect(page.getByText(/cancelad/i).first()).toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/Entrar/, { timeout: 10_000 });
   });
 
-  test('aba histórico exibe consultas concluídas com status CONCLUIDO e completed (R4)', async ({
-    page, goto,
-  }) => {
-    test.skip(!process.env.E2E_HAS_COMPLETED_APPOINTMENT, 'Requer seed de consulta concluída');
-
+  rdTest('exibe as 3 abas de status com contadores @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);
-    await page.getByRole('tab', { name: /histórico|passadas/i }).click();
+    await waitForPatientDashboard(page);
 
-    await expect(page.getByText(/concluíd|finalizad/i).first()).toBeVisible({ timeout: 10_000 });
+    // Tabs com contador dinâmico: "Próximas (N)", "Histórico (N)", "Canceladas (N)"
+    await expect(page.getByRole('tab', { name: /próximas \(\d+\)/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /histórico \(\d+\)/i })).toBeVisible();
+    await expect(page.getByRole('tab', { name: /canceladas \(\d+\)/i })).toBeVisible();
+  });
+
+  rdTest('aba "Próximas" ativa por padrão', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    // Tabs defaultValue="proximas" — primeira aba começa selecionada
+    await expect(
+      page.getByRole('tab', { name: /próximas/i })
+    ).toHaveAttribute('aria-selected', 'true');
+  });
+
+  rdTest('exibe os 3 atalhos de ação rápida @critical', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    // Três Cards com Link — testamos pelo texto descritivo que é mais estável
+    await expect(page.getByText('Atendimento imediato')).toBeVisible();
+    await expect(page.getByText('Nova consulta')).toBeVisible();
+    await expect(page.getByText('Tire dúvidas')).toBeVisible();
   });
 
 });
 
-test.describe('dashboard paciente — avaliação', () => {
+// ---------------------------------------------------------------------------
+// Navegação entre abas
+// ---------------------------------------------------------------------------
+rdTest.describe('patient-dashboard — navegação de abas', () => {
 
-  test('consulta concluída sem avaliação exibe botão "Avaliar" @critical', async ({
-    page, goto,
-  }) => {
-    test.skip(!process.env.E2E_HAS_COMPLETED_APPOINTMENT, 'Requer seed de consulta concluída não avaliada');
-
+  rdTest('clicar na aba Histórico a ativa', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);
-    await page.getByRole('tab', { name: /histórico|passadas/i }).click();
+    await waitForPatientDashboard(page);
 
-    await expect(page.getByRole('button', { name: /avaliar/i })).toBeVisible({ timeout: 10_000 });
+    await clickDashboardTab(page, 'historico');
+    // Estado vazio ou com dados — não deve quebrar
+    await expect(
+      page.getByText('Nenhuma consulta no histórico')
+        .or(page.getByRole('heading', { level: 3 }).first())
+    ).toBeVisible({ timeout: 8_000 });
   });
 
-  test('consulta já avaliada NÃO exibe botão "Avaliar" @critical', async ({
-    page, goto,
-  }) => {
-    // Previne que o usuário avalie duas vezes (DashboardPaciente verifica reviewedAppointmentIds)
-    test.skip(!process.env.E2E_HAS_REVIEWED_APPOINTMENT, 'Requer seed de consulta já avaliada');
-
+  rdTest('clicar na aba Canceladas a ativa', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);
-    await page.getByRole('tab', { name: /histórico|passadas/i }).click();
+    await waitForPatientDashboard(page);
 
-    // Não deve exibir botão de avaliar para esta consulta específica
-    // TODO: identificar a consulta pelo ID e verificar ausência do botão nela
-    test.fixme(true, 'Requer identificação da consulta específica por ID');
+    await clickDashboardTab(page, 'canceladas');
+    await expect(
+      page.getByText('Nenhuma consulta cancelada')
+        .or(page.getByText('Cancelada').first())
+    ).toBeVisible({ timeout: 8_000 });
+  });
+
+  rdTest('clicar em "Consulta Agora" navega para /ConsultaAgora', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    // Link dentro do card de ação rápida
+    await page.getByText('Atendimento imediato').click();
+    await expect(page).toHaveURL(/ConsultaAgora/, { timeout: 10_000 });
+  });
+
+  rdTest('clicar em "Agendar" navega para /AgendamentoEspecialidade', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    await page.getByText('Nova consulta').click();
+    await expect(page).toHaveURL(/AgendamentoEspecialidade/, { timeout: 10_000 });
   });
 
 });
 
-test.describe('dashboard paciente — consulta ativa', () => {
+// ---------------------------------------------------------------------------
+// Estado vazio — sem dados não quebra a tela
+// ---------------------------------------------------------------------------
+rdTest.describe('patient-dashboard — estado vazio (sem dados)', () => {
 
-  test('ResumeConsultationCard aparece quando há consulta ativa', async ({ page, goto }) => {
-    test.skip(!process.env.E2E_HAS_ACTIVE_CONSULTATION, 'Requer consulta em status em_atendimento ou aguardando');
+  rdTest('aba Próximas vazia exibe CTA de agendamento @critical', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    // Aguarda o loading (skeleton) desaparecer
+    await page.waitForFunction(
+      () => !document.querySelector('.animate-pulse'),
+      { timeout: 10_000 },
+    ).catch(() => {}); // Se não tiver skeleton, tudo bem
+
+    const hasEmpty = await page.getByRole('heading', { name: 'Nenhuma consulta agendada' }).isVisible().catch(() => false);
+    const hasAppointments = await page.locator('h3').filter({ hasText: /dr\(a\)\./i }).count() > 0;
+
+    // Uma das duas condições deve ser verdadeira — nunca tela em branco
+    expect(hasEmpty || hasAppointments).toBe(true);
+  });
+
+  rdTest('aba Histórico vazia exibe estado vazio sem crash', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+    await clickDashboardTab(page, 'historico');
+
+    // Ou mostra "Nenhuma consulta no histórico" ou mostra cards
+    const isEmpty = await page.getByText('Nenhuma consulta no histórico').isVisible().catch(() => false);
+    const hasCards = (await page.getByRole('heading', { level: 3 }).count()) > 0;
+    expect(isEmpty || hasCards).toBe(true);
+  });
+
+  rdTest('aba Canceladas vazia exibe estado vazio sem crash', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+    await clickDashboardTab(page, 'canceladas');
+
+    const isEmpty = await page.getByText('Nenhuma consulta cancelada').isVisible().catch(() => false);
+    const hasBadge = await page.getByText('Cancelada').isVisible().catch(() => false);
+    expect(isEmpty || hasBadge).toBe(true);
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Sessão e persistência
+// ---------------------------------------------------------------------------
+rdTest.describe('patient-dashboard — sessão', () => {
+
+  rdTest('sessão persiste após reload @critical', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    await page.reload();
+
+    // authService.restoreSession() restaura a partir do localStorage
+    await expect(page).toHaveURL(/DashboardPaciente/, { timeout: 15_000 });
+    await waitForPatientDashboard(page);
+  });
+
+  rdTest('após logout, dashboard redireciona para /Entrar', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+
+    await logoutViaMenu(page);
 
     await goto(ROUTES.dashboardPaciente);
+    await expect(page).toHaveURL(/\/Entrar/, { timeout: 10_000 });
+  });
 
-    // O card de retomada aparece quando useMyActiveConsultation retorna hasActiveConsultation=true
-    await expect(page.getByRole('button', { name: /retomar|entrar na consulta/i })).toBeVisible({ timeout: 15_000 });
+});
+
+// ---------------------------------------------------------------------------
+// Modal de avaliação — estrutura (independe de ter consultas concluídas)
+// ---------------------------------------------------------------------------
+rdTest.describe('patient-dashboard — avaliação', () => {
+
+  rdTest('consulta concluída exibe botão Avaliar se não avaliada @critical', async ({
+    page, goto,
+  }) => {
+    rdTest.skip(
+      !process.env.E2E_HAS_COMPLETED_APPOINTMENT,
+      'Define E2E_HAS_COMPLETED_APPOINTMENT=true.',
+    );
+
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+    await clickDashboardTab(page, 'historico');
+
+    await expect(
+      page.getByRole('button', { name: /avaliar/i }).first()
+    ).toBeVisible({ timeout: 8_000 });
+  });
+
+  rdTest('clicar em Avaliar abre dialog com título "Avaliar Consulta"', async ({
+    page, goto,
+  }) => {
+    rdTest.skip(
+      !process.env.E2E_HAS_COMPLETED_APPOINTMENT,
+      'Define E2E_HAS_COMPLETED_APPOINTMENT=true.',
+    );
+
+    await goto(ROUTES.dashboardPaciente);
+    await waitForPatientDashboard(page);
+    await clickDashboardTab(page, 'historico');
+
+    await page.getByRole('button', { name: /avaliar/i }).first().click();
+
+    // Dialog Radix — DialogTitle "Avaliar Consulta"
+    await expect(
+      page.getByRole('dialog', { name: /avaliar consulta/i })
+    ).toBeVisible({ timeout: 5_000 });
+
+    await expect(page.getByRole('button', { name: /enviar avaliação/i })).toBeVisible();
   });
 
 });

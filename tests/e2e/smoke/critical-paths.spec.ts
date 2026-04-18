@@ -31,9 +31,9 @@ test.describe('smoke — app de pé', () => {
 
     // O título do documento é "Lovable App" (index.html ainda não foi atualizado),
     // então validamos por conteúdo da UI — mais robusto que toHaveTitle.
-    // Layout deslogado mostra botão "Entrar" e link "Criar conta".
+    // Em mobile, o CTA "Criar conta" some do header, então o mínimo estável
+    // aqui é a presença do acesso "Entrar" e do conteúdo principal.
     await expect(page.getByRole('link', { name: 'Entrar' })).toBeVisible();
-    await expect(page.getByRole('link', { name: 'Criar conta' })).toBeVisible();
 
     // Home.jsx renderiza um h1 com o conteúdo principal
     await expect(page.getByRole('heading', { level: 1 }).first()).toBeVisible();
@@ -53,7 +53,7 @@ test.describe('smoke — app de pé', () => {
     await goto(ROUTES.cadastroPaciente);
 
     await expect(page.getByRole('heading', { name: /criar conta de paciente/i })).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Criar conta' })).toBeVisible();
+    await expect(page.locator('form').getByRole('button', { name: 'Criar conta' })).toBeVisible();
   });
 
   test('especialidades renderiza sem login @smoke', async ({ page, goto }) => {

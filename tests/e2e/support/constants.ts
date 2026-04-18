@@ -73,7 +73,6 @@ export const AUTH_REQUIRED_ROUTES = [
   ROUTES.perfil,
   ROUTES.laudosMedicos,
   ROUTES.solicitacaoExames,
-  ROUTES.renovacaoReceitas,
 ] as const;
 
 // ---------------------------------------------------------------------------

@@ -53,8 +53,7 @@ async function selectFutureDate(page: Page) {
   await page.waitForSelector('table[role="grid"]', { timeout: 8_000 });
 
   // Tenta clicar na primeira célula habilitada (não desabilitada, não vazia)
-  const enabledDay = page.locator('table[role="grid"] button[name]')
-    .filter({ hasNotAttribute: 'disabled' })
+  const enabledDay = page.locator('table[role="grid"] button[name]:not([disabled])')
     .first();
 
   await enabledDay.click({ timeout: 8_000 });
@@ -162,8 +161,7 @@ rdTest.describe('by-specialty — estrutura e acesso', () => {
       await expect(page.locator('table[role="grid"]')).toBeVisible();
 
       // O dia de hoje deve estar desabilitado (< 36h)
-      const todayBtn = page.locator('table[role="grid"] button[aria-selected="false"]')
-        .filter({ hasNotAttribute: 'disabled' });
+      const todayBtn = page.locator('table[role="grid"] button[aria-selected="false"]:not([disabled])');
       // Verifica que existem dias habilitados (3+ dias no futuro)
       await expect(todayBtn.first()).toBeVisible({ timeout: 8_000 });
     });

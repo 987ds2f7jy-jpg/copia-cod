@@ -68,7 +68,7 @@ test.describe('login — formulário', () => {
 
     // Mensagem de erro vinda do authService.login() via getUserFacingErrorMessage()
     await expect(
-      page.getByText(/erro ao fazer login|credenciais|inválid/i)
+      page.getByText(/erro ao fazer login|credenciais|invalid|email ou senha/i)
     ).toBeVisible({ timeout: 12_000 });
 
     await expect(page).toHaveURL(/Entrar/);
@@ -269,7 +269,7 @@ test.describe('login — redirecionamento pós-login (rd_login_next)', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // Aguarda resposta de erro
-    await expect(page.getByText(/erro ao fazer login|credenciais|inválid/i))
+    await expect(page.getByText(/erro ao fazer login|credenciais|invalid|email ou senha/i))
       .toBeVisible({ timeout: 12_000 });
 
     // rd_login_next permanece — não foi limpo pelo login que falhou

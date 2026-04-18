@@ -46,7 +46,12 @@ test.describe('acesso público — rotas acessíveis sem login', () => {
       await clearAuthState();
       await goto(route);
 
-      // Nenhuma rota pública deve redirecionar para /Entrar
+      // Rotas públicas devem permanecer acessíveis sem auth.
+      if (route === ROUTES.entrar) {
+        await expect(page).toHaveURL(/\/Entrar/, { timeout: 8_000 });
+        return;
+      }
+
       await expect(page).not.toHaveURL(/\/Entrar/, { timeout: 8_000 });
     });
   }

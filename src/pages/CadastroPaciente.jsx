@@ -146,9 +146,10 @@ export default function CadastroPaciente() {
 
   const renderField = (field, label, extraProps = {}) => (
     <div>
-      <Label className="mb-1 block">{label}</Label>
+      <Label htmlFor={field} className="mb-1 block">{label}</Label>
       <Input
         {...extraProps}
+        id={field}
         value={formData[field]}
         onChange={(event) => setField(field, event.target.value)}
         className={`mt-1 ${errors[field] ? 'border-red-400' : ''}`}
@@ -184,7 +185,7 @@ export default function CadastroPaciente() {
             <CardTitle>Dados pessoais</CardTitle>
           </CardHeader>
           <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
+            <form noValidate onSubmit={handleSubmit} className="space-y-4">
               {renderField('full_name', 'Nome completo', {
                 placeholder: 'Seu nome completo',
               })}
@@ -195,9 +196,10 @@ export default function CadastroPaciente() {
               })}
 
               <div>
-                <Label className="mb-1 block">Senha</Label>
+                <Label htmlFor="password" className="mb-1 block">Senha</Label>
                 <div className="relative mt-1">
                   <Input
+                    id="password"
                     type={showPassword ? 'text' : 'password'}
                     value={formData.password}
                     onChange={(event) => setField('password', event.target.value)}
@@ -207,6 +209,7 @@ export default function CadastroPaciente() {
                   />
                   <button
                     type="button"
+                    aria-label={showPassword ? 'Ocultar' : 'Mostrar'}
                     className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
                     onClick={() => setShowPassword((current) => !current)}
                   >
