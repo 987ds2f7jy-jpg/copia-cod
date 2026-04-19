@@ -69,6 +69,15 @@ verify_jwt = false
 [functions.login-app-user]
 verify_jwt = false
 
+[functions.payments]
+verify_jwt = false
+
+[functions.payments-webhook]
+verify_jwt = false
+
+[functions.quote-service-pricing]
+verify_jwt = false
+
 [functions.read-models]
 verify_jwt = false
 
@@ -91,6 +100,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.set-professional-duty]
+verify_jwt = false
+
+[functions.simulate-payment-paid]
 verify_jwt = false
 
 [functions.start-consulta-session]
