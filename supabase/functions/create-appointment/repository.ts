@@ -248,6 +248,7 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
       return {
         ...row,
         current_payment_charge_id: paymentCharge.paymentChargeId,
+        payment: paymentCharge,
       };
     },
   };

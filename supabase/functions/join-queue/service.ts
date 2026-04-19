@@ -1,17 +1,103 @@
 import { AppError } from '../_shared/errors.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
+  getFeeGroupForServiceCode,
   getOnDutyServiceCodeForSpecialty,
   normalizePricingSpecialty,
 } from '../_shared/pricing/service-codes.ts';
+import type { ResolvedServicePricing, ServiceCode } from '../_shared/pricing/types.ts';
 import type {
   JoinQueueCommand,
   JoinQueueRepository,
   JoinQueueResult,
+  QueueRecord,
+  SolicitacaoPaymentSnapshotRecord,
 } from './types.ts';
 
 function normalizePlantaoSpecialty(value: string) {
   return normalizePricingSpecialty(value);
+}
+
+function buildQueueResult(queueEntry: QueueRecord, reusedExisting: boolean): JoinQueueResult {
+  return {
+    queueEntry: {
+      id: queueEntry.id,
+      status: queueEntry.status || '',
+      specialty: queueEntry.specialty || '',
+      position: Number(queueEntry.position || 0),
+      estimatedWaitTime: Number(queueEntry.estimated_wait_time || 0),
+      assignedProfessionalId: queueEntry.assigned_professional_id || '',
+      solicitacaoExameId: queueEntry.solicitacao_exame_id || '',
+      serviceCode: queueEntry.service_code || '',
+      quotedGrossPrice: Number(queueEntry.quoted_gross_price || 0),
+      paymentStatus: queueEntry.payment_status || 'payment_pending',
+      currentPaymentChargeId: queueEntry.current_payment_charge_id || null,
+    },
+    payment: queueEntry.payment || null,
+    reusedExisting,
+  };
+}
+
+function buildPricingFromSolicitacaoSnapshot(
+  snapshot: SolicitacaoPaymentSnapshotRecord,
+): ResolvedServicePricing {
+  if (!snapshot.service_code || !snapshot.price_source) {
+    throw new AppError({
+      status: 409,
+      code: 'SOLICITACAO_PAYMENT_SNAPSHOT_INCOMPLETE',
+      message: 'Linked exam request does not have a complete pricing snapshot.',
+      details: { solicitacaoExameId: snapshot.id },
+    });
+  }
+
+  const grossPrice = Number(snapshot.quoted_gross_price || 0);
+  const platformFeePercent = Number(snapshot.quoted_platform_fee_percent || 0);
+  const platformFeeAmount = Number(snapshot.quoted_platform_fee_amount || 0);
+  const professionalNetAmount = Number(snapshot.quoted_professional_net_amount || 0);
+
+  if (grossPrice <= 0) {
+    throw new AppError({
+      status: 409,
+      code: 'SOLICITACAO_PAYMENT_SNAPSHOT_INVALID',
+      message: 'Linked exam request has an invalid pricing snapshot.',
+      details: { solicitacaoExameId: snapshot.id },
+    });
+  }
+
+  return {
+    serviceCode: snapshot.service_code as ServiceCode,
+    priceSource: snapshot.price_source as ResolvedServicePricing['priceSource'],
+    feeGroup: getFeeGroupForServiceCode(snapshot.service_code as ServiceCode),
+    grossPrice,
+    platformFeePercent,
+    platformFeeAmount,
+    professionalNetAmount,
+    pricingRuleId: snapshot.pricing_rule_id || null,
+    feeRuleId: snapshot.fee_rule_id || null,
+  };
+}
+
+function assertLinkedSolicitacaoIsPaid(snapshot: SolicitacaoPaymentSnapshotRecord | null, solicitacaoExameId: string) {
+  if (!snapshot?.id) {
+    throw new AppError({
+      status: 404,
+      code: 'SOLICITACAO_EXAME_NOT_FOUND',
+      message: 'Linked exam request was not found.',
+      details: { solicitacaoExameId },
+    });
+  }
+
+  if (snapshot.payment_status !== 'paid' || !snapshot.current_payment_charge_id) {
+    throw new AppError({
+      status: 402,
+      code: 'SOLICITACAO_EXAME_PAYMENT_REQUIRED',
+      message: 'Linked exam request must be paid before joining the on-duty queue.',
+      details: {
+        solicitacaoExameId,
+        paymentStatus: snapshot.payment_status || '',
+      },
+    });
+  }
 }
 
 export async function joinQueue({
@@ -61,22 +147,32 @@ export async function joinQueue({
   const existingEntry = await repository.findCurrentActiveQueueEntry(appUser.id);
 
   if (existingEntry?.id) {
-    return {
-      queueEntry: {
-        id: existingEntry.id,
-        status: existingEntry.status || '',
-        specialty: existingEntry.specialty || '',
-        position: Number(existingEntry.position || 0),
-        estimatedWaitTime: Number(existingEntry.estimated_wait_time || 0),
-        assignedProfessionalId: existingEntry.assigned_professional_id || '',
-        solicitacaoExameId: existingEntry.solicitacao_exame_id || '',
-      },
-      reusedExisting: true,
-    };
+    return buildQueueResult(existingEntry, true);
   }
 
   const normalizedSpecialty = normalizePlantaoSpecialty(input.specialty);
-  const serviceCode = getOnDutyServiceCodeForSpecialty(input.specialty);
+  const linkedSolicitacaoSnapshot = input.solicitacaoExameId
+    ? await repository.findSolicitacaoPaymentSnapshot({
+      solicitacaoExameId: input.solicitacaoExameId,
+      patientId: appUser.id,
+    })
+    : null;
+  let serviceCode = getOnDutyServiceCodeForSpecialty(input.specialty);
+  let pricing: ResolvedServicePricing | null = null;
+  let linkedPaidPayment: {
+    currentPaymentChargeId: string;
+    paidAt: string | null;
+  } | null = null;
+
+  if (input.solicitacaoExameId) {
+    assertLinkedSolicitacaoIsPaid(linkedSolicitacaoSnapshot, input.solicitacaoExameId);
+    pricing = buildPricingFromSolicitacaoSnapshot(linkedSolicitacaoSnapshot as SolicitacaoPaymentSnapshotRecord);
+    serviceCode = pricing.serviceCode;
+    linkedPaidPayment = {
+      currentPaymentChargeId: linkedSolicitacaoSnapshot?.current_payment_charge_id || '',
+      paidAt: linkedSolicitacaoSnapshot?.paid_at || null,
+    };
+  }
 
   if (!serviceCode) {
     throw new AppError({
@@ -105,7 +201,7 @@ export async function joinQueue({
   const waitingCount = await repository.countWaitingQueueBySpecialty(input.specialty);
   const position = waitingCount + 1;
   const estimatedWaitTime = position * 10;
-  const pricing = await repository.resolveServicePricing({ serviceCode });
+  pricing = pricing || await repository.resolveServicePricing({ serviceCode });
 
   console.info('[join-queue] request:start', {
     requestId,
@@ -126,6 +222,7 @@ export async function joinQueue({
     estimatedWaitTime,
     solicitacaoExameId: input.solicitacaoExameId,
     pricing,
+    linkedPaidPayment,
   });
 
   console.info('[join-queue] request:success', {
@@ -137,16 +234,5 @@ export async function joinQueue({
     quotedGrossPrice: queueEntry.quoted_gross_price,
   });
 
-  return {
-    queueEntry: {
-      id: queueEntry.id,
-      status: queueEntry.status || 'waiting',
-      specialty: queueEntry.specialty || input.specialty,
-      position: Number(queueEntry.position || position),
-      estimatedWaitTime: Number(queueEntry.estimated_wait_time || estimatedWaitTime),
-      assignedProfessionalId: queueEntry.assigned_professional_id || '',
-      solicitacaoExameId: queueEntry.solicitacao_exame_id || input.solicitacaoExameId,
-    },
-    reusedExisting: false,
-  };
+  return buildQueueResult(queueEntry, false);
 }

@@ -59,7 +59,7 @@ function resolveAuthToken(authMode) {
   return '';
 }
 
-function buildHeaders({ body, authMode }) {
+function buildHeaders({ body, authMode, headers: extraHeaders = null }) {
   const headers = new Headers();
   headers.set('apikey', env.edgeFunctionsPublishableKey);
 
@@ -71,6 +71,14 @@ function buildHeaders({ body, authMode }) {
 
   if (!(body instanceof FormData)) {
     headers.set('Content-Type', 'application/json');
+  }
+
+  if (extraHeaders && typeof extraHeaders === 'object') {
+    Object.entries(extraHeaders).forEach(([key, value]) => {
+      if (value !== undefined && value !== null && String(value).trim()) {
+        headers.set(key, String(value));
+      }
+    });
   }
 
   return headers;
@@ -88,10 +96,11 @@ async function executeEdgeFunction(functionName, {
   body,
   fallbackMessage,
   authMode,
+  headers,
 }) {
   const response = await fetch(`${env.edgeFunctionsBaseUrl}/${functionName}`, {
     method: 'POST',
-    headers: buildHeaders({ body, authMode }),
+    headers: buildHeaders({ body, authMode, headers }),
     body: buildRequestBody(body),
   });
 
@@ -192,6 +201,7 @@ export async function invokeEdgeFunction(functionName, {
   fallbackMessage,
   authMode = 'session',
   retryOnUnauthorized = true,
+  headers = null,
 }) {
   if ((authMode === 'session' || authMode === 'optional') && getStoredSession()?.accessToken) {
     try {
@@ -206,6 +216,7 @@ export async function invokeEdgeFunction(functionName, {
       body,
       fallbackMessage,
       authMode,
+      headers,
     });
   } catch (error) {
     if (
@@ -220,6 +231,7 @@ export async function invokeEdgeFunction(functionName, {
           body,
           fallbackMessage,
           authMode,
+          headers,
         });
       }
     }

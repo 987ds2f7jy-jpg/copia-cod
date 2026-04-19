@@ -1,4 +1,5 @@
 import { invokeEdgeFunction } from './edgeFunctions';
+import { normalizePayment } from './payments';
 
 export async function createSolicitacaoExameRequest(payload) {
   const result = await invokeEdgeFunction('create-solicitacao-exame', {
@@ -6,7 +7,14 @@ export async function createSolicitacaoExameRequest(payload) {
     fallbackMessage: 'Nao foi possivel criar a solicitacao de exame.',
   });
 
-  return result?.solicitacaoExame ?? null;
+  if (!result?.solicitacaoExame) {
+    return null;
+  }
+
+  return {
+    ...result.solicitacaoExame,
+    payment: normalizePayment(result?.payment, result.solicitacaoExame),
+  };
 }
 
 export async function updateSolicitacaoExameRequest(payload) {

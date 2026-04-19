@@ -132,6 +132,7 @@ function createCreateSolicitacaoExameRepository(client: SupabaseClient): CreateS
       return {
         ...row,
         current_payment_charge_id: paymentCharge.paymentChargeId,
+        payment: paymentCharge,
       };
     },
   };

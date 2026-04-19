@@ -7,6 +7,8 @@ import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { entities } from '@/client-api/readModels';
 import { joinQueueEntry, leaveQueueEntry } from '@/client-api/queues';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
@@ -24,6 +26,7 @@ import {
 } from '@/lib/solicitacoesExames';
 import ResumeConsultationCard from '@/components/teleconsulta/ResumeConsultationCard';
 import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
+import PaymentStep from '@/components/payments/PaymentStep';
 
 const SPECIALTIES = [
   { id: 'clinico_geral', name: 'Clinico Geral' },
@@ -107,6 +110,10 @@ function normalizeOnDutyProfessionals(publicProfiles = []) {
   });
 
   return Array.from(merged.values());
+}
+
+function isQueuePaid(queueEntry) {
+  return queueEntry?.paymentStatus === 'paid' || queueEntry?.payment_status === 'paid';
 }
 
 function ConsultaAgoraInner() {
@@ -213,10 +220,16 @@ function ConsultaAgoraInner() {
       }
 
       if (currentQueue) {
-        saveConsultaAgoraAutoResumeState(currentQueue.id);
-        setShouldAutoResumeAfterQueue(true);
         setQueueEntry(currentQueue);
-        setStep('queue');
+        if (isQueuePaid(currentQueue)) {
+          saveConsultaAgoraAutoResumeState(currentQueue.id);
+          setShouldAutoResumeAfterQueue(true);
+          setStep('queue');
+        } else {
+          clearConsultaAgoraAutoResumeState();
+          setShouldAutoResumeAfterQueue(false);
+          setStep('payment');
+        }
       } else {
         setQueueEntry(null);
         setStep('form');
@@ -259,7 +272,7 @@ function ConsultaAgoraInner() {
         return null;
       }
 
-      const filters = { status: 'waiting' };
+      const filters = { status: 'waiting', payment_status: 'paid' };
 
       if (selectedSpecialty) {
         filters.specialty = selectedSpecialty;
@@ -270,6 +283,15 @@ function ConsultaAgoraInner() {
     },
     enabled: Boolean(selectedSpecialty),
     refetchInterval: 30000,
+  });
+
+  const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
+    queryKey: ['service-pricing', 'on-duty', selectedSpecialty],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'on_duty',
+      specialty: selectedSpecialty,
+    }),
+    enabled: step === 'form' && Boolean(selectedSpecialty),
   });
 
   const enterQueue = useMutation({
@@ -283,16 +305,23 @@ function ConsultaAgoraInner() {
         specialty: payload.specialty,
         symptoms: payload.symptoms || '',
         priorityLevel: payload.priority_level || 'normal',
+        solicitacaoExameId: payload.solicitacao_exame_id || '',
       });
 
       return result.queueEntry;
     },
     onSuccess: (nextQueueEntry) => {
-      saveConsultaAgoraAutoResumeState(nextQueueEntry?.id);
-      setShouldAutoResumeAfterQueue(true);
       setQueueEntry(nextQueueEntry);
-      setStep('queue');
-      clearSpecificExamRedirect();
+      if (isQueuePaid(nextQueueEntry)) {
+        saveConsultaAgoraAutoResumeState(nextQueueEntry?.id);
+        setShouldAutoResumeAfterQueue(true);
+        setStep('queue');
+        clearSpecificExamRedirect();
+      } else {
+        clearConsultaAgoraAutoResumeState();
+        setShouldAutoResumeAfterQueue(false);
+        setStep('payment');
+      }
       queryClient.invalidateQueries({ queryKey: ['queueStats'] });
     },
   });
@@ -379,9 +408,24 @@ function ConsultaAgoraInner() {
       patient_email: user.email,
       specialty: selectedSpecialty,
       symptoms,
+      solicitacao_exame_id: readSpecificExamRedirect()?.solicitacaoExameId || '',
       priority_level: 'normal',
       status: 'waiting',
     });
+  };
+
+  const handleQueuePaymentPaid = (paidPayment) => {
+    setQueueEntry((previous) => ({
+      ...previous,
+      payment: paidPayment,
+      paymentStatus: 'paid',
+      payment_status: 'paid',
+    }));
+    saveConsultaAgoraAutoResumeState(queueEntry?.id);
+    setShouldAutoResumeAfterQueue(true);
+    setStep('queue');
+    clearSpecificExamRedirect();
+    queryClient.invalidateQueries({ queryKey: ['queueStats'] });
   };
 
   return (
@@ -485,9 +529,29 @@ function ConsultaAgoraInner() {
                     </div>
                   )}
 
+                  {selectedSpecialty && hasAvailableProfessionals && (
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+                      <div className="flex items-center justify-between gap-3">
+                        <span className="text-emerald-700">Valor oficial do plantao</span>
+                        <span className="font-bold text-emerald-800">
+                          {quoteLoading
+                            ? 'Carregando...'
+                            : serviceQuote?.grossPrice
+                            ? formatMoney(serviceQuote.grossPrice)
+                            : 'A definir'}
+                        </span>
+                      </div>
+                      {quoteError && (
+                        <p className="mt-2 text-red-600">
+                          {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                        </p>
+                      )}
+                    </div>
+                  )}
+
                   <Button
                     onClick={handleJoinQueue}
-                    disabled={!selectedSpecialty || !hasAvailableProfessionals || enterQueue.isPending}
+                    disabled={!selectedSpecialty || !hasAvailableProfessionals || enterQueue.isPending || quoteLoading || Boolean(quoteError)}
                     className="gradient-primary h-14 w-full border-0 text-lg text-white"
                   >
                     {enterQueue.isPending ? (
@@ -495,10 +559,27 @@ function ConsultaAgoraInner() {
                     ) : (
                       <Users className="mr-2 h-5 w-5" />
                     )}
-                    Entrar na Fila
+                    Criar pagamento e entrar na fila
                   </Button>
                 </CardContent>
               </Card>
+            </motion.div>
+          )}
+
+          {step === 'payment' && queueEntry && (
+            <motion.div key="payment" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
+              <PaymentStep
+                payment={queueEntry.payment || queueEntry}
+                ownerType="queue"
+                ownerId={queueEntry.id}
+                title="Pagamento do plantao"
+                description="Sua entrada na fila so fica ativa apos pagamento confirmado."
+                paidTitle="Pagamento confirmado"
+                paidDescription="Agora voce entrou na fila de atendimento."
+                continueLabel="Ver fila"
+                onPaid={handleQueuePaymentPaid}
+                onContinue={() => setStep('queue')}
+              />
             </motion.div>
           )}
 

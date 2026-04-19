@@ -320,6 +320,9 @@ export async function createAppointment({
       professionalId: appointment.professional_id || professionalId,
       professionalName: appointment.professional_name || professionalName,
       price: Number(appointment.price || price || 0),
+      paymentStatus: appointment.payment_status || 'payment_pending',
+      currentPaymentChargeId: appointment.current_payment_charge_id || null,
     },
+    payment: appointment.payment || null,
   };
 }

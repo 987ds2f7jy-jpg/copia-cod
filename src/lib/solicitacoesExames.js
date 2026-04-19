@@ -203,7 +203,12 @@ export async function findCurrentQueueEntry(patientId, specialty = CLINICO_GERAL
 
   const statuses = ['waiting', 'in_progress', 'em_atendimento'];
   const matches = await Promise.all(
-    statuses.map((status) => entities.Queue.filter({ patient_id: patientId, specialty, status }, '-created_date', 5)),
+    statuses.map((status) => entities.Queue.filter({
+      patient_id: patientId,
+      specialty,
+      status,
+      payment_status: 'paid',
+    }, '-created_date', 5)),
   );
 
   return matches.flat()[0] || null;
@@ -365,6 +370,7 @@ export async function listDirectSolicitacoesForProfessional(professional) {
     status: 'pending',
     fluxo_destino: 'dashboard',
     especialidade_destino: CLINICO_GERAL,
+    payment_status: 'paid',
   }, '-created_date');
 }
 

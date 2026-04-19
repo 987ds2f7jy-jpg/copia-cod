@@ -23,6 +23,9 @@ import {
   buildDatetime
 } from '@/lib/scheduling';
 import { createAppointmentRequest } from '@/client-api/appointments';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
+import PaymentStep from '@/components/payments/PaymentStep';
 
 function AgendamentoPerfilInner() {
   const [searchParams] = useSearchParams();
@@ -38,6 +41,8 @@ function AgendamentoPerfilInner() {
   const [selectedTime, setSelectedTime] = useState(null);
   const [symptoms, setSymptoms] = useState('');
   const [submitError, setSubmitError] = useState(null);
+  const [createdAppointment, setCreatedAppointment] = useState(null);
+  const [appointmentPayment, setAppointmentPayment] = useState(null);
 
   const { data: publicProfile, isLoading: loadingPublic } = useQuery({
     queryKey: ['pub-prof', professionalId],
@@ -99,6 +104,16 @@ function AgendamentoPerfilInner() {
 
   const availableSlots = appointmentType === 'priority' ? prioritySlots : standardSlots;
 
+  const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
+    queryKey: ['service-pricing', 'appointment-profile', privateProfileId, appointmentType],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'appointment_profile',
+      professionalProfileId: privateProfileId,
+      priority: appointmentType === 'priority',
+    }),
+    enabled: step === 2 && Boolean(privateProfileId),
+  });
+
   const weekdaysWithSlots = useMemo(() => {
     return new Set(availabilitySlots.map(s => s.weekday));
   }, [availabilitySlots]);
@@ -136,8 +151,10 @@ function AgendamentoPerfilInner() {
         priority: data.appointment_type === 'priority',
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setSubmitError(null);
+      setCreatedAppointment(result?.appointment || null);
+      setAppointmentPayment(result?.payment || result?.appointment?.payment || null);
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       queryClient.invalidateQueries({ queryKey: ['booked-appts', privateProfileId] });
       setStep(3);
@@ -402,13 +419,21 @@ function AgendamentoPerfilInner() {
                   <div className="flex justify-between">
                     <span className="text-gray-500">Valor</span>
                     <span className="font-semibold text-emerald-600">
-                      {appointmentType === 'priority'
-                        ? (publicProfile.price_priority > 0 ? `R$ ${publicProfile.price_priority.toFixed(2)}` : 'A definir')
-                        : (publicProfile.price_standard > 0 ? `R$ ${publicProfile.price_standard.toFixed(2)}` : 'A definir')
-                      }
+                      {quoteLoading
+                        ? 'Carregando valor oficial...'
+                        : serviceQuote?.grossPrice
+                        ? formatMoney(serviceQuote.grossPrice)
+                        : 'A definir'}
                     </span>
                   </div>
                 </div>
+
+                {quoteError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                  </div>
+                )}
 
                 <div>
                   <Label className="mb-2 block">Motivo / Sintomas (opcional)</Label>
@@ -433,7 +458,7 @@ function AgendamentoPerfilInner() {
                   </Button>
                   <Button
                     onClick={handleSubmit}
-                    disabled={createAppointment.isPending}
+                    disabled={createAppointment.isPending || quoteLoading || Boolean(quoteError)}
                     className={appointmentType === 'priority' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
                   >
                     {createAppointment.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -446,8 +471,25 @@ function AgendamentoPerfilInner() {
 
           {/* Step 3: Sucesso */}
           {step === 3 && (
-            <Card className="border-0 shadow-sm">
-              <CardContent className="p-8 text-center">
+            appointmentPayment?.status !== 'paid' ? (
+              <PaymentStep
+                payment={appointmentPayment}
+                ownerType="appointment"
+                ownerId={createdAppointment?.id}
+                title="Pagamento do agendamento"
+                description="Sua consulta foi registrada, mas so sera liberada apos a confirmacao do pagamento."
+                paidTitle="Pagamento confirmado"
+                paidDescription="Agora sua consulta esta liberada no sistema."
+                continueLabel="Ver minhas consultas"
+                onPaid={(paidPayment) => {
+                  setAppointmentPayment(paidPayment);
+                  queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
+                }}
+                onContinue={() => navigate(createPageUrl('DashboardPaciente'))}
+              />
+            ) : (
+              <Card className="border-0 shadow-sm">
+                <CardContent className="p-8 text-center">
                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
                   appointmentType === 'priority' ? 'bg-amber-100' : 'bg-emerald-100'
                 }`}>
@@ -501,6 +543,7 @@ function AgendamentoPerfilInner() {
                 </div>
               </CardContent>
             </Card>
+            )
           )}
         </motion.div>
       </div>

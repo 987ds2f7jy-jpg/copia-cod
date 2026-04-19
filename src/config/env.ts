@@ -9,6 +9,11 @@ const envSchema = z.object({
   VITE_BACKEND_PUBLISHABLE_KEY: z.string().min(1).optional(),
   VITE_MAPBOX_TOKEN: z.string().min(1).optional(),
   VITE_APP_ENV: z.enum(["development", "staging", "production", "test"]).optional(),
+  VITE_ENABLE_PAYMENT_SIMULATION: z
+    .string()
+    .transform((value) => value === "true")
+    .optional(),
+  VITE_PAYMENT_SIMULATION_SECRET: z.string().min(1).optional(),
 });
 
 const parsedEnv = envSchema.safeParse(import.meta.env);
@@ -23,12 +28,15 @@ if (!parsedEnv.success) {
 
 const rawEnv = parsedEnv.data;
 const backendFunctionsUrl = rawEnv.VITE_BACKEND_FUNCTIONS_URL || DEFAULT_BACKEND_FUNCTIONS_URL;
+const appEnv = rawEnv.VITE_APP_ENV ?? (import.meta.env.PROD ? "production" : "development");
 
 export const env = {
   edgeFunctionsBaseUrl: backendFunctionsUrl.replace(/\/$/, ""),
   edgeFunctionsPublishableKey: rawEnv.VITE_BACKEND_PUBLISHABLE_KEY || DEFAULT_BACKEND_PUBLISHABLE_KEY,
   mapboxToken: rawEnv.VITE_MAPBOX_TOKEN || DEFAULT_MAPBOX_TOKEN,
-  appEnv: rawEnv.VITE_APP_ENV ?? (import.meta.env.PROD ? "production" : "development"),
+  appEnv,
+  paymentSimulationEnabled: appEnv !== "production" && rawEnv.VITE_ENABLE_PAYMENT_SIMULATION === true,
+  paymentSimulationSecret: appEnv !== "production" ? rawEnv.VITE_PAYMENT_SIMULATION_SECRET || "" : "",
   isDev: import.meta.env.DEV,
   isProd: import.meta.env.PROD,
 };

@@ -13,6 +13,7 @@ import type {
   PlantaoConsultaRecord,
   PublicProfileRecord,
   QueueRecord,
+  SolicitacaoPaymentSnapshotRecord,
 } from './types.ts';
 
 type AppUserRow = {
@@ -106,7 +107,8 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           pricing_rule_id,
           fee_rule_id,
           payment_status,
-          current_payment_charge_id
+          current_payment_charge_id,
+          paid_at
         `)
         .eq('patient_id', patientId)
         .in('status', ['waiting', 'in_progress', 'em_atendimento'])
@@ -124,6 +126,43 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
       }
 
       return (data as QueueRecord | null) || null;
+    },
+
+    async findSolicitacaoPaymentSnapshot({
+      solicitacaoExameId,
+      patientId,
+    }): Promise<SolicitacaoPaymentSnapshotRecord | null> {
+      const { data, error } = await client
+        .from('solicitacoes_exames')
+        .select(`
+          id,
+          paciente_id,
+          service_code,
+          price_source,
+          quoted_gross_price,
+          quoted_platform_fee_percent,
+          quoted_platform_fee_amount,
+          quoted_professional_net_amount,
+          pricing_rule_id,
+          fee_rule_id,
+          payment_status,
+          current_payment_charge_id,
+          paid_at
+        `)
+        .eq('id', solicitacaoExameId)
+        .eq('paciente_id', patientId)
+        .maybeSingle();
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'SOLICITACAO_PAYMENT_SNAPSHOT_LOOKUP_FAILED',
+          message: 'Unable to load linked exam request payment snapshot.',
+          details: error.message,
+        });
+      }
+
+      return (data as SolicitacaoPaymentSnapshotRecord | null) || null;
     },
 
     async listOnDutyPublicProfiles(): Promise<PublicProfileRecord[]> {
@@ -194,7 +233,9 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           quoted_professional_net_amount: params.pricing.professionalNetAmount,
           pricing_rule_id: params.pricing.pricingRuleId,
           fee_rule_id: params.pricing.feeRuleId,
-          payment_status: 'payment_pending',
+          payment_status: params.linkedPaidPayment ? 'paid' : 'payment_pending',
+          current_payment_charge_id: params.linkedPaidPayment?.currentPaymentChargeId || null,
+          paid_at: params.linkedPaidPayment?.paidAt || null,
         })
         .select(`
           id,
@@ -218,7 +259,8 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           pricing_rule_id,
           fee_rule_id,
           payment_status,
-          current_payment_charge_id
+          current_payment_charge_id,
+          paid_at
         `)
         .single();
 
@@ -241,6 +283,10 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
         });
       }
 
+      if (params.linkedPaidPayment) {
+        return row;
+      }
+
       const paymentCharge = await createPaymentCharge(client, {
         ownerType: 'queue',
         ownerId: row.id,
@@ -251,6 +297,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
       return {
         ...row,
         current_payment_charge_id: paymentCharge.paymentChargeId,
+        payment: paymentCharge,
       };
     },
   };

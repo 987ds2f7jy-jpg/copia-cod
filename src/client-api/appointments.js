@@ -1,4 +1,5 @@
 import { invokeEdgeFunction } from './edgeFunctions';
+import { normalizePayment } from './payments';
 
 export async function createAppointmentRequest({
   professionalProfileId = null,
@@ -8,7 +9,7 @@ export async function createAppointmentRequest({
   symptoms = '',
   priority = false,
 }) {
-  return invokeEdgeFunction('create-appointment', {
+  const result = await invokeEdgeFunction('create-appointment', {
     body: {
       professionalProfileId,
       specialty,
@@ -19,6 +20,17 @@ export async function createAppointmentRequest({
     },
     fallbackMessage: 'Nao foi possivel criar o agendamento.',
   });
+
+  return {
+    ...result,
+    appointment: result?.appointment
+      ? {
+        ...result.appointment,
+        payment: normalizePayment(result?.payment, result.appointment),
+      }
+      : null,
+    payment: normalizePayment(result?.payment, result?.appointment),
+  };
 }
 
 export async function cancelAppointmentRequest({

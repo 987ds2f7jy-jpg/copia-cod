@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthContext';
 import { deleteUploadedFiles, uploadFile } from '@/client-api/uploads';
 import { Button } from '@/components/ui/button';
@@ -23,6 +24,9 @@ import {
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
 import { createPrescriptionRenewalRequest } from '@/lib/solicitacoesExames';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
+import PaymentStep from '@/components/payments/PaymentStep';
 
 const FREQUENCIAS = [
   '1x ao dia',
@@ -43,6 +47,16 @@ export default function RenovacaoReceitas() {
   const [previewUrl, setPreviewUrl] = useState('');
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [pendingSolicitacao, setPendingSolicitacao] = useState(null);
+
+  const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
+    queryKey: ['service-pricing', 'solicitacao-exame', 'renovacao_receitas'],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'solicitacao_exame',
+      tipo: 'renovacao_receitas',
+    }),
+    enabled: accepted && !success && Boolean(user?.id),
+  });
 
   function getUserFacingErrorMessage(error) {
     if (error instanceof Error && error.message) {
@@ -91,17 +105,17 @@ export default function RenovacaoReceitas() {
       });
       uploadedFilePath = uploadedFile?.path || '';
 
-      await createPrescriptionRenewalRequest(user, {
+      const solicitacao = await createPrescriptionRenewalRequest(user, {
         nomeMedicamento: medicamento.trim(),
         dosagem: dosagem.trim(),
         frequencia,
         arquivoReceitaUrl: uploadedFile?.path || '',
       });
 
-      setSuccess(true);
+      setPendingSolicitacao(solicitacao);
       toast({
-        title: 'Solicitacao enviada!',
-        description: 'Seu pedido de renovacao foi enviado para analise medica.',
+        title: 'Solicitacao criada',
+        description: 'Finalize o pagamento para liberar a analise medica.',
       });
     } catch (error) {
       console.error('[RenovacaoReceitas] Falha ao enviar solicitacao', error);
@@ -122,6 +136,15 @@ export default function RenovacaoReceitas() {
 
   const formValid = medicamento.trim() && dosagem.trim() && frequencia && arquivo;
 
+  function finishPayment() {
+    setSuccess(true);
+    setPendingSolicitacao(null);
+    toast({
+      title: 'Pagamento confirmado',
+      description: 'Seu pedido de renovacao foi liberado para analise medica.',
+    });
+  }
+
   if (success) {
     return (
       <div className="min-h-screen bg-gray-50 py-12">
@@ -134,6 +157,27 @@ export default function RenovacaoReceitas() {
             Seu pedido de renovacao de receita foi enviado para analise medica. Voce sera notificado quando houver resposta.
           </p>
           <Button onClick={() => window.history.back()} variant="outline">Voltar</Button>
+        </div>
+      </div>
+    );
+  }
+
+  if (pendingSolicitacao) {
+    return (
+      <div className="min-h-screen bg-gray-50 py-12">
+        <div className="max-w-lg mx-auto px-4">
+          <PaymentStep
+            payment={pendingSolicitacao.payment || pendingSolicitacao}
+            ownerType="solicitacao_exame"
+            ownerId={pendingSolicitacao.id}
+            title="Pagamento da renovacao"
+            description="Sua solicitacao foi criada, mas so seguira para analise apos pagamento confirmado."
+            paidTitle="Pagamento confirmado"
+            paidDescription="A renovacao foi liberada para analise medica."
+            continueLabel="Concluir"
+            onPaid={finishPayment}
+            onContinue={finishPayment}
+          />
         </div>
       </div>
     );
@@ -261,10 +305,28 @@ export default function RenovacaoReceitas() {
                   </div>
                 </div>
 
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+                  <div className="flex items-center justify-between">
+                    <span className="text-emerald-700">Valor oficial</span>
+                    <span className="font-bold text-emerald-800">
+                      {quoteLoading
+                        ? 'Carregando...'
+                        : serviceQuote?.grossPrice
+                        ? formatMoney(serviceQuote.grossPrice)
+                        : 'A definir'}
+                    </span>
+                  </div>
+                  {quoteError && (
+                    <p className="mt-2 text-red-600">
+                      {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                    </p>
+                  )}
+                </div>
+
                 <Button
                   type="submit"
                   className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-5 text-base"
-                  disabled={!formValid || loading}
+                  disabled={!formValid || loading || quoteLoading || Boolean(quoteError)}
                 >
                   {loading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                   Enviar Solicitacao de Renovacao

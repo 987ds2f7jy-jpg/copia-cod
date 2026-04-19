@@ -1,4 +1,5 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
+import type { CreatedPaymentCharge } from '../_shared/payments/types.ts';
 import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
 
 export type CreateAppointmentInput = {
@@ -63,6 +64,7 @@ export type AppointmentRecord = {
   symptoms: string | null;
   accepted_at: string | null;
   consulta_id: string | null;
+  payment?: CreatedPaymentCharge;
 };
 
 export type CreateAppointmentResult = {
@@ -77,7 +79,10 @@ export type CreateAppointmentResult = {
     professionalId: string | null;
     professionalName: string;
     price: number;
+    paymentStatus: string;
+    currentPaymentChargeId: string | null;
   };
+  payment: CreatedPaymentCharge | null;
 };
 
 export type CreateAppointmentSuccessResponse = ApiSuccess<CreateAppointmentResult>;

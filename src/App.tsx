@@ -12,6 +12,7 @@ import AppLoadingScreen from '@/components/AppLoadingScreen';
 
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
 const FinanceiroProfissional = lazy(() => import('./pages/FinanceiroProfissional'));
+const PagamentoRetorno = lazy(() => import('./pages/PagamentoRetorno'));
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -68,6 +69,14 @@ function App() {
                 />
               ))}
               <Route path="/Agendamento" element={<AgendamentoRedirect />} />
+              <Route
+                path="/pagamento/:status"
+                element={
+                  <LayoutWrapper currentPageName="PagamentoRetorno">
+                    <PagamentoRetorno />
+                  </LayoutWrapper>
+                }
+              />
               <Route
                 path="/consulta/:consultaId"
                 element={

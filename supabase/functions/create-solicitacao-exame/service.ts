@@ -203,5 +203,6 @@ export async function createSolicitacaoExame({
 
   return {
     solicitacaoExame,
+    payment: solicitacaoExame.payment || null,
   };
 }

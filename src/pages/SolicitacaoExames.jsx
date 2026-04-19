@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -16,6 +17,9 @@ import {
 } from '@/components/ui/dialog';
 import { AlertTriangle, CheckCircle, Loader2, Search } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
+import PaymentStep from '@/components/payments/PaymentStep';
 import {
   buildSpecificExamSymptoms,
   createCheckupRequest,
@@ -29,11 +33,31 @@ function SolicitacaoExamesInner() {
   const [checkupOpen, setCheckupOpen] = useState(false);
   const [checkupConfirmed, setCheckupConfirmed] = useState(false);
   const [checkupLoading, setCheckupLoading] = useState(false);
+  const [pendingCheckup, setPendingCheckup] = useState(null);
   const [especificosOpen, setEspecificosOpen] = useState(false);
   const [exame, setExame] = useState('');
   const [motivo, setMotivo] = useState('');
   const [sintomas, setSintomas] = useState('');
   const [especificosLoading, setEspecificosLoading] = useState(false);
+  const [pendingEspecificos, setPendingEspecificos] = useState(null);
+
+  const { data: checkupQuote, isLoading: checkupQuoteLoading, error: checkupQuoteError } = useQuery({
+    queryKey: ['service-pricing', 'solicitacao-exame', 'checkup'],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'solicitacao_exame',
+      tipo: 'checkup',
+    }),
+    enabled: checkupOpen,
+  });
+
+  const { data: especificosQuote, isLoading: especificosQuoteLoading, error: especificosQuoteError } = useQuery({
+    queryKey: ['service-pricing', 'solicitacao-exame', 'especificos'],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'solicitacao_exame',
+      tipo: 'especificos',
+    }),
+    enabled: especificosOpen,
+  });
 
   async function handleCheckupSubmit() {
     if (!checkupConfirmed) {
@@ -43,13 +67,12 @@ function SolicitacaoExamesInner() {
     setCheckupLoading(true);
 
     try {
-      await createCheckupRequest(user);
+      const solicitacao = await createCheckupRequest(user);
+      setPendingCheckup(solicitacao);
       toast({
-        title: 'Solicitacao enviada!',
-        description: 'Seu pedido de Check-Up foi enviado para a fila direta do clinico geral.',
+        title: 'Solicitacao criada',
+        description: 'Finalize o pagamento para liberar o pedido de Check-Up.',
       });
-      setCheckupOpen(false);
-      setCheckupConfirmed(false);
     } catch (error) {
       toast({
         title: 'Erro',
@@ -69,7 +92,7 @@ function SolicitacaoExamesInner() {
     setEspecificosLoading(true);
 
     try {
-      await createSpecificExamRequest(user, {
+      const solicitacao = await createSpecificExamRequest(user, {
         exame: exame.trim(),
         motivo: motivo.trim(),
         sintomas: sintomas.trim(),
@@ -81,16 +104,17 @@ function SolicitacaoExamesInner() {
         sintomas: sintomas.trim(),
       });
 
-      persistSpecificExamRedirect({
+      setPendingEspecificos({
+        solicitacao,
+        redirect: {
         especialidade: 'clinico_geral',
         sintomas: sintomasCompletos,
         exame: exame.trim(),
         motivo: motivo.trim(),
         descricao_original_sintomas: sintomas.trim(),
+        solicitacaoExameId: solicitacao.id,
+        },
       });
-
-      setEspecificosOpen(false);
-      navigate(`/ConsultaAgora?especialidade=${encodeURIComponent('clinico_geral')}&sintomas=${encodeURIComponent(sintomasCompletos)}`);
     } catch (error) {
       toast({
         title: 'Erro',
@@ -100,6 +124,29 @@ function SolicitacaoExamesInner() {
     } finally {
       setEspecificosLoading(false);
     }
+  }
+
+  function finishCheckupPayment() {
+    toast({
+      title: 'Pagamento confirmado',
+      description: 'Seu pedido de Check-Up foi liberado para avaliacao.',
+    });
+    setPendingCheckup(null);
+    setCheckupOpen(false);
+    setCheckupConfirmed(false);
+  }
+
+  function finishEspecificosPayment() {
+    const redirect = pendingEspecificos?.redirect;
+
+    if (!redirect) {
+      return;
+    }
+
+    persistSpecificExamRedirect(redirect);
+    setPendingEspecificos(null);
+    setEspecificosOpen(false);
+    navigate(`/ConsultaAgora?especialidade=${encodeURIComponent('clinico_geral')}&sintomas=${encodeURIComponent(redirect.sintomas)}`);
   }
 
   return (
@@ -151,6 +198,21 @@ function SolicitacaoExamesInner() {
             <DialogDescription>Leia com atencao antes de prosseguir.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {pendingCheckup ? (
+              <PaymentStep
+                payment={pendingCheckup.payment || pendingCheckup}
+                ownerType="solicitacao_exame"
+                ownerId={pendingCheckup.id}
+                title="Pagamento do Check-Up"
+                description="O pedido foi criado, mas so sera liberado apos pagamento confirmado."
+                paidTitle="Pagamento confirmado"
+                paidDescription="Seu Check-Up foi liberado para avaliacao."
+                continueLabel="Concluir"
+                onPaid={finishCheckupPayment}
+                onContinue={finishCheckupPayment}
+              />
+            ) : (
+            <>
             <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-sm text-amber-800 space-y-2">
               <p className="font-semibold">Atencao:</p>
               <p>Esta modalidade e exclusiva para pacientes assintomaticos no momento.</p>
@@ -172,6 +234,24 @@ function SolicitacaoExamesInner() {
               </label>
             </div>
 
+            <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-emerald-700">Valor oficial</span>
+                <span className="font-bold text-emerald-800">
+                  {checkupQuoteLoading
+                    ? 'Carregando...'
+                    : checkupQuote?.grossPrice
+                    ? formatMoney(checkupQuote.grossPrice)
+                    : 'A definir'}
+                </span>
+              </div>
+              {checkupQuoteError && (
+                <p className="mt-2 text-red-600">
+                  {checkupQuoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                </p>
+              )}
+            </div>
+
             <div className="flex gap-3">
               <Button
                 variant="outline"
@@ -185,13 +265,15 @@ function SolicitacaoExamesInner() {
               </Button>
               <Button
                 className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-                disabled={!checkupConfirmed || checkupLoading}
+                disabled={!checkupConfirmed || checkupLoading || checkupQuoteLoading || Boolean(checkupQuoteError)}
                 onClick={handleCheckupSubmit}
               >
                 {checkupLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
                 Confirmar e Enviar
               </Button>
             </div>
+            </>
+            )}
           </div>
         </DialogContent>
       </Dialog>
@@ -203,6 +285,21 @@ function SolicitacaoExamesInner() {
             <DialogDescription>Preencha os dados para solicitar o exame e seguir para o plantao.</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
+            {pendingEspecificos?.solicitacao ? (
+              <PaymentStep
+                payment={pendingEspecificos.solicitacao.payment || pendingEspecificos.solicitacao}
+                ownerType="solicitacao_exame"
+                ownerId={pendingEspecificos.solicitacao.id}
+                title="Pagamento dos exames especificos"
+                description="Pague esta solicitacao para liberar o encaminhamento ao plantao."
+                paidTitle="Pagamento confirmado"
+                paidDescription="Agora vamos levar voce para o plantao."
+                continueLabel="Seguir para o plantao"
+                onPaid={finishEspecificosPayment}
+                onContinue={finishEspecificosPayment}
+              />
+            ) : (
+            <>
             <div>
               <label className="text-sm font-medium text-gray-700 mb-1 block">Qual exame voce deseja solicitar?</label>
               <Input
@@ -227,14 +324,33 @@ function SolicitacaoExamesInner() {
                 placeholder="Descreva seus sintomas..."
               />
             </div>
+            <div className="rounded-xl border border-blue-100 bg-blue-50 p-3 text-sm">
+              <div className="flex items-center justify-between">
+                <span className="text-blue-700">Valor oficial</span>
+                <span className="font-bold text-blue-800">
+                  {especificosQuoteLoading
+                    ? 'Carregando...'
+                    : especificosQuote?.grossPrice
+                    ? formatMoney(especificosQuote.grossPrice)
+                    : 'A definir'}
+                </span>
+              </div>
+              {especificosQuoteError && (
+                <p className="mt-2 text-red-600">
+                  {especificosQuoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                </p>
+              )}
+            </div>
             <Button
               className="w-full bg-blue-600 hover:bg-blue-700 text-white"
-              disabled={!exame.trim() || especificosLoading}
+              disabled={!exame.trim() || especificosLoading || especificosQuoteLoading || Boolean(especificosQuoteError)}
               onClick={handleEspecificosSubmit}
             >
               {especificosLoading && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
               Solicitar ao Medico
             </Button>
+            </>
+            )}
           </div>
         </DialogContent>
       </Dialog>

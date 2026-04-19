@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { deleteUploadedFiles, uploadFile as uploadPrivateFile } from '@/client-api/uploads';
@@ -30,6 +31,9 @@ import {
   X,
 } from 'lucide-react';
 import { toast } from '@/components/ui/use-toast';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
+import PaymentStep from '@/components/payments/PaymentStep';
 import {
   clearLaudoWizardState,
   deleteSolicitacaoExame,
@@ -135,6 +139,8 @@ function LaudosMedicosInner() {
   const [step, setStep] = useState(0);
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
+  const [pendingLaudoSolicitacao, setPendingLaudoSolicitacao] = useState(null);
+  const [finalizingPaidLaudo, setFinalizingPaidLaudo] = useState(false);
 
   const [nome, setNome] = useState('');
   const [nascimento, setNascimento] = useState('');
@@ -154,6 +160,15 @@ function LaudosMedicosInner() {
   const [docIdentidade, setDocIdentidade] = useState(null);
   const [examesRecentes, setExamesRecentes] = useState([]);
   const [relatorios, setRelatorios] = useState([]);
+
+  const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
+    queryKey: ['service-pricing', 'solicitacao-exame', 'laudo_medico'],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'solicitacao_exame',
+      tipo: 'laudo_medico',
+    }),
+    enabled: accepted && step === STEPS.length - 1 && !success,
+  });
 
   useEffect(() => {
     if (!user || hydrationRef.current) {
@@ -355,8 +370,6 @@ function LaudosMedicosInner() {
 
     let uploadedFiles = [];
     let createdSolicitacao = null;
-    let createdQueueEntry = null;
-    let reusedExistingQueue = false;
 
     try {
       const [docUpload, examesUploads, relatoriosUploads] = await Promise.all([
@@ -390,27 +403,11 @@ function LaudosMedicosInner() {
         arquivos: arquivosUrls,
       });
 
-      const queueResult = await createLaudoQueueEntry({
-        patientId: user.id,
-        patientName: nome,
-        patientEmail: email,
-        tipoLaudo,
-        diagnostico,
-        finalidade,
-        solicitacaoExameId: createdSolicitacao.id,
-      });
-
-      createdQueueEntry = queueResult.entry;
-      reusedExistingQueue = Boolean(queueResult.reusedExisting);
-
-      await linkSolicitacaoExameToQueue(createdSolicitacao.id, createdQueueEntry?.id);
-
-      clearLaudoWizardState();
-      setSuccess(true);
+      setPendingLaudoSolicitacao(createdSolicitacao);
 
       toast({
-        title: 'Solicitacao enviada!',
-        description: 'Voce foi direcionado para a fila de Clinico Geral.',
+        title: 'Solicitacao criada',
+        description: 'Finalize o pagamento para entrar na fila de Clinico Geral.',
       });
     } catch (error) {
       console.error('[laudos-medicos] submit failed', error);
@@ -420,14 +417,6 @@ function LaudosMedicosInner() {
           await deleteSolicitacaoExame(createdSolicitacao.id);
         } catch (cleanupError) {
           console.error('[laudos-medicos] cleanup solicitacao failed', cleanupError);
-        }
-      }
-
-      if (createdQueueEntry?.id && !reusedExistingQueue) {
-        try {
-          await leaveQueueEntry({ queueId: createdQueueEntry.id });
-        } catch (cleanupError) {
-          console.error('[laudos-medicos] cleanup queue failed', cleanupError);
         }
       }
 
@@ -441,6 +430,84 @@ function LaudosMedicosInner() {
     } finally {
       setLoading(false);
     }
+  }
+
+  async function finalizePaidLaudo() {
+    if (!pendingLaudoSolicitacao?.id || finalizingPaidLaudo) {
+      return;
+    }
+
+    setFinalizingPaidLaudo(true);
+
+    let createdQueueEntry = null;
+    let reusedExistingQueue = false;
+
+    try {
+      const queueResult = await createLaudoQueueEntry({
+        patientId: user.id,
+        patientName: nome,
+        patientEmail: email,
+        tipoLaudo,
+        diagnostico,
+        finalidade,
+        solicitacaoExameId: pendingLaudoSolicitacao.id,
+      });
+
+      createdQueueEntry = queueResult.entry;
+      reusedExistingQueue = Boolean(queueResult.reusedExisting);
+
+      await linkSolicitacaoExameToQueue(pendingLaudoSolicitacao.id, createdQueueEntry?.id);
+
+      clearLaudoWizardState();
+      setPendingLaudoSolicitacao(null);
+      setSuccess(true);
+
+      toast({
+        title: 'Pagamento confirmado',
+        description: 'Voce entrou na fila de Clinico Geral para finalizar o laudo.',
+      });
+    } catch (error) {
+      console.error('[laudos-medicos] finalize paid request failed', error);
+
+      if (createdQueueEntry?.id && !reusedExistingQueue) {
+        await leaveQueueEntry({ queueId: createdQueueEntry.id }).catch(() => {});
+      }
+
+      toast({
+        title: 'Erro ao liberar laudo',
+        description: getErrorMessage(error, 'Pagamento confirmado, mas nao foi possivel entrar na fila. Tente novamente.'),
+        variant: 'destructive',
+      });
+    } finally {
+      setFinalizingPaidLaudo(false);
+    }
+  }
+
+  if (pendingLaudoSolicitacao) {
+    return (
+      <div className="min-h-screen bg-background flex items-center justify-center p-4">
+        <div className="max-w-md w-full space-y-3">
+          <PaymentStep
+            payment={pendingLaudoSolicitacao.payment || pendingLaudoSolicitacao}
+            ownerType="solicitacao_exame"
+            ownerId={pendingLaudoSolicitacao.id}
+            title="Pagamento do laudo medico"
+            description="Sua solicitacao foi criada, mas so entra na fila apos pagamento confirmado."
+            paidTitle="Pagamento confirmado"
+            paidDescription="Estamos liberando sua entrada na fila de Clinico Geral."
+            continueLabel={finalizingPaidLaudo ? 'Liberando...' : 'Entrar na fila'}
+            onPaid={finalizePaidLaudo}
+            onContinue={finalizePaidLaudo}
+          />
+          {finalizingPaidLaudo && (
+            <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
+              <Loader2 className="h-4 w-4 animate-spin" />
+              Liberando fila de atendimento...
+            </div>
+          )}
+        </div>
+      </div>
+    );
   }
 
   if (success) {
@@ -731,6 +798,26 @@ function LaudosMedicosInner() {
           </CardContent>
         </Card>
 
+        {step === STEPS.length - 1 ? (
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+            <div className="flex items-center justify-between">
+              <span className="text-emerald-700">Valor oficial do laudo</span>
+              <span className="font-bold text-emerald-800">
+                {quoteLoading
+                  ? 'Carregando...'
+                  : serviceQuote?.grossPrice
+                  ? formatMoney(serviceQuote.grossPrice)
+                  : 'A definir'}
+              </span>
+            </div>
+            {quoteError && (
+              <p className="mt-2 text-red-600">
+                {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+              </p>
+            )}
+          </div>
+        ) : null}
+
         <div className="flex gap-3">
           {step > 0 ? (
             <Button variant="outline" className="flex-1" onClick={() => setStep((current) => current - 1)}>
@@ -747,7 +834,7 @@ function LaudosMedicosInner() {
           ) : (
             <Button
               className="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white"
-              disabled={!canAdvance() || loading}
+              disabled={!canAdvance() || loading || quoteLoading || Boolean(quoteError)}
               onClick={handleSubmit}
             >
               {loading ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <CheckCircle className="w-4 h-4 mr-2" />}

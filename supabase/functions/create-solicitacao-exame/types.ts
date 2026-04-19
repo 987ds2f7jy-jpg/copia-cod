@@ -1,5 +1,6 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
 import type { AppUserRecord } from '../_shared/appUsers.ts';
+import type { CreatedPaymentCharge } from '../_shared/payments/types.ts';
 import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
 
 export type JsonValue =
@@ -67,6 +68,7 @@ export type SolicitacaoExameRecord = {
   fee_rule_id: string | null;
   payment_status: string | null;
   current_payment_charge_id: string | null;
+  payment?: CreatedPaymentCharge;
   created_date: string;
   updated_at: string;
 };
@@ -98,6 +100,7 @@ export type CreateSolicitacaoExameParams = {
 
 export type CreateSolicitacaoExameResult = {
   solicitacaoExame: SolicitacaoExameRecord;
+  payment: CreatedPaymentCharge | null;
 };
 
 export type CreateSolicitacaoExameSuccessResponse = ApiSuccess<CreateSolicitacaoExameResult>;

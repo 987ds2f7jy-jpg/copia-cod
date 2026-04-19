@@ -1,6 +1,7 @@
 import { invokeEdgeFunction } from './edgeFunctions';
+import { normalizePayment } from './payments';
 
-function normalizeQueueEntry(queueEntry) {
+function normalizeQueueEntry(queueEntry, payment = null) {
   if (!queueEntry) {
     return null;
   }
@@ -10,13 +11,23 @@ function normalizeQueueEntry(queueEntry) {
     estimatedWaitTime: queueEntry.estimatedWaitTime ?? queueEntry.estimated_wait_time ?? 0,
     assignedProfessionalId: queueEntry.assignedProfessionalId ?? queueEntry.assigned_professional_id ?? '',
     solicitacaoExameId: queueEntry.solicitacaoExameId ?? queueEntry.solicitacao_exame_id ?? '',
+    serviceCode: queueEntry.serviceCode ?? queueEntry.service_code ?? '',
+    quotedGrossPrice: queueEntry.quotedGrossPrice ?? queueEntry.quoted_gross_price ?? 0,
+    paymentStatus: queueEntry.paymentStatus ?? queueEntry.payment_status ?? 'payment_pending',
+    currentPaymentChargeId: queueEntry.currentPaymentChargeId ?? queueEntry.current_payment_charge_id ?? null,
   };
+  const normalizedPayment = normalizePayment(payment || queueEntry.payment, normalized);
 
   return {
     ...normalized,
     estimated_wait_time: normalized.estimatedWaitTime,
     assigned_professional_id: normalized.assignedProfessionalId,
     solicitacao_exame_id: normalized.solicitacaoExameId,
+    service_code: normalized.serviceCode,
+    quoted_gross_price: normalized.quotedGrossPrice,
+    payment_status: normalized.paymentStatus,
+    current_payment_charge_id: normalized.currentPaymentChargeId,
+    payment: normalizedPayment,
   };
 }
 
@@ -38,7 +49,8 @@ export async function joinQueueEntry({
 
   return {
     ...result,
-    queueEntry: normalizeQueueEntry(result?.queueEntry),
+    payment: normalizePayment(result?.payment, result?.queueEntry),
+    queueEntry: normalizeQueueEntry(result?.queueEntry, result?.payment),
   };
 }
 

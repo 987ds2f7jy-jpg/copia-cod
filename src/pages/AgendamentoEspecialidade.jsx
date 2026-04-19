@@ -3,7 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
 import { createPageUrl } from '@/utils';
-import { useMutation, useQueryClient } from '@tanstack/react-query';
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query';
 import { motion } from 'framer-motion';
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -21,6 +21,9 @@ import {
   validateSchedulingWindow, buildDatetime, ALL_TIME_SLOTS
 } from '@/lib/scheduling';
 import { createAppointmentRequest } from '@/client-api/appointments';
+import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { formatMoney } from '@/client-api/payments';
+import PaymentStep from '@/components/payments/PaymentStep';
 
 const PROFESSIONS = [
   {
@@ -50,6 +53,8 @@ function AgendamentoEspecialidadeInner() {
   const [symptoms, setSymptoms] = useState('');
   const [step, setStep] = useState(1);
   const [submitError, setSubmitError] = useState(null);
+  const [createdAppointment, setCreatedAppointment] = useState(null);
+  const [appointmentPayment, setAppointmentPayment] = useState(null);
 
   const availableSlots = useMemo(() => {
     if (!selectedDate) return [];
@@ -59,6 +64,15 @@ function AgendamentoEspecialidadeInner() {
       return validateSchedulingWindow(dt).valid;
     });
   }, [selectedDate]);
+
+  const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
+    queryKey: ['service-pricing', 'appointment-specialty', selectedSpecialty],
+    queryFn: () => quoteServicePricingRequest({
+      flow: 'appointment_specialty',
+      specialty: selectedSpecialty || '',
+    }),
+    enabled: step === 4 && Boolean(selectedSpecialty),
+  });
 
   const createRequest = useMutation({
     mutationFn: async () => {
@@ -76,8 +90,10 @@ function AgendamentoEspecialidadeInner() {
         priority: false,
       });
     },
-    onSuccess: () => {
+    onSuccess: (result) => {
       setSubmitError(null);
+      setCreatedAppointment(result?.appointment || null);
+      setAppointmentPayment(result?.payment || result?.appointment?.payment || null);
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setStep(5);
     },
@@ -281,7 +297,24 @@ function AgendamentoEspecialidadeInner() {
                     <span className="text-gray-500">Status inicial</span>
                     <Badge className="bg-amber-100 text-amber-700">Aguardando aceite</Badge>
                   </div>
+                  <div className="flex justify-between">
+                    <span className="text-gray-500">Valor oficial</span>
+                    <span className="font-semibold text-emerald-600">
+                      {quoteLoading
+                        ? 'Carregando...'
+                        : serviceQuote?.grossPrice
+                        ? formatMoney(serviceQuote.grossPrice)
+                        : 'A definir'}
+                    </span>
+                  </div>
                 </div>
+
+                {quoteError && (
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                  </div>
+                )}
 
                 <div>
                   <Label className="mb-2 block">Motivo / Sintomas (opcional)</Label>
@@ -306,7 +339,7 @@ function AgendamentoEspecialidadeInner() {
                   </Button>
                   <Button
                     onClick={() => createRequest.mutate()}
-                    disabled={createRequest.isPending}
+                    disabled={createRequest.isPending || quoteLoading || Boolean(quoteError)}
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     {createRequest.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
@@ -319,6 +352,23 @@ function AgendamentoEspecialidadeInner() {
 
           {/* Step 5: Sucesso */}
           {step === 5 && (
+            appointmentPayment?.status !== 'paid' ? (
+              <PaymentStep
+                payment={appointmentPayment}
+                ownerType="appointment"
+                ownerId={createdAppointment?.id}
+                title="Pagamento da solicitacao"
+                description="A solicitacao foi criada, mas so sera enviada para aceite apos pagamento confirmado."
+                paidTitle="Pagamento confirmado"
+                paidDescription="Sua solicitacao por especialidade esta liberada."
+                continueLabel="Ver minhas consultas"
+                onPaid={(paidPayment) => {
+                  setAppointmentPayment(paidPayment);
+                  queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
+                }}
+                onContinue={() => navigate(createPageUrl('DashboardPaciente'))}
+              />
+            ) : (
             <Card className="border-0 shadow-sm">
               <CardContent className="p-8 text-center">
                 <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
@@ -355,6 +405,7 @@ function AgendamentoEspecialidadeInner() {
                 </div>
               </CardContent>
             </Card>
+            )
           )}
         </motion.div>
       </div>
