@@ -12,7 +12,7 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, Shield, Video
+  ArrowLeft, Shield, Video, Sparkles
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
