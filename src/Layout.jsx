@@ -109,6 +109,7 @@ function LayoutInner({ children, currentPageName }) {
     { name: 'Agendamento', page: 'AgendamentoEspecialidade', icon: Search },
     { name: 'Consulta Agora', page: 'ConsultaAgora', icon: Clock },
     { name: 'Pergunte ao Especialista', page: 'PergunteEspecialista', icon: MessageSquare },
+    { name: 'Planos', page: 'Planos', icon: Sparkles },
   ];
 
   const hideLayoutPages = ['Login', 'Cadastro', 'Entrar', 'Teleconsulta'];
