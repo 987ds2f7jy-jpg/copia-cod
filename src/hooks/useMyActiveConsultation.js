@@ -1,7 +1,8 @@
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthContext';
 import { getStoredSession } from '@/client-api/session';
 import { ensureFreshSession } from '@/client-api/edgeFunctions';
+import { isTransientApiError } from '@/lib/api-errors';
 import {
   buildEmptyActiveConsultation,
   getMyActiveConsultationRequest,
@@ -27,17 +28,23 @@ function isTransientAuthError(error) {
   );
 }
 
+function isRecoverableBackgroundError(error) {
+  return isTransientAuthError(error) || isTransientApiError(error);
+}
+
 export function useMyActiveConsultation({
   enabled = true,
   staleTime = 10_000,
   refetchInterval = 15_000,
 } = {}) {
   const { user, loading } = useAuth();
+  const queryClient = useQueryClient();
   const hasStoredSession = Boolean(getStoredSession()?.accessToken);
   const canFetch = enabled && !loading && Boolean(user?.id) && hasStoredSession;
+  const queryKey = ['myActiveConsultation', user?.id];
 
   return useQuery({
-    queryKey: ['myActiveConsultation', user?.id],
+    queryKey,
     enabled: canFetch,
     staleTime,
     refetchInterval: canFetch ? refetchInterval : false,
@@ -47,8 +54,8 @@ export function useMyActiveConsultation({
         await ensureFreshSession();
         return await getMyActiveConsultationRequest();
       } catch (error) {
-        if (isTransientAuthError(error)) {
-          return buildEmptyActiveConsultation();
+        if (isRecoverableBackgroundError(error)) {
+          return queryClient.getQueryData(queryKey) || buildEmptyActiveConsultation();
         }
 
         throw error;
