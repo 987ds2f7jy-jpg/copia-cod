@@ -48,6 +48,8 @@ const PRICE_SOURCE_BY_SERVICE_CODE: Record<ServiceCode, PriceSource> = {
 
 const SPECIALTY_ALIASES: Record<string, string> = {
   psicologia_clinica: 'psicologia',
+  nutricao_clinica: 'nutricao',
+  fonoaudiologia_clinica: 'fonoaudiologia',
 };
 
 export function getFeeGroupForServiceCode(serviceCode: ServiceCode): FeeGroup {

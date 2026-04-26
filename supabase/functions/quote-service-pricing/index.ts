@@ -18,7 +18,7 @@ import {
   SPECIALTY_REQUEST_SERVICE_CODE,
 } from '../_shared/pricing/service-codes.ts';
 import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
-import type { ServiceCode } from '../_shared/pricing/types.ts';
+import type { ResolveServicePricingInput } from '../_shared/pricing/types.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -79,10 +79,7 @@ function parseInput(body: unknown): QuoteInput {
   };
 }
 
-function resolveQuoteService(input: QuoteInput): {
-  serviceCode: ServiceCode;
-  professionalProfileId: string | null;
-} {
+function resolveQuoteService(input: QuoteInput): ResolveServicePricingInput {
   if (input.flow === 'appointment_profile') {
     if (!input.professionalProfileId) {
       throw new AppError({
@@ -99,9 +96,18 @@ function resolveQuoteService(input: QuoteInput): {
   }
 
   if (input.flow === 'appointment_specialty') {
+    if (!input.specialty) {
+      throw new AppError({
+        status: 400,
+        code: 'SPECIALTY_REQUIRED',
+        message: 'Specialty is required for specialty appointment pricing.',
+      });
+    }
+
     return {
       serviceCode: SPECIALTY_REQUEST_SERVICE_CODE,
       professionalProfileId: null,
+      specialty: input.specialty,
     };
   }
 

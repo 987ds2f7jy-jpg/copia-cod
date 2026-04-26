@@ -3,8 +3,10 @@ import type { SupabaseClient } from '../supabase.ts';
 import {
   getFeeGroupForServiceCode,
   getPriceSourceForServiceCode,
+  normalizePricingSpecialty,
   PROFILE_PRIORITY_SERVICE_CODE,
   PROFILE_STANDARD_SERVICE_CODE,
+  SPECIALTY_REQUEST_SERVICE_CODE,
 } from './service-codes.ts';
 import type {
   FeeGroup,
@@ -22,6 +24,7 @@ type ProfessionalPriceRow = {
 type PlatformPriceRow = {
   id: string;
   service_code: string;
+  specialty_code: string | null;
   fee_group: string;
   gross_price: number | string | null;
   effective_from: string | null;
@@ -120,15 +123,42 @@ async function resolveProfessionalGrossPrice(
   return grossPrice;
 }
 
-async function resolvePlatformPrice(client: SupabaseClient, serviceCode: ServiceCode) {
+function resolveSpecialtyCodeForPricing(input: ResolveServicePricingInput) {
+  const specialtyCode = normalizePricingSpecialty(input.specialtyCode || input.specialty || '');
+
+  if (!specialtyCode) {
+    throw new AppError({
+      status: 422,
+      code: 'SPECIALTY_CODE_REQUIRED_FOR_PRICING',
+      message: 'Specialty is required to resolve specialty appointment pricing.',
+      details: { serviceCode: input.serviceCode },
+    });
+  }
+
+  return specialtyCode;
+}
+
+async function resolvePlatformPrice(
+  client: SupabaseClient,
+  serviceCode: ServiceCode,
+  input: ResolveServicePricingInput,
+) {
   const now = new Date();
-  const { data, error } = await client
+  let query = client
     .from('platform_service_prices')
-    .select('id, service_code, fee_group, gross_price, effective_from, effective_to')
+    .select('id, service_code, specialty_code, fee_group, gross_price, effective_from, effective_to')
     .eq('service_code', serviceCode)
     .eq('active', true)
     .lte('effective_from', now.toISOString())
     .order('effective_from', { ascending: false });
+
+  const specialtyCode = serviceCode === SPECIALTY_REQUEST_SERVICE_CODE
+    ? resolveSpecialtyCodeForPricing(input)
+    : '';
+
+  query = query.eq('specialty_code', specialtyCode);
+
+  const { data, error } = await query;
 
   if (error) {
     throw new AppError({
@@ -148,7 +178,7 @@ async function resolvePlatformPrice(client: SupabaseClient, serviceCode: Service
       status: 409,
       code: 'PLATFORM_PRICE_NOT_CONFIGURED',
       message: 'Platform price is not configured for this service.',
-      details: { serviceCode },
+      details: { serviceCode, specialtyCode },
     });
   }
 
@@ -159,7 +189,16 @@ async function resolvePlatformPrice(client: SupabaseClient, serviceCode: Service
       status: 409,
       code: 'PLATFORM_PRICE_NOT_CONFIGURED',
       message: 'Platform price must be greater than zero for this service.',
-      details: { serviceCode, pricingRuleId: row.id },
+      details: { serviceCode, specialtyCode, pricingRuleId: row.id },
+    });
+  }
+
+  if (serviceCode === SPECIALTY_REQUEST_SERVICE_CODE) {
+    console.log('[pricing] specialty_request resolved', {
+      serviceCode,
+      specialtyCode,
+      grossPrice,
+      pricingRuleId: row.id,
     });
   }
 
@@ -239,7 +278,7 @@ export async function resolveServicePricing(
       ),
       pricingRuleId: null,
     }
-    : await resolvePlatformPrice(client, serviceCode);
+    : await resolvePlatformPrice(client, serviceCode, input);
 
   if (
     priceSource === 'professional_profile' &&

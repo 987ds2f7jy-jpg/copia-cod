@@ -1,6 +1,7 @@
 import { AppError } from '../_shared/errors.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
+  normalizePricingSpecialty,
   PROFILE_PRIORITY_SERVICE_CODE,
   PROFILE_STANDARD_SERVICE_CODE,
   SPECIALTY_REQUEST_SERVICE_CODE,
@@ -109,15 +110,6 @@ function validateSchedulingWindow(scheduledDatetime: string, priority: boolean) 
   }
 }
 
-function normalizeSpecialty(value: string) {
-  return value
-    .toLowerCase()
-    .trim()
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .replace(/\s+/g, '_');
-}
-
 function assertTargetAvailability({
   weekday,
   time,
@@ -200,6 +192,7 @@ export async function createAppointment({
   let status = 'SOLICITADO';
   let serviceCode: ServiceCode = SPECIALTY_REQUEST_SERVICE_CODE;
   let pricingProfessionalProfileId: string | null = null;
+  let pricingSpecialty: string | null = null;
 
   if (input.professionalProfileId) {
     const professional = await repository.findProfessionalTargetById(input.professionalProfileId);
@@ -263,11 +256,13 @@ export async function createAppointment({
     appointmentType = 'ESPECIALIDADE';
     status = 'SOLICITADO';
     serviceCode = SPECIALTY_REQUEST_SERVICE_CODE;
+    pricingSpecialty = specialty;
   }
 
   const pricing = await repository.resolveServicePricing({
     serviceCode,
     professionalProfileId: pricingProfessionalProfileId,
+    specialty: pricingSpecialty,
   });
   const price = pricing.grossPrice;
 
@@ -278,7 +273,7 @@ export async function createAppointment({
     appointmentType,
     serviceCode,
     scheduledDatetime,
-    specialty: normalizeSpecialty(specialty),
+    specialty: normalizePricingSpecialty(specialty),
   });
 
   const appointment = await repository.createAppointment({

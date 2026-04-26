@@ -29,6 +29,8 @@ export type PaymentStatus =
 export type ResolveServicePricingInput = {
   serviceCode: ServiceCode;
   professionalProfileId?: string | null;
+  specialty?: string | null;
+  specialtyCode?: string | null;
 };
 
 export type ResolvedServicePricing = {
