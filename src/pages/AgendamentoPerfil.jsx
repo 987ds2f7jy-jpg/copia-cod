@@ -43,6 +43,7 @@ function AgendamentoPerfilInner() {
   const [submitError, setSubmitError] = useState(null);
   const [createdAppointment, setCreatedAppointment] = useState(null);
   const [appointmentPayment, setAppointmentPayment] = useState(null);
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const { data: publicProfile, isLoading: loadingPublic } = useQuery({
     queryKey: ['pub-prof', professionalId],
@@ -111,7 +112,9 @@ function AgendamentoPerfilInner() {
       professionalProfileId: privateProfileId,
       priority: appointmentType === 'priority',
     }),
-    enabled: step === 2 && Boolean(privateProfileId),
+    enabled: canQuotePatientService && step === 2 && Boolean(privateProfileId),
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   const weekdaysWithSlots = useMemo(() => {

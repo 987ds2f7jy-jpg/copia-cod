@@ -55,6 +55,7 @@ function AgendamentoEspecialidadeInner() {
   const [submitError, setSubmitError] = useState(null);
   const [createdAppointment, setCreatedAppointment] = useState(null);
   const [appointmentPayment, setAppointmentPayment] = useState(null);
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const availableSlots = useMemo(() => {
     if (!selectedDate) return [];
@@ -71,7 +72,9 @@ function AgendamentoEspecialidadeInner() {
       flow: 'appointment_specialty',
       specialty: selectedSpecialty || '',
     }),
-    enabled: step === 4 && Boolean(selectedSpecialty),
+    enabled: canQuotePatientService && step === 4 && Boolean(selectedSpecialty),
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   const createRequest = useMutation({

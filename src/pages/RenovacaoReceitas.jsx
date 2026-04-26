@@ -48,6 +48,7 @@ export default function RenovacaoReceitas() {
   const [loading, setLoading] = useState(false);
   const [success, setSuccess] = useState(false);
   const [pendingSolicitacao, setPendingSolicitacao] = useState(null);
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
     queryKey: ['service-pricing', 'solicitacao-exame', 'renovacao_receitas'],
@@ -55,7 +56,9 @@ export default function RenovacaoReceitas() {
       flow: 'solicitacao_exame',
       tipo: 'renovacao_receitas',
     }),
-    enabled: accepted && !success && Boolean(user?.id),
+    enabled: canQuotePatientService && accepted && !success,
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   function getUserFacingErrorMessage(error) {

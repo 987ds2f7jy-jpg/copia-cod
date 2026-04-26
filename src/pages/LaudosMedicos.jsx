@@ -141,6 +141,7 @@ function LaudosMedicosInner() {
   const [success, setSuccess] = useState(false);
   const [pendingLaudoSolicitacao, setPendingLaudoSolicitacao] = useState(null);
   const [finalizingPaidLaudo, setFinalizingPaidLaudo] = useState(false);
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const [nome, setNome] = useState('');
   const [nascimento, setNascimento] = useState('');
@@ -167,7 +168,9 @@ function LaudosMedicosInner() {
       flow: 'solicitacao_exame',
       tipo: 'laudo_medico',
     }),
-    enabled: accepted && step === STEPS.length - 1 && !success,
+    enabled: canQuotePatientService && accepted && step === STEPS.length - 1 && !success,
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   useEffect(() => {

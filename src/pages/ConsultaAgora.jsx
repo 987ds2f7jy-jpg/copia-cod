@@ -128,6 +128,7 @@ function ConsultaAgoraInner() {
   const [shouldAutoResumeAfterQueue, setShouldAutoResumeAfterQueue] = useState(
     () => Boolean(readConsultaAgoraAutoResumeState()),
   );
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const { data: activeConsultation } = useMyActiveConsultation({
     enabled: Boolean(user?.id),
@@ -291,7 +292,9 @@ function ConsultaAgoraInner() {
       flow: 'on_duty',
       specialty: selectedSpecialty,
     }),
-    enabled: step === 'form' && Boolean(selectedSpecialty),
+    enabled: canQuotePatientService && step === 'form' && Boolean(selectedSpecialty),
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   const enterQueue = useMutation({

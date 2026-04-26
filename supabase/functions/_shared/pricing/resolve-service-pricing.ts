@@ -145,7 +145,7 @@ async function resolvePlatformPrice(client: SupabaseClient, serviceCode: Service
 
   if (!row?.id) {
     throw new AppError({
-      status: 503,
+      status: 409,
       code: 'PLATFORM_PRICE_NOT_CONFIGURED',
       message: 'Platform price is not configured for this service.',
       details: { serviceCode },
@@ -156,7 +156,7 @@ async function resolvePlatformPrice(client: SupabaseClient, serviceCode: Service
 
   if (grossPrice <= 0) {
     throw new AppError({
-      status: 503,
+      status: 409,
       code: 'PLATFORM_PRICE_NOT_CONFIGURED',
       message: 'Platform price must be greater than zero for this service.',
       details: { serviceCode, pricingRuleId: row.id },
@@ -209,7 +209,7 @@ async function resolveFeeRule(client: SupabaseClient, feeGroup: FeeGroup, servic
 
   if (!row?.id) {
     throw new AppError({
-      status: 503,
+      status: 409,
       code: 'PLATFORM_FEE_RULE_NOT_CONFIGURED',
       message: 'Platform fee rule is not configured for this service.',
       details: { feeGroup, serviceCode },

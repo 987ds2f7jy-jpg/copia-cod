@@ -40,6 +40,7 @@ function SolicitacaoExamesInner() {
   const [sintomas, setSintomas] = useState('');
   const [especificosLoading, setEspecificosLoading] = useState(false);
   const [pendingEspecificos, setPendingEspecificos] = useState(null);
+  const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const { data: checkupQuote, isLoading: checkupQuoteLoading, error: checkupQuoteError } = useQuery({
     queryKey: ['service-pricing', 'solicitacao-exame', 'checkup'],
@@ -47,7 +48,9 @@ function SolicitacaoExamesInner() {
       flow: 'solicitacao_exame',
       tipo: 'checkup',
     }),
-    enabled: checkupOpen,
+    enabled: canQuotePatientService && checkupOpen,
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   const { data: especificosQuote, isLoading: especificosQuoteLoading, error: especificosQuoteError } = useQuery({
@@ -56,7 +59,9 @@ function SolicitacaoExamesInner() {
       flow: 'solicitacao_exame',
       tipo: 'especificos',
     }),
-    enabled: especificosOpen,
+    enabled: canQuotePatientService && especificosOpen,
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
   });
 
   async function handleCheckupSubmit() {

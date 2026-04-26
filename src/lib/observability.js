@@ -9,6 +9,8 @@ function buildEntry(type, payload = {}) {
 }
 
 function writeLog(level, label, payload) {
+  if (level === 'silent') return;
+
   const entry = buildEntry(label, payload);
   const method = level === 'error' ? console.error : level === 'warn' ? console.warn : console.info;
   method(`[${label}]`, entry);
@@ -24,8 +26,9 @@ export function logApiResponse(payload) {
   writeLog('info', 'api.response', payload);
 }
 
-export function logApiError(payload) {
-  writeLog('error', 'api.error', payload);
+export function logApiError(payload, options = {}) {
+  const level = options.level || payload?.level || 'error';
+  writeLog(level, 'api.error', payload);
 }
 
 export function logUiWarning(scope, payload) {
