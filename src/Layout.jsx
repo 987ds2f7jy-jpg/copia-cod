@@ -12,7 +12,7 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, Shield, Video
+  ArrowLeft, Shield, Video, Sparkles
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
@@ -31,7 +31,7 @@ function BrandMark({ className = 'h-8 w-8' }) {
 }
 
 // Pages that are "root" pages (show logo) vs "child" pages (show back button on mobile)
-const ROOT_PAGES = ['Home', 'Especialidades', 'AgendamentoEspecialidade', 'ConsultaAgora', 'PergunteEspecialista'];
+const ROOT_PAGES = ['Home', 'Especialidades', 'AgendamentoEspecialidade', 'ConsultaAgora', 'PergunteEspecialista', 'Planos'];
 
 // Bottom nav items for mobile
 const BOTTOM_NAV = [
@@ -109,6 +109,7 @@ function LayoutInner({ children, currentPageName }) {
     { name: 'Agendamento', page: 'AgendamentoEspecialidade', icon: Search },
     { name: 'Consulta Agora', page: 'ConsultaAgora', icon: Clock },
     { name: 'Pergunte ao Especialista', page: 'PergunteEspecialista', icon: MessageSquare },
+    { name: 'Planos', page: 'Planos', icon: Sparkles },
   ];
 
   const hideLayoutPages = ['Login', 'Cadastro', 'Entrar', 'Teleconsulta'];
@@ -342,6 +343,7 @@ function LayoutInner({ children, currentPageName }) {
                 <li><Link to={createPageUrl('AgendamentoEspecialidade')} className="hover:text-white">Agendamento</Link></li>
                 <li><Link to={createPageUrl('ConsultaAgora')} className="hover:text-white">Consulta Agora</Link></li>
                 <li><Link to={createPageUrl('PergunteEspecialista')} className="hover:text-white">Pergunte ao Especialista</Link></li>
+                <li><Link to={createPageUrl('Planos')} className="hover:text-white">Planos</Link></li>
               </ul>
             </div>
             <div>
