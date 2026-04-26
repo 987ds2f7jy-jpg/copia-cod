@@ -43,11 +43,16 @@
  */
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
+import { skipIfNoAuth } from '../support/auth-harness';
 import { ROUTES, APPOINTMENT_STATUS } from '../support/constants';
 
 rdTest.describe('cancellation — estrutura do dashboard', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   rdTest('dashboard carrega e exibe as 3 abas @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);

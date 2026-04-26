@@ -40,6 +40,7 @@
 import { test, expect, type Page } from '@playwright/test';
 import { test as rdTest, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 
 // ---------------------------------------------------------------------------
 // Helper: avança pelo calendário para encontrar uma data habilitada
@@ -74,6 +75,10 @@ rdTest.describe('by-specialty — estrutura e acesso', () => {
 
   rdTest.describe('com paciente autenticado', () => {
     rdTest.use({ storageState: AUTH_STATE.patient });
+
+    rdTest.beforeEach(async ({}, testInfo) => {
+      skipIfNoAuth(testInfo, 'patient');
+    });
 
     rdTest('step 1 renderiza as 4 profissões disponíveis @critical', async ({ page, goto }) => {
       await goto(ROUTES.agendamentoEspecialidade);
@@ -189,6 +194,9 @@ rdTest.describe('by-specialty — navegação de steps', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
+  });
   rdTest('step 3 → step 4 após selecionar data e horário @critical', async ({
     page, goto,
   }) => {
@@ -295,6 +303,10 @@ rdTest.describe('by-specialty — navegação de steps', () => {
 rdTest.describe('by-specialty — caminho feliz (requer E2E_ALLOW_SCHEDULING)', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   rdTest('fluxo completo termina no step 5 com "Solicitação Enviada!" @critical', async ({
     page, goto,

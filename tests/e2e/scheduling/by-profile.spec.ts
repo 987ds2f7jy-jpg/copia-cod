@@ -44,6 +44,7 @@
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 
 const TEST_PROF_ID = process.env.E2E_PROFESSIONAL_PUBLIC_ID ?? '';
 const hasProfId = !!TEST_PROF_ID;
@@ -91,6 +92,10 @@ rdTest.describe('by-profile — guards de acesso', () => {
 rdTest.describe('by-profile — com paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   // -------------------------------------------------------------------------
   // Step 1 — estrutura
@@ -321,6 +326,10 @@ rdTest.describe('by-profile — com paciente autenticado', () => {
 rdTest.describe('by-profile — profissional não pode agendar', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
+
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'professional');
+  });
 
   rdTest('profissional vê "Ação não permitida" ao tentar agendar @critical', async ({
     page, goto,
