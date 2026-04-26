@@ -31,7 +31,7 @@ function BrandMark({ className = 'h-8 w-8' }) {
 }
 
 // Pages that are "root" pages (show logo) vs "child" pages (show back button on mobile)
-const ROOT_PAGES = ['Home', 'Especialidades', 'AgendamentoEspecialidade', 'ConsultaAgora', 'PergunteEspecialista'];
+const ROOT_PAGES = ['Home', 'Especialidades', 'AgendamentoEspecialidade', 'ConsultaAgora', 'PergunteEspecialista', 'Planos'];
 
 // Bottom nav items for mobile
 const BOTTOM_NAV = [
