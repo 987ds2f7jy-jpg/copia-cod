@@ -88,7 +88,8 @@ rdTest.describe('admin-aprovacao — admin autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.admin });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'admin');
   });
 

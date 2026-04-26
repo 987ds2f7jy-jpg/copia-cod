@@ -111,7 +111,7 @@ export default defineConfig({
     },
     {
       name: 'chromium',
-      testMatch: '**/{auth,patient,professional,scheduling}/**/*.spec.ts',
+      testMatch: '**/{admin,auth,patient,professional,scheduling,teleconsulta}/**/*.spec.ts',
       use: { ...devices['Desktop Chrome'] },
     },
     {

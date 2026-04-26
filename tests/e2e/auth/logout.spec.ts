@@ -28,6 +28,7 @@
 import { test, expect } from '../support/fixtures';
 import { AUTH_STATE } from '../support/fixtures';
 import { ROUTES, USERS } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 
 // Helper: abre o dropdown do usuário no Layout e clica em "Sair"
 async function logout(page: import('@playwright/test').Page) {
@@ -48,6 +49,11 @@ async function logout(page: import('@playwright/test').Page) {
 test.describe('logout — paciente', () => {
 
   test.use({ storageState: AUTH_STATE.patient });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   test('logout redireciona para home @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardPaciente);
@@ -137,6 +143,11 @@ test.describe('logout — paciente', () => {
 test.describe('logout — profissional', () => {
 
   test.use({ storageState: AUTH_STATE.professional });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'professional');
+  });
 
   test('profissional consegue fazer logout @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardProfissional);

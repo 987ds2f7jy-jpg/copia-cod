@@ -74,7 +74,8 @@ rdTest.describe('financeiro — profissional aprovado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'professional');
   });
 

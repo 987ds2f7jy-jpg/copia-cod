@@ -56,9 +56,10 @@ rdTest.describe('by-profile — guards de acesso', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest('sem ?professional= exibe "Profissional não encontrado"', async ({
+rdTest('sem ?professional= exibe "Profissional não encontrado"', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
     await goto(ROUTES.agendamentoPerfil);
 
     await expect(
@@ -66,7 +67,8 @@ rdTest.describe('by-profile — guards de acesso', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  rdTest('ID inválido exibe "Profissional não encontrado"', async ({ page, goto }) => {
+rdTest('ID inválido exibe "Profissional não encontrado"', async ({ page, goto }, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
     await goto(`${ROUTES.agendamentoPerfil}?professional=id-invalido-e2e-test`);
 
     await expect(
@@ -93,7 +95,8 @@ rdTest.describe('by-profile — com paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -327,7 +330,8 @@ rdTest.describe('by-profile — profissional não pode agendar', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'professional');
   });
 

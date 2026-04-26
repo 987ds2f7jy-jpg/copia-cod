@@ -114,16 +114,16 @@ type RdFixtures = {
 // Objeto test estendido — importar daqui em todos os spec files
 // ---------------------------------------------------------------------------
 export const test = base.extend<RdFixtures>({
-  goto: async ({ page }, use) => {
-    await use((route) => goto(page, route));
+  goto: async ({ page }, applyFixture) => {
+    await applyFixture((route) => goto(page, route));
   },
 
-  loginViaUI: async ({ page }, use) => {
-    await use((email, password) => loginViaUI(page, email, password));
+  loginViaUI: async ({ page }, applyFixture) => {
+    await applyFixture((email, password) => loginViaUI(page, email, password));
   },
 
-  clearAuthState: async ({ page }, use) => {
-    await use(() => clearAuthState(page));
+  clearAuthState: async ({ page }, applyFixture) => {
+    await applyFixture(() => clearAuthState(page));
   },
 });
 

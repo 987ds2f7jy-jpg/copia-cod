@@ -78,7 +78,9 @@ rdTest.describe('pergunte-especialista — público', () => {
       page.getByText(/faça login para enviar uma pergunta/i)
     ).toBeVisible({ timeout: 8_000 });
 
-    await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
+    await expect(
+      page.getByLabel('Fazer Pergunta').getByRole('link', { name: 'Entrar' })
+    ).toBeVisible();
   });
 
 });
@@ -90,7 +92,8 @@ rdTest.describe('pergunte-especialista — paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -211,7 +214,8 @@ rdTest.describe('pergunte-especialista — profissional não pode perguntar', ()
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'professional');
   });
 

@@ -42,6 +42,7 @@
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 import {
   waitForPatientDashboard,
   clickDashboardTab,
@@ -50,12 +51,17 @@ import {
 
 rdTest.use({ storageState: AUTH_STATE.patient });
 
+function ensurePatientAuth(testInfo: { skip: (condition: boolean, reason: string) => void }) {
+  skipIfNoAuth(testInfo, 'patient');
+}
+
 // ---------------------------------------------------------------------------
 // Estrutura central — carrega e exibe os elementos principais
 // ---------------------------------------------------------------------------
 rdTest.describe('patient-dashboard — estrutura', () => {
 
-  rdTest('carrega com sessão válida e exibe cabeçalho @critical', async ({ page, goto }) => {
+rdTest('carrega com sessão válida e exibe cabeçalho @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -74,7 +80,8 @@ rdTest.describe('patient-dashboard — estrutura', () => {
     await expect(page).toHaveURL(/\/Entrar/, { timeout: 10_000 });
   });
 
-  rdTest('exibe as 3 abas de status com contadores @critical', async ({ page, goto }) => {
+rdTest('exibe as 3 abas de status com contadores @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -84,7 +91,8 @@ rdTest.describe('patient-dashboard — estrutura', () => {
     await expect(page.getByRole('tab', { name: /canceladas \(\d+\)/i })).toBeVisible();
   });
 
-  rdTest('aba "Próximas" ativa por padrão', async ({ page, goto }) => {
+rdTest('aba "Próximas" ativa por padrão', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -94,7 +102,8 @@ rdTest.describe('patient-dashboard — estrutura', () => {
     ).toHaveAttribute('aria-selected', 'true');
   });
 
-  rdTest('exibe os 3 atalhos de ação rápida @critical', async ({ page, goto }) => {
+rdTest('exibe os 3 atalhos de ação rápida @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -111,7 +120,8 @@ rdTest.describe('patient-dashboard — estrutura', () => {
 // ---------------------------------------------------------------------------
 rdTest.describe('patient-dashboard — navegação de abas', () => {
 
-  rdTest('clicar na aba Histórico a ativa', async ({ page, goto }) => {
+rdTest('clicar na aba Histórico a ativa', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -123,7 +133,8 @@ rdTest.describe('patient-dashboard — navegação de abas', () => {
     ).toBeVisible({ timeout: 8_000 });
   });
 
-  rdTest('clicar na aba Canceladas a ativa', async ({ page, goto }) => {
+rdTest('clicar na aba Canceladas a ativa', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -134,7 +145,8 @@ rdTest.describe('patient-dashboard — navegação de abas', () => {
     ).toBeVisible({ timeout: 8_000 });
   });
 
-  rdTest('clicar em "Consulta Agora" navega para /ConsultaAgora', async ({ page, goto }) => {
+rdTest('clicar em "Consulta Agora" navega para /ConsultaAgora', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -143,7 +155,8 @@ rdTest.describe('patient-dashboard — navegação de abas', () => {
     await expect(page).toHaveURL(/ConsultaAgora/, { timeout: 10_000 });
   });
 
-  rdTest('clicar em "Agendar" navega para /AgendamentoEspecialidade', async ({ page, goto }) => {
+rdTest('clicar em "Agendar" navega para /AgendamentoEspecialidade', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -158,7 +171,8 @@ rdTest.describe('patient-dashboard — navegação de abas', () => {
 // ---------------------------------------------------------------------------
 rdTest.describe('patient-dashboard — estado vazio (sem dados)', () => {
 
-  rdTest('aba Próximas vazia exibe CTA de agendamento @critical', async ({ page, goto }) => {
+rdTest('aba Próximas vazia exibe CTA de agendamento @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -175,7 +189,8 @@ rdTest.describe('patient-dashboard — estado vazio (sem dados)', () => {
     expect(hasEmpty || hasAppointments).toBe(true);
   });
 
-  rdTest('aba Histórico vazia exibe estado vazio sem crash', async ({ page, goto }) => {
+rdTest('aba Histórico vazia exibe estado vazio sem crash', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
     await clickDashboardTab(page, 'historico');
@@ -186,7 +201,8 @@ rdTest.describe('patient-dashboard — estado vazio (sem dados)', () => {
     expect(isEmpty || hasCards).toBe(true);
   });
 
-  rdTest('aba Canceladas vazia exibe estado vazio sem crash', async ({ page, goto }) => {
+rdTest('aba Canceladas vazia exibe estado vazio sem crash', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
     await clickDashboardTab(page, 'canceladas');
@@ -203,7 +219,8 @@ rdTest.describe('patient-dashboard — estado vazio (sem dados)', () => {
 // ---------------------------------------------------------------------------
 rdTest.describe('patient-dashboard — sessão', () => {
 
-  rdTest('sessão persiste após reload @critical', async ({ page, goto }) => {
+rdTest('sessão persiste após reload @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -214,7 +231,8 @@ rdTest.describe('patient-dashboard — sessão', () => {
     await waitForPatientDashboard(page);
   });
 
-  rdTest('após logout, dashboard redireciona para /Entrar', async ({ page, goto }) => {
+rdTest('após logout, dashboard redireciona para /Entrar', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.dashboardPaciente);
     await waitForPatientDashboard(page);
 
@@ -231,9 +249,10 @@ rdTest.describe('patient-dashboard — sessão', () => {
 // ---------------------------------------------------------------------------
 rdTest.describe('patient-dashboard — avaliação', () => {
 
-  rdTest('consulta concluída exibe botão Avaliar se não avaliada @critical', async ({
+rdTest('consulta concluída exibe botão Avaliar se não avaliada @critical', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensurePatientAuth(testInfo);
     rdTest.skip(
       !process.env.E2E_HAS_COMPLETED_APPOINTMENT,
       'Define E2E_HAS_COMPLETED_APPOINTMENT=true.',
@@ -248,9 +267,10 @@ rdTest.describe('patient-dashboard — avaliação', () => {
     ).toBeVisible({ timeout: 8_000 });
   });
 
-  rdTest('clicar em Avaliar abre dialog com título "Avaliar Consulta"', async ({
+rdTest('clicar em Avaliar abre dialog com título "Avaliar Consulta"', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensurePatientAuth(testInfo);
     rdTest.skip(
       !process.env.E2E_HAS_COMPLETED_APPOINTMENT,
       'Define E2E_HAS_COMPLETED_APPOINTMENT=true.',

@@ -58,7 +58,8 @@ rdTest.describe('solicitacao-exames — paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -234,7 +235,8 @@ rdTest.describe('laudos-medicos — paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -318,7 +320,8 @@ rdTest.describe('renovacao-receitas — paciente autenticado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 

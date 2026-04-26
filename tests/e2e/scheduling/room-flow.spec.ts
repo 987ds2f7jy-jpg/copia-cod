@@ -55,6 +55,7 @@
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 
 // ---------------------------------------------------------------------------
 // Helper: intercepta a chamada ao Edge Function zoom-token
@@ -99,6 +100,11 @@ rdTest.describe('room-flow — acesso sem auth', () => {
 rdTest.describe('room-flow — estados da sala (paciente)', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   rdTest('ID inexistente exibe "Consulta nao encontrada" e botão Voltar @critical', async ({
     page, goto,
@@ -208,6 +214,11 @@ rdTest.describe('room-flow — banner de retomada no Layout', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
+
   rdTest('banner aparece na home quando há consulta ativa @critical', async ({
     page, goto,
   }) => {
@@ -250,6 +261,11 @@ rdTest.describe('room-flow — profissional na sala', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'professional');
+  });
+
   rdTest('profissional em consulta aguardando vê processo de inicialização @critical', async ({
     page, goto,
   }) => {
@@ -286,6 +302,11 @@ rdTest.describe('room-flow — profissional na sala', () => {
 rdTest.describe('room-flow — verificação de status', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   rdTest('renderConsultationStatus — verifica renderização de status @critical', async ({
     page, goto,

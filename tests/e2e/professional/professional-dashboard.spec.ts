@@ -45,11 +45,16 @@
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 import {
   waitForProfessionalDashboard,
   clickProfessionalTab,
   logoutViaMenu,
 } from '../support/page-helpers';
+
+function ensureProfessionalAuth(testInfo: { skip: (condition: boolean, reason: string) => void }) {
+  skipIfNoAuth(testInfo, 'professional');
+}
 
 // ---------------------------------------------------------------------------
 // Profissional aprovado
@@ -58,7 +63,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest('carrega com sessão válida e exibe cabeçalho @critical', async ({ page, goto }) => {
+rdTest('carrega com sessão válida e exibe cabeçalho @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -82,7 +88,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await expect(page).toHaveURL(/\/Entrar/, { timeout: 10_000 });
   });
 
-  rdTest('exibe abas Dashboard e Meu Perfil @critical', async ({ page, goto }) => {
+rdTest('exibe abas Dashboard e Meu Perfil @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -90,9 +97,10 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await expect(page.getByRole('button', { name: 'Meu Perfil', exact: true })).toBeVisible();
   });
 
-  rdTest('filtros de período Hoje/Semana/Mês estão visíveis na aba Dashboard', async ({
+rdTest('filtros de período Hoje/Semana/Mês estão visíveis na aba Dashboard', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -101,7 +109,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await expect(page.getByRole('button', { name: 'Mês', exact: true })).toBeVisible();
   });
 
-  rdTest('KPIs principais renderizam (com ou sem dados) @critical', async ({ page, goto }) => {
+rdTest('KPIs principais renderizam (com ou sem dados) @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -113,7 +122,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await expect(page.getByText('Fila agora')).toBeVisible();
   });
 
-  rdTest('widget PlantaoBlock renderiza com Switch @critical', async ({ page, goto }) => {
+rdTest('widget PlantaoBlock renderiza com Switch @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -126,7 +136,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     ).toBeVisible();
   });
 
-  rdTest('clicar em "Semana" altera o período selecionado', async ({ page, goto }) => {
+rdTest('clicar em "Semana" altera o período selecionado', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -136,9 +147,10 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await expect(page.getByText('Consultas realizadas')).toBeVisible();
   });
 
-  rdTest('clicar em "Meu Perfil" exibe o componente MeuPerfil @critical', async ({
+rdTest('clicar em "Meu Perfil" exibe o componente MeuPerfil @critical', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -150,7 +162,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     ).toBeVisible({ timeout: 10_000 });
   });
 
-  rdTest('sessão persiste após reload @critical', async ({ page, goto }) => {
+rdTest('sessão persiste após reload @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -160,7 +173,8 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
     await waitForProfessionalDashboard(page);
   });
 
-  rdTest('após logout, dashboard redireciona para /Entrar', async ({ page, goto }) => {
+rdTest('após logout, dashboard redireciona para /Entrar', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -173,9 +187,10 @@ rdTest.describe('professional-dashboard — profissional aprovado', () => {
   // -------------------------------------------------------------------------
   // Sem dados — não deve quebrar a tela
   // -------------------------------------------------------------------------
-  rdTest('dashboard sem consultas não exibe crash (estado zerado)', async ({
+rdTest('dashboard sem consultas não exibe crash (estado zerado)', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
@@ -222,7 +237,8 @@ rdTest.describe('professional-dashboard — status gate (R7)', () => {
   rdTest.describe('acesso por role', () => {
     rdTest.use({ storageState: AUTH_STATE.patient });
 
-    rdTest('paciente em /DashboardProfissional vê "Acesso Restrito"', async ({ page, goto }) => {
+    rdTest('paciente em /DashboardProfissional vê "Acesso Restrito"', async ({ page, goto }, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
     await goto(ROUTES.dashboardProfissional);
 
     await expect(

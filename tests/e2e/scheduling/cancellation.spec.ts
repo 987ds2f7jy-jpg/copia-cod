@@ -50,7 +50,8 @@ rdTest.describe('cancellation — estrutura do dashboard', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 

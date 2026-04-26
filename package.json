@@ -18,7 +18,9 @@
   "test:e2e:auth": "playwright test tests/e2e/auth",
   "test:e2e:scheduling": "playwright test tests/e2e/scheduling",
   "test:e2e:patient": "playwright test tests/e2e/patient",
-  "test:e2e:professional": "playwright test tests/e2e/professional"
+  "test:e2e:professional": "playwright test tests/e2e/professional",
+  "test:e2e:admin": "playwright test tests/e2e/admin",
+  "test:e2e:teleconsulta": "playwright test tests/e2e/teleconsulta"
 },
   "dependencies": {
     "@deepgram/sdk": "^4.11.2",

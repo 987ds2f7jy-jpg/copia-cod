@@ -60,7 +60,8 @@ rdTest.describe('consulta-agora — paciente (estrutura)', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -116,7 +117,7 @@ rdTest.describe('consulta-agora — paciente (estrutura)', () => {
     await expect(textarea).toHaveValue(/febre/);
   });
 
-  rdTest('botão "Entrar na Fila" fica desabilitado sem especialidade @critical', async ({
+  rdTest('botão de criar cobrança fica desabilitado sem especialidade @critical', async ({
     page, goto,
   }) => {
     await goto(ROUTES.consultaAgora);
@@ -126,7 +127,7 @@ rdTest.describe('consulta-agora — paciente (estrutura)', () => {
     ).toBeVisible({ timeout: 12_000 });
 
     await expect(
-      page.getByRole('button', { name: 'Entrar na Fila' })
+      page.getByRole('button', { name: 'Criar pagamento e entrar na fila' })
     ).toBeDisabled();
   });
 
@@ -147,7 +148,7 @@ rdTest.describe('consulta-agora — paciente (estrutura)', () => {
 
     // Com especialidade selecionada: ou o botão fica habilitado
     // (há profissionais disponíveis) ou aparece o aviso de indisponibilidade
-    const btnEnabled = await page.getByRole('button', { name: 'Entrar na Fila' }).isEnabled();
+    const btnEnabled = await page.getByRole('button', { name: 'Criar pagamento e entrar na fila' }).isEnabled();
     const hasWarning = await page.getByText(/nenhum profissional.*plantao ativo/i).isVisible().catch(() => false);
 
     expect(btnEnabled || hasWarning).toBe(true);
@@ -170,11 +171,12 @@ rdTest.describe('consulta-agora — entrada na fila (requer E2E_ALLOW_QUEUE)', (
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
-  rdTest('entrar na fila exibe step de aguardando com posição @critical', async ({
+  rdTest('criar cobrança exibe o step de pagamento @critical', async ({
     page, goto,
   }) => {
     rdTest.skip(
@@ -193,7 +195,7 @@ rdTest.describe('consulta-agora — entrada na fila (requer E2E_ALLOW_QUEUE)', (
     await page.getByRole('option', { name: /clinico geral/i }).click();
 
     // Aguardar botão habilitar
-    const btn = page.getByRole('button', { name: 'Entrar na Fila' });
+    const btn = page.getByRole('button', { name: 'Criar pagamento e entrar na fila' });
     await expect(btn).toBeEnabled({ timeout: 5_000 });
 
     // Preencher sintomas
@@ -201,19 +203,20 @@ rdTest.describe('consulta-agora — entrada na fila (requer E2E_ALLOW_QUEUE)', (
 
     await btn.click();
 
-    // Após entrar na fila, deve aparecer o step de queue
-    // ConsultaAgora.jsx: h2 "Voce esta na fila" (sem acento)
+    // O app atual libera primeiro a etapa de pagamento.
     await expect(
-      page.getByRole('heading', { name: /voce esta na fila/i })
+      page.getByRole('heading', { name: 'Pagamento do plantao' })
     ).toBeVisible({ timeout: 15_000 });
 
-    // Botão de sair da fila deve aparecer
     await expect(
-      page.getByRole('button', { name: 'Sair da Fila' })
+      page.getByRole('button', { name: /ir para pagamento|simular pagamento aprovado/i })
+        .or(page.getByText(/a cobranca foi criada|checkout disponivel/i))
     ).toBeVisible();
   });
 
-  rdTest('sair da fila volta para o formulário @critical', async ({ page, goto }) => {
+  rdTest('após criar cobrança, o fluxo segue para checkout ou fila liberada @critical', async ({
+    page, goto,
+  }) => {
     rdTest.skip(
       !process.env.E2E_ALLOW_QUEUE,
       'Define E2E_ALLOW_QUEUE=true.',
@@ -227,22 +230,36 @@ rdTest.describe('consulta-agora — entrada na fila (requer E2E_ALLOW_QUEUE)', (
 
     await page.getByText('Selecione a especialidade').click();
     await page.getByRole('option', { name: /clinico geral/i }).click();
-    const btn = page.getByRole('button', { name: 'Entrar na Fila' });
+    const btn = page.getByRole('button', { name: 'Criar pagamento e entrar na fila' });
     await expect(btn).toBeEnabled({ timeout: 5_000 });
     await page.getByPlaceholder(/dor de cabeca|sintomas/i).fill('Teste E2E saída de fila');
     await btn.click();
 
     await expect(
-      page.getByRole('heading', { name: /voce esta na fila/i })
+      page.getByRole('heading', { name: 'Pagamento do plantao' })
     ).toBeVisible({ timeout: 15_000 });
 
-    // Sair da fila
-    await page.getByRole('button', { name: 'Sair da Fila' }).click();
+    const simulateButton = page.getByRole('button', { name: 'Simular pagamento aprovado' });
+    const canSimulate = await simulateButton.isVisible().catch(() => false);
 
-    // Deve voltar para o step 'form'
+    if (canSimulate) {
+      await simulateButton.click();
+      await expect(page.getByRole('button', { name: 'Ver fila' })).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: 'Ver fila' }).click();
+      await expect(
+        page.getByRole('heading', { name: /voce esta na fila/i })
+      ).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: 'Sair da Fila' }).click();
+      await expect(
+        page.getByText('Entrar na Fila de Atendimento')
+      ).toBeVisible({ timeout: 10_000 });
+      return;
+    }
+
     await expect(
-      page.getByText('Entrar na Fila de Atendimento')
-    ).toBeVisible({ timeout: 10_000 });
+      page.getByRole('button', { name: /ir para pagamento/i })
+        .or(page.getByText(/ainda nao ha checkout disponivel/i))
+    ).toBeVisible();
   });
 
 });
@@ -254,7 +271,8 @@ rdTest.describe('consulta-agora — profissional bloqueado', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'professional');
   });
 

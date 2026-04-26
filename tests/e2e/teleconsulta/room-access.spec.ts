@@ -76,7 +76,8 @@ rdTest.describe('teleconsulta — paciente (estados)', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -179,7 +180,8 @@ rdTest.describe('teleconsulta — banner de retomada', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 
@@ -226,7 +228,8 @@ rdTest.describe('teleconsulta — profissional', () => {
 
   rdTest.use({ storageState: AUTH_STATE.professional });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'professional');
   });
 
@@ -264,29 +267,13 @@ rdTest.describe('teleconsulta — profissional', () => {
 // ---------------------------------------------------------------------------
 // Payment — documentação de ausência
 // ---------------------------------------------------------------------------
-rdTest.describe('payment — ausência documentada', () => {
+rdTest.describe('payment — cobertura pendente', () => {
 
-  rdTest('não existe UI de pagamento/checkout no frontend @critical', async ({
-    page, goto, clearAuthState,
-  }) => {
-    // Análise do código-fonte: não foi encontrada nenhuma página de checkout,
-    // gateway de pagamento ou fluxo de cobrança antes da consulta.
-    // O campo `price` existe em normalizeConsultation() mas não há UI de pagamento.
-    // Este teste documenta essa ausência — se uma página de pagamento for criada,
-    // adicionar testes reais aqui.
-
-    // Verificação: nenhuma das rotas conhecidas leva a uma página de pagamento
-    await clearAuthState();
-
-    const paymentRoutes = ['/Pagamento', '/Checkout', '/Payment', '/checkout', '/pagamento'];
-    for (const route of paymentRoutes) {
-      await goto(route);
-      // Deve ir para 404 ou /Entrar — nunca uma página real de pagamento
-      const url = page.url();
-      const isPaymentPage = await page.getByText(/cartão|boleto|pix.*pagamento|checkout/i)
-        .isVisible().catch(() => false);
-      expect(isPaymentPage).toBe(false);
-    }
+  rdTest('fluxo de pagamento da teleconsulta precisa de cobertura real @critical', async () => {
+    rdTest.fixme(
+      true,
+      'O frontend já possui PaymentStep e retorno /pagamento/:status; este caso precisa ser reescrito para validar checkout real em vez de documentar ausência.'
+    );
   });
 
 });

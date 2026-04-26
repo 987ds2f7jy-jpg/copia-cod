@@ -76,7 +76,8 @@ rdTest.describe('by-specialty — estrutura e acesso', () => {
   rdTest.describe('com paciente autenticado', () => {
     rdTest.use({ storageState: AUTH_STATE.patient });
 
-    rdTest.beforeEach(async ({}, testInfo) => {
+    rdTest.beforeEach(async ({ page }, testInfo) => {
+      void page;
       skipIfNoAuth(testInfo, 'patient');
     });
 
@@ -194,7 +195,8 @@ rdTest.describe('by-specialty — navegação de steps', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
   rdTest('step 3 → step 4 após selecionar data e horário @critical', async ({
@@ -304,7 +306,8 @@ rdTest.describe('by-specialty — caminho feliz (requer E2E_ALLOW_SCHEDULING)', 
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach(async ({ page }, testInfo) => {
+    void page;
     skipIfNoAuth(testInfo, 'patient');
   });
 

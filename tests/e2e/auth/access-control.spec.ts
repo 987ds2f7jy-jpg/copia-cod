@@ -30,6 +30,7 @@
 
 import { test, expect } from '../support/fixtures';
 import { AUTH_STATE } from '../support/fixtures';
+import { skipIfNoAuth } from '../support/auth-harness';
 import {
   ROUTES,
   PUBLIC_ROUTES,
@@ -121,6 +122,11 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
 
   test.use({ storageState: AUTH_STATE.patient });
 
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
+
   test('paciente em /DashboardProfissional vê "Acesso Restrito" @critical', async ({
     page, goto,
   }) => {
@@ -178,6 +184,11 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
 test.describe('controle de acesso — profissional em rotas de agendamento', () => {
 
   test.use({ storageState: AUTH_STATE.professional });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'professional');
+  });
 
   test('profissional em /AgendamentoPerfil vê "Ação não permitida" @critical', async ({
     page, goto,
@@ -253,6 +264,11 @@ test.describe('controle de acesso — admin', () => {
 
   test.use({ storageState: AUTH_STATE.admin });
 
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'admin');
+  });
+
   test('admin acessa /AdminAprovacao sem bloqueio @critical', async ({ page, goto }) => {
     await goto(ROUTES.adminAprovacao);
 
@@ -286,6 +302,11 @@ test.describe('controle de acesso — admin', () => {
 test.describe('persistência de sessão', () => {
 
   test.use({ storageState: AUTH_STATE.patient });
+
+  test.beforeEach(async ({ page }, testInfo) => {
+    void page;
+    skipIfNoAuth(testInfo, 'patient');
+  });
 
   test('sessão persiste ao navegar entre rotas protegidas', async ({ page, goto }) => {
     // Navega entre múltiplas rotas protegidas — sessão nunca deve cair

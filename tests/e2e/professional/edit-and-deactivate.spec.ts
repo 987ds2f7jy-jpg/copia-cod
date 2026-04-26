@@ -47,11 +47,16 @@
 
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import { skipIfNoAuth } from '../support/auth-harness';
 import {
   waitForPerfilPage,
   fillPerfilField,
   savePerfilAndWait,
 } from '../support/page-helpers';
+
+function ensurePatientAuth(testInfo: { skip: (condition: boolean, reason: string) => void }) {
+  skipIfNoAuth(testInfo, 'patient');
+}
 
 // ---------------------------------------------------------------------------
 // Estrutura e acesso
@@ -68,7 +73,8 @@ rdTest.describe('perfil — estrutura', () => {
     await expect(page).toHaveURL(/\/Entrar/, { timeout: 10_000 });
   });
 
-  rdTest('carrega com dados do usuário preenchidos @critical', async ({ page, goto }) => {
+rdTest('carrega com dados do usuário preenchidos @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -84,7 +90,8 @@ rdTest.describe('perfil — estrutura', () => {
     await expect(card.first()).toBeVisible({ timeout: 8_000 });
   });
 
-  rdTest('todos os campos do formulário estão presentes @critical', async ({ page, goto }) => {
+rdTest('todos os campos do formulário estão presentes @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -97,7 +104,8 @@ rdTest.describe('perfil — estrutura', () => {
     await expect(page.locator('#state')).toBeVisible();
   });
 
-  rdTest('botão de salvar está habilitado @critical', async ({ page, goto }) => {
+rdTest('botão de salvar está habilitado @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -106,9 +114,10 @@ rdTest.describe('perfil — estrutura', () => {
     ).toBeEnabled();
   });
 
-  rdTest('zona de cuidado e botão de desativar conta estão visíveis', async ({
+rdTest('zona de cuidado e botão de desativar conta estão visíveis', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -127,7 +136,8 @@ rdTest.describe('perfil — edição de campos', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest('alterar telefone e salvar exibe "Salvo!" @critical', async ({ page, goto }) => {
+rdTest('alterar telefone e salvar exibe "Salvo!" @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -138,7 +148,8 @@ rdTest.describe('perfil — edição de campos', () => {
     // O que importa é que "Salvo!" apareceu (confirma onSuccess)
   });
 
-  rdTest('alterar cidade e salvar exibe "Salvo!"', async ({ page, goto }) => {
+rdTest('alterar cidade e salvar exibe "Salvo!"', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -146,7 +157,8 @@ rdTest.describe('perfil — edição de campos', () => {
     await savePerfilAndWait(page);
   });
 
-  rdTest('estado é convertido para maiúsculo automaticamente', async ({ page, goto }) => {
+rdTest('estado é convertido para maiúsculo automaticamente', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -159,7 +171,8 @@ rdTest.describe('perfil — edição de campos', () => {
     expect(value).toBe('SP');
   });
 
-  rdTest('salvar sem alterações não exibe erro', async ({ page, goto }) => {
+rdTest('salvar sem alterações não exibe erro', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -181,9 +194,10 @@ rdTest.describe('perfil — AlertDialog de desativação', () => {
 
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest('clicar em "Desativar conta" abre o AlertDialog @critical', async ({
+rdTest('clicar em "Desativar conta" abre o AlertDialog @critical', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -201,7 +215,8 @@ rdTest.describe('perfil — AlertDialog de desativação', () => {
     await expect(page.getByText(/sera marcada como inativa/i)).toBeVisible();
   });
 
-  rdTest('"Cancelar" no AlertDialog fecha sem desativar @critical', async ({ page, goto }) => {
+rdTest('"Cancelar" no AlertDialog fecha sem desativar @critical', async ({ page, goto }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
@@ -218,9 +233,10 @@ rdTest.describe('perfil — AlertDialog de desativação', () => {
     await expect(page.getByRole('heading', { name: 'Meu perfil' })).toBeVisible();
   });
 
-  rdTest('botão de confirmação "Sim, desativar minha conta" está presente', async ({
+rdTest('botão de confirmação "Sim, desativar minha conta" está presente', async ({
     page, goto,
-  }) => {
+  }, testInfo) => {
+    ensurePatientAuth(testInfo);
     await goto(ROUTES.perfil);
     await waitForPerfilPage(page);
 
