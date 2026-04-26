@@ -343,6 +343,7 @@ function LayoutInner({ children, currentPageName }) {
                 <li><Link to={createPageUrl('AgendamentoEspecialidade')} className="hover:text-white">Agendamento</Link></li>
                 <li><Link to={createPageUrl('ConsultaAgora')} className="hover:text-white">Consulta Agora</Link></li>
                 <li><Link to={createPageUrl('PergunteEspecialista')} className="hover:text-white">Pergunte ao Especialista</Link></li>
+                <li><Link to={createPageUrl('Planos')} className="hover:text-white">Planos</Link></li>
               </ul>
             </div>
             <div>
