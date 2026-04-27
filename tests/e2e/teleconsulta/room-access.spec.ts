@@ -265,15 +265,9 @@ rdTest.describe('teleconsulta — profissional', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Payment — documentação de ausência
+// Payment — coberto em teleconsulta/payment-flow.spec.ts
 // ---------------------------------------------------------------------------
-rdTest.describe('payment — cobertura pendente', () => {
-
-  rdTest('fluxo de pagamento da teleconsulta precisa de cobertura real @critical', async () => {
-    rdTest.fixme(
-      true,
-      'O frontend já possui PaymentStep e retorno /pagamento/:status; este caso precisa ser reescrito para validar checkout real em vez de documentar ausência.'
-    );
-  });
-
-});
+// O fluxo de pagamento do plantão (botão "Criar pagamento e entrar na fila",
+// step='payment', "Pagamento do plantao", simulação, /pagamento/:status)
+// está implementado em teleconsulta/payment-flow.spec.ts.
+// Não duplicar testes aqui.

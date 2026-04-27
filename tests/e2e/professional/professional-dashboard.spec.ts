@@ -234,6 +234,33 @@ rdTest.describe('professional-dashboard — status gate (R7)', () => {
     await expect(page.getByText('Consultas realizadas')).not.toBeVisible();
   });
 
+  rdTest('toggle do Switch de plantão altera badge Ativo/Inativo @critical', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+
+    await expect(page.getByText('Plantão')).toBeVisible({ timeout: 10_000 });
+
+    const switchEl = page.getByRole('switch');
+    await expect(switchEl).toBeVisible();
+
+    // Ler estado inicial
+    const initialChecked = await switchEl.isChecked();
+    const initialBadge   = initialChecked ? 'Ativo' : 'Inativo';
+    await expect(page.getByText(initialBadge)).toBeVisible();
+
+    // Alternar
+    await switchEl.click();
+
+    // Badge deve mudar para o estado oposto
+    const newBadge = initialChecked ? 'Inativo' : 'Ativo';
+    await expect(page.getByText(newBadge)).toBeVisible({ timeout: 8_000 });
+
+    // Reverter para o estado original (cleanup)
+    await switchEl.click();
+    await expect(page.getByText(initialBadge)).toBeVisible({ timeout: 8_000 });
+  });
+
   rdTest.describe('acesso por role', () => {
     rdTest.use({ storageState: AUTH_STATE.patient });
 
