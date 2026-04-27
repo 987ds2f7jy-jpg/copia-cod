@@ -159,16 +159,19 @@ rdTest.describe('especialidades — busca e estado vazio', () => {
     await goto(ROUTES.especialidades);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 12_000 });
 
-    await page.getByPlaceholder('Buscar por nome ou especialidade...').fill('xyzquenaoexiste999');
+    const searchInput = page.getByPlaceholder('Buscar por nome ou especialidade...');
+
+    await searchInput.fill('xyzquenaoexiste999');
     await expect(
       page.getByRole('heading', { name: 'Nenhum profissional encontrado' })
     ).toBeVisible({ timeout: 8_000 });
 
-    await page.getByRole('button', { name: 'Limpar busca' }).click();
+    await page.getByRole('button', { name: 'Ver todos os profissionais' }).click();
 
     await expect(
       page.getByRole('heading', { name: 'Nenhum profissional encontrado' })
     ).not.toBeVisible({ timeout: 5_000 });
+    await expect(searchInput).toHaveValue('');
   });
 
   rdTest('URL param ?especialidade= pré-seleciona filtro e muda subtítulo @critical', async ({ page, goto }) => {

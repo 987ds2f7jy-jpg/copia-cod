@@ -5,6 +5,11 @@ import { getUserFacingErrorMessage } from '@/lib/errors';
 import { resetProfessionalDutyForUser } from '@/lib/professionals';
 
 const AuthContext = createContext(null);
+let logoutRedirectInProgress = false;
+
+export function isLogoutRedirectInProgress() {
+  return logoutRedirectInProgress;
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null);
@@ -19,6 +24,14 @@ export function AuthProvider({ children }) {
     window.sessionStorage.removeItem('rd_login_next');
   }, []);
 
+  const markLogoutRedirectInProgress = useCallback(() => {
+    logoutRedirectInProgress = true;
+  }, []);
+
+  const clearLogoutRedirectInProgress = useCallback(() => {
+    logoutRedirectInProgress = false;
+  }, []);
+
   const clearClientState = useCallback(() => {
     setUser(null);
     if (typeof window !== 'undefined') {
@@ -29,6 +42,8 @@ export function AuthProvider({ children }) {
   }, [queryClient]);
 
   useEffect(() => {
+    clearLogoutRedirectInProgress();
+
     let isMounted = true;
 
     const syncSession = async () => {
@@ -64,7 +79,7 @@ export function AuthProvider({ children }) {
       isMounted = false;
       unsubscribe();
     };
-  }, []);
+  }, [clearLogoutRedirectInProgress]);
 
   const login = useCallback(async (email, password) => {
     try {
@@ -103,10 +118,11 @@ export function AuthProvider({ children }) {
     }
 
     clearPostLoginRedirect();
+    markLogoutRedirectInProgress();
     await authService.logout();
     clearClientState();
     window.location.href = '/';
-  }, [clearClientState, clearPostLoginRedirect, user]);
+  }, [clearClientState, clearPostLoginRedirect, markLogoutRedirectInProgress, user]);
 
   const refreshUser = useCallback(async () => {
     const updatedUser = await authService.refreshUser();
@@ -145,10 +161,11 @@ export function AuthProvider({ children }) {
     }
 
     clearPostLoginRedirect();
+    markLogoutRedirectInProgress();
     await authService.deactivateAccount();
     clearClientState();
     window.location.href = '/';
-  }, [clearClientState, clearPostLoginRedirect, user]);
+  }, [clearClientState, clearPostLoginRedirect, markLogoutRedirectInProgress, user]);
 
   const redirectToLogin = useCallback((next) => {
     if (next) {

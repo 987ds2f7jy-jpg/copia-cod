@@ -1,4 +1,6 @@
 import { invokeEdgeFunction } from './edgeFunctions';
+import { isTransientApiError } from '@/lib/api-errors';
+import { AppError, normalizeError } from '@/lib/errors';
 
 function toTrimmedString(value) {
   return String(value ?? '').trim();
@@ -208,6 +210,45 @@ function normalizeActiveConsultation(result) {
   };
 }
 
+function normalizeTeleconsultaContextError(error) {
+  const fallbackMessage = 'Nao foi possivel carregar o contexto da teleconsulta.';
+  const normalized = normalizeError(error, fallbackMessage);
+  const rawMessage = String(normalized.userMessage || normalized.message || '').toLowerCase();
+  const code = String(normalized.code || '').trim().toUpperCase();
+
+  if (
+    rawMessage.includes('consulta nao encontrada') ||
+    rawMessage.includes('consultation not found') ||
+    rawMessage.includes('provided identifiers is invalid') ||
+    code === 'CONSULTATION_NOT_FOUND' ||
+    code === 'INVALID_IDENTIFIER'
+  ) {
+    return new AppError({
+      message: 'Consulta nao encontrada',
+      userMessage: 'Consulta nao encontrada',
+      code: normalized.code,
+      status: normalized.status,
+      details: normalized.details,
+      hint: normalized.hint,
+      cause: normalized.cause,
+    });
+  }
+
+  if (isTransientApiError(normalized)) {
+    return new AppError({
+      message: fallbackMessage,
+      userMessage: fallbackMessage,
+      code: normalized.code,
+      status: normalized.status,
+      details: normalized.details,
+      hint: normalized.hint,
+      cause: normalized.cause,
+    });
+  }
+
+  return normalized;
+}
+
 export async function getTeleconsultaContextRequest({
   consultationId = null,
   patientId = null,
@@ -215,20 +256,24 @@ export async function getTeleconsultaContextRequest({
   historyLimit = 20,
   excludeConsultationId = null,
 } = {}) {
-  const result = await invokeEdgeFunction('get-teleconsulta-context', {
-    body: {
-      consultationId: consultationId || null,
-      patientId: patientId || null,
-      patientIds: Array.isArray(patientIds)
-        ? patientIds.map(toTrimmedString).filter(Boolean)
-        : [],
-      historyLimit,
-      excludeConsultationId: excludeConsultationId || null,
-    },
-    fallbackMessage: 'Nao foi possivel carregar o contexto da teleconsulta.',
-  });
+  try {
+    const result = await invokeEdgeFunction('get-teleconsulta-context', {
+      body: {
+        consultationId: consultationId || null,
+        patientId: patientId || null,
+        patientIds: Array.isArray(patientIds)
+          ? patientIds.map(toTrimmedString).filter(Boolean)
+          : [],
+        historyLimit,
+        excludeConsultationId: excludeConsultationId || null,
+      },
+      fallbackMessage: 'Nao foi possivel carregar o contexto da teleconsulta.',
+    });
 
-  return normalizeTeleconsultaContext(result);
+    return normalizeTeleconsultaContext(result);
+  } catch (error) {
+    throw normalizeTeleconsultaContextError(error);
+  }
 }
 
 export async function getMyActiveConsultationRequest() {

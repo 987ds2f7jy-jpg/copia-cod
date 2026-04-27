@@ -139,10 +139,10 @@ rdTest('clicar na aba Canceladas a ativa', async ({ page, goto }, testInfo) => {
     await waitForPatientDashboard(page);
 
     await clickDashboardTab(page, 'canceladas');
-    await expect(
-      page.getByText('Nenhuma consulta cancelada')
-        .or(page.getByText('Cancelada').first())
-    ).toBeVisible({ timeout: 8_000 });
+
+    const isEmpty = await page.getByText('Nenhuma consulta cancelada').isVisible().catch(() => false);
+    const hasCancelledBadge = await page.getByText('Cancelada', { exact: true }).isVisible().catch(() => false);
+    expect(isEmpty || hasCancelledBadge).toBe(true);
   });
 
 rdTest('clicar em "Consulta Agora" navega para /ConsultaAgora', async ({ page, goto }, testInfo) => {

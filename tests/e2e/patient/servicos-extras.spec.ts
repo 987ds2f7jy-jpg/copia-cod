@@ -151,7 +151,9 @@ rdTest.describe('solicitacao-exames — paciente autenticado', () => {
     await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
 
     // DialogTitle "Exames Especificos"
-    await expect(page.getByText('Exames Especificos')).toBeVisible();
+    await expect(
+      page.getByRole('dialog').getByRole('heading', { name: 'Exames Especificos' })
+    ).toBeVisible();
 
     // Campo de exame
     await expect(
@@ -377,7 +379,7 @@ rdTest.describe('renovacao-receitas — paciente autenticado', () => {
 
     // Área de upload de receita
     await expect(
-      page.getByText(/clique para enviar jpg|upload/i)
+      page.getByText('Clique para enviar JPG, PNG ou PDF')
     ).toBeVisible();
   });
 

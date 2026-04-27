@@ -82,12 +82,8 @@ rdTest('carrega com dados do usuário preenchidos @critical', async ({ page, got
     await expect(page.getByRole('heading', { name: 'Meu perfil' })).toBeVisible();
     await expect(page.getByText('Gerencie suas informacoes pessoais.')).toBeVisible();
 
-    // Card do usuário mostra nome e email
-    // CardTitle = user.full_name
-    const card = page.locator('[class*="CardTitle"]').or(
-      page.locator('.font-semibold').filter({ hasText: /\w{2,}/ })
-    );
-    await expect(card.first()).toBeVisible({ timeout: 8_000 });
+    // O card do usuario mostra nome e email abaixo do cabecalho.
+    await expect(page.getByText('@', { exact: false })).toBeVisible({ timeout: 8_000 });
   });
 
 rdTest('todos os campos do formulário estão presentes @critical', async ({ page, goto }, testInfo) => {
@@ -181,7 +177,7 @@ rdTest('salvar sem alterações não exibe erro', async ({ page, goto }, testInf
 
     // Não deve aparecer nenhuma mensagem de erro
     await expect(
-      page.locator('[class*="red-50"]').or(page.locator('[class*="border-red"]'))
+      page.getByText(/nao foi possivel salvar|erro ao salvar/i)
     ).not.toBeVisible({ timeout: 5_000 });
   });
 

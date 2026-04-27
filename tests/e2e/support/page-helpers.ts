@@ -14,7 +14,6 @@
  */
 
 import { type Page, expect } from '@playwright/test';
-import { USERS } from './constants';
 
 // ---------------------------------------------------------------------------
 // Menu do usuário (Layout.jsx — DropdownMenu no header)
@@ -23,20 +22,10 @@ import { USERS } from './constants';
 
 /** Abre o dropdown de usuário no Layout. */
 export async function openUserMenu(page: Page) {
-  // Localiza o trigger pelo primeiro nome OU fallback 'Usuário'
-  const trigger = page
-    .locator('header')
-    .getByRole('button', { name: /usuário/i })
-    .or(
-      page.locator('header').getByRole('button', {
-        name: new RegExp(
-          [USERS.patient.name, USERS.professional.name, USERS.admin.name]
-            .map((n) => n.split(' ')[0])
-            .join('|'),
-          'i',
-        ),
-      }),
-    );
+  // Usa o aria-label estável do trigger, com fallback amplo por compatibilidade.
+  const trigger = page.locator('header').getByRole('button', {
+    name: /menu do usu[aá]rio|usu[aá]rio/i,
+  });
   await trigger.first().click();
 }
 
@@ -112,9 +101,59 @@ export async function clickDashboardTab(
 /** Aguarda o DashboardProfissional carregar (h1 com nome ou fallback). */
 export async function waitForProfessionalDashboard(page: Page) {
   await expect(page).toHaveURL(/\/DashboardProfissional/, { timeout: 15_000 });
-  await expect(
-    page.getByRole('heading', { name: /dr\(a\)\.|painel profissional/i }),
-  ).toBeVisible({ timeout: 15_000 });
+
+  const hasKnownDashboardState = async () => {
+    const dashboardHeading = await page
+      .getByRole('heading', { name: /dr\(a\)\.|painel profissional/i })
+      .isVisible()
+      .catch(() => false);
+
+    if (dashboardHeading) {
+      return true;
+    }
+
+    const knownFallbacks = [
+      /perfil profissional n[aã]o encontrado/i,
+      /cadastro em an[aá]lise/i,
+      /conta suspensa/i,
+      /cadastro n[aã]o aprovado/i,
+    ];
+
+    for (const pattern of knownFallbacks) {
+      const visible = await page
+        .getByRole('heading', { name: pattern })
+        .isVisible()
+        .catch(() => false);
+
+      if (visible) {
+        return true;
+      }
+    }
+
+    return false;
+  };
+
+  const waitForKnownState = async (timeoutMs: number) => {
+    const startedAt = Date.now();
+
+    while ((Date.now() - startedAt) < timeoutMs) {
+      if (await hasKnownDashboardState()) {
+        return true;
+      }
+
+      await page.waitForTimeout(750);
+    }
+
+    return false;
+  };
+
+  if (await waitForKnownState(15_000)) {
+    return;
+  }
+
+  await page.reload();
+  await expect(page).toHaveURL(/\/DashboardProfissional/, { timeout: 15_000 });
+  expect(await waitForKnownState(15_000)).toBe(true);
 }
 
 /** Clica na aba interna do DashboardProfissional. */

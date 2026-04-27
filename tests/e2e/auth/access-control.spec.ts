@@ -31,6 +31,7 @@
 import { test, expect } from '../support/fixtures';
 import { AUTH_STATE } from '../support/fixtures';
 import { skipIfNoAuth } from '../support/auth-harness';
+import { openUserMenu } from '../support/page-helpers';
 import {
   ROUTES,
   PUBLIC_ROUTES,
@@ -158,10 +159,10 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
   }) => {
     await goto(ROUTES.adminAprovacao);
 
-    // AdminAprovacao.jsx: if (user?.role !== 'admin') → h2 "Acesso Restrito"
+    // App.tsx protege a rota via ProtectedRoute antes da tela interna.
     await expect(page.getByRole('heading', { name: 'Acesso Restrito' }))
       .toBeVisible({ timeout: 10_000 });
-    await expect(page.getByText(/exclusiva para administradores/i)).toBeVisible();
+    await expect(page.getByText(/não tem permissão|nao tem permissao/i)).toBeVisible();
     await expect(page).toHaveURL(/AdminAprovacao/);
   });
 
@@ -242,10 +243,7 @@ test.describe('controle de acesso — profissional em rotas de agendamento', () 
   }) => {
     await goto(ROUTES.home);
 
-    // Abre o dropdown
-    const menuTrigger = page.getByRole('button', { name: /usuário/i })
-      .or(page.locator('header').getByRole('button').filter({ hasText: /\w/ }).last());
-    await menuTrigger.first().click();
+    await openUserMenu(page);
 
     // Layout.jsx: user.role === 'professional' → exibe "Área Profissional"
     await expect(page.getByRole('menuitem', { name: 'Área Profissional' })).toBeVisible();
@@ -286,9 +284,7 @@ test.describe('controle de acesso — admin', () => {
   test('menu do admin mostra "Aprovar Profissionais"', async ({ page, goto }) => {
     await goto(ROUTES.home);
 
-    const menuTrigger = page.getByRole('button', { name: /usuário/i })
-      .or(page.locator('header').getByRole('button').filter({ hasText: /\w/ }).last());
-    await menuTrigger.first().click();
+    await openUserMenu(page);
 
     // Layout.jsx: user.role === 'admin' → exibe "Aprovar Profissionais"
     await expect(page.getByRole('menuitem', { name: 'Aprovar Profissionais' })).toBeVisible();

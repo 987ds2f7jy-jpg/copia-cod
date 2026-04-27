@@ -27,20 +27,13 @@
 
 import { test, expect } from '../support/fixtures';
 import { AUTH_STATE } from '../support/fixtures';
-import { ROUTES, USERS } from '../support/constants';
+import { ROUTES } from '../support/constants';
 import { skipIfNoAuth } from '../support/auth-harness';
+import { openUserMenu, logoutViaMenu } from '../support/page-helpers';
 
 // Helper: abre o dropdown do usuário no Layout e clica em "Sair"
 async function logout(page: import('@playwright/test').Page) {
-  // O trigger mostra o primeiro nome ou "Usuário"
-  // Usar locator mais estável: o único DropdownMenuTrigger no header
-  // que contém um ícone de usuário + texto
-  const menuTrigger = page.getByRole('button', { name: /usuário/i })
-    .or(page.getByRole('button', { name: new RegExp(USERS.patient.name.split(' ')[0], 'i') }))
-    .or(page.getByRole('button', { name: new RegExp(USERS.professional.name.split(' ')[0], 'i') }));
-
-  await menuTrigger.first().click();
-  await page.getByRole('menuitem', { name: 'Sair' }).click();
+  await logoutViaMenu(page);
 }
 
 // ---------------------------------------------------------------------------
@@ -113,9 +106,7 @@ test.describe('logout — paciente', () => {
     await goto(ROUTES.home);
 
     // Layout.jsx: DropdownMenuItem "Minhas Consultas" → /DashboardPaciente
-    const menuTrigger = page.getByRole('button', { name: /usuário/i })
-      .or(page.getByRole('button', { name: new RegExp(USERS.patient.name.split(' ')[0], 'i') }));
-    await menuTrigger.first().click();
+    await openUserMenu(page);
 
     await expect(page.getByRole('menuitem', { name: 'Minhas Consultas' })).toBeVisible();
     await expect(page.getByRole('menuitem', { name: 'Sair' })).toBeVisible();
@@ -152,14 +143,7 @@ test.describe('logout — profissional', () => {
   test('profissional consegue fazer logout @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardProfissional);
 
-    const menuTrigger = page.getByRole('button', {
-      name: new RegExp(USERS.professional.name.split(' ')[0], 'i'),
-    }).or(page.getByRole('button', { name: /usuário/i }));
-
-    await menuTrigger.first().click();
-    await page.getByRole('menuitem', { name: 'Sair' }).click();
-
-    await expect(page).toHaveURL('/', { timeout: 15_000 });
+    await logout(page);
 
     const session = await page.evaluate(() =>
       window.localStorage.getItem('rd.auth.session.v1'),
@@ -170,11 +154,7 @@ test.describe('logout — profissional', () => {
   test('menu do profissional exibe "Área Profissional"', async ({ page, goto }) => {
     await goto(ROUTES.home);
 
-    const menuTrigger = page.getByRole('button', {
-      name: new RegExp(USERS.professional.name.split(' ')[0], 'i'),
-    }).or(page.getByRole('button', { name: /usuário/i }));
-
-    await menuTrigger.first().click();
+    await openUserMenu(page);
 
     // Layout.jsx: user.role === 'professional' → exibe "Área Profissional"
     await expect(page.getByRole('menuitem', { name: 'Área Profissional' })).toBeVisible();

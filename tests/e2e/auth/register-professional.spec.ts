@@ -23,7 +23,7 @@
  *
  * SELETORES REAIS (CadastroProfissional.jsx)
  *   CardTitle "Criar sua Conta"              → step 1 (sem auth)
- *   CardTitle "Informacoes Basicas"          → step 2
+ *   CardTitle "Dados Pessoais e Profissionais" → step 2
  *   CardTitle "Formacao e Registro"          → step 3 (ícone Award)
  *   CardTitle "Perfil Publico"               → step 4
  *   h2 "Cadastro Enviado!"                   → step 99 (sucesso)
@@ -90,9 +90,9 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
     await page.getByRole('button', { name: /continuar/i }).click();
 
-    // Step 2: Informações Básicas
+    // Step 2: Dados Pessoais e Profissionais
     await expect(
-      page.getByRole('heading', { name: /informacoes basicas|informações básicas/i })
+      page.getByRole('heading', { name: /dados pessoais e profissionais/i })
     ).toBeVisible({ timeout: 10_000 });
   });
 
@@ -106,12 +106,12 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
-      page.getByRole('heading', { name: /informacoes basicas|informações básicas/i })
+      page.getByRole('heading', { name: /dados pessoais e profissionais/i })
     ).toBeVisible({ timeout: 10_000 });
 
-    await expect(page.getByText('Nome completo')).toBeVisible();
-    // Profissão: Select com as 4 opções
-    await expect(page.getByText(/profissao|profissão|area de atuacao/i)).toBeVisible();
+    await expect(page.getByRole('textbox', { name: /nome completo/i })).toBeVisible();
+    await expect(page.getByText('Profissão', { exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox').nth(1)).toBeVisible();
   });
 
   rdTest('botão "Continuar" no step 2 fica desabilitado sem nome e profissão @critical', async ({ page }) => {
@@ -124,7 +124,7 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
-      page.getByRole('heading', { name: /informacoes basicas|informações básicas/i })
+      page.getByRole('heading', { name: /dados pessoais e profissionais/i })
     ).toBeVisible({ timeout: 10_000 });
 
     await expect(
@@ -142,17 +142,16 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
-      page.getByRole('heading', { name: /informacoes basicas|informações básicas/i })
+      page.getByRole('heading', { name: /dados pessoais e profissionais/i })
     ).toBeVisible({ timeout: 10_000 });
 
     // Selecionar profissão (Radix Select)
-    await page.getByText(/selecione a profissão|profissão/i).click();
+    await page.getByRole('combobox').nth(1).click();
     await page.getByRole('option', { name: 'Medicina' }).click();
 
     // Especialidade fica disponível após selecionar profissão
-    await expect(
-      page.getByText(/selecione a especialidade|especialidade/i)
-    ).toBeVisible({ timeout: 5_000 });
+    await expect(page.getByText('Especialidade', { exact: true })).toBeVisible();
+    await expect(page.getByRole('combobox').nth(2)).toBeVisible();
   });
 
 });
@@ -184,10 +183,10 @@ rdTest.describe('cadastro-profissional — step 3 (formação)', () => {
 
     // Step 2
     await expect(
-      page.getByRole('heading', { name: /informacoes basicas/i })
+      page.getByRole('heading', { name: /dados pessoais e profissionais/i })
     ).toBeVisible({ timeout: 10_000 });
-    await page.getByLabel('Nome completo').fill('Dr. Profissional E2E Teste');
-    await page.getByText(/selecione a profissão/i).click();
+    await page.getByRole('textbox', { name: /nome completo/i }).fill('Dr. Profissional E2E Teste');
+    await page.getByRole('combobox').nth(1).click();
     await page.getByRole('option', { name: 'Psicologia' }).click();
     await page.getByRole('button', { name: /continuar/i }).click();
 

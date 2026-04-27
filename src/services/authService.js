@@ -7,6 +7,7 @@ import {
   subscribeToSessionChanges,
 } from '@/client-api/session';
 import { ensureFreshSession } from '@/client-api/edgeFunctions';
+import { isTransientApiError } from '@/lib/api-errors';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
 
@@ -78,6 +79,18 @@ function normalizeAccountError(error, fallbackMessage) {
     return new AppError({
       message: 'Credenciais invalidas.',
       userMessage: 'Email ou senha invalidos.',
+      code: normalized.code,
+      status: normalized.status,
+      details: normalized.details,
+      hint: normalized.hint,
+      cause: normalized.cause,
+    });
+  }
+
+  if (isTransientApiError(normalized)) {
+    return new AppError({
+      message: fallbackMessage,
+      userMessage: fallbackMessage,
       code: normalized.code,
       status: normalized.status,
       details: normalized.details,

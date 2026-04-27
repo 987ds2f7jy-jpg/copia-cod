@@ -69,6 +69,7 @@ async function clearAuthState(page: Page) {
   await page.evaluate(() => {
     window.localStorage.removeItem('rd.auth.session.v1');
     window.sessionStorage.removeItem('rd_login_next');
+    window.sessionStorage.removeItem('rd_logout_redirect_in_progress');
     window.sessionStorage.removeItem('rd_last_active_consultation');
     window.sessionStorage.removeItem('rd_consulta_agora_auto_resume');
   });

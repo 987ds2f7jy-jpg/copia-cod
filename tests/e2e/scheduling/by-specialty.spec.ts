@@ -60,6 +60,13 @@ async function selectFutureDate(page: Page) {
   await enabledDay.click({ timeout: 8_000 });
 }
 
+async function expectEnabledCalendarDay(page: Page) {
+  await page.waitForSelector('table[role="grid"]', { timeout: 8_000 });
+
+  const enabledDay = page.locator('table[role="grid"] button[name]:not([disabled])').first();
+  await expect(enabledDay).toBeVisible({ timeout: 8_000 });
+}
+
 // ---------------------------------------------------------------------------
 // Estrutura e guards (independem de auth real)
 // ---------------------------------------------------------------------------
@@ -166,10 +173,11 @@ rdTest.describe('by-specialty — estrutura e acesso', () => {
       // O calendário deve estar presente
       await expect(page.locator('table[role="grid"]')).toBeVisible();
 
-      // O dia de hoje deve estar desabilitado (< 36h)
-      const todayBtn = page.locator('table[role="grid"] button[aria-selected="false"]:not([disabled])');
-      // Verifica que existem dias habilitados (3+ dias no futuro)
-      await expect(todayBtn.first()).toBeVisible({ timeout: 8_000 });
+      // A janela de 36h deve desabilitar parte do calendário atual...
+      await expect(page.locator('table[role="grid"] [role="gridcell"][disabled]').first())
+        .toBeVisible();
+      // ...mas ainda precisa oferecer alguma data futura válida.
+      await expectEnabledCalendarDay(page);
     });
 
     rdTest('profissional vê "Ação não permitida" ao tentar acessar o fluxo', async ({
@@ -239,7 +247,7 @@ rdTest.describe('by-specialty — navegação de steps', () => {
     ).toBeVisible({ timeout: 8_000 });
 
     // Resumo mostra a especialidade selecionada
-    await expect(page.getByText('Nutrição Clínica')).toBeVisible();
+    await expect(page.getByText('Nutrição Clínica', { exact: true }).first()).toBeVisible();
     // Badge de status inicial
     await expect(page.getByText('Aguardando aceite')).toBeVisible();
   });
@@ -265,7 +273,7 @@ rdTest.describe('by-specialty — navegação de steps', () => {
     ).toBeVisible({ timeout: 8_000 });
 
     // Volta para step 3
-    await page.getByRole('button', { name: /voltar/i }).click();
+    await page.getByRole('button', { name: /^Voltar$/ }).first().click();
     await expect(
       page.getByRole('heading', { name: 'Escolha data e horário' })
     ).toBeVisible();

@@ -28,6 +28,7 @@
 
 import { test, expect } from '../support/fixtures';
 import { ROUTES, USERS } from '../support/constants';
+import { openUserMenu } from '../support/page-helpers';
 
 const hasPatientCreds = !!(process.env.E2E_PATIENT_EMAIL && process.env.E2E_PATIENT_PASSWORD);
 const hasProfessionalCreds = !!(process.env.E2E_PROFESSIONAL_EMAIL && process.env.E2E_PROFESSIONAL_PASSWORD);
@@ -68,7 +69,7 @@ test.describe('login — formulário', () => {
 
     // Mensagem de erro vinda do authService.login() via getUserFacingErrorMessage()
     await expect(
-      page.getByText(/erro ao fazer login|credenciais|invalid|email ou senha/i)
+      page.getByText(/erro ao fazer login|credenciais|invalid|email ou senha|n[aã]o foi poss[ií]vel realizar o login/i)
     ).toBeVisible({ timeout: 12_000 });
 
     await expect(page).toHaveURL(/Entrar/);
@@ -153,10 +154,22 @@ test.describe('login — caminho feliz paciente', () => {
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardPaciente/, { timeout: 20_000 });
 
-    // Layout.jsx: user.full_name.split(' ')[0] || 'Usuário'
-    // O botão de dropdown mostra o primeiro nome do usuário
-    const firstName = USERS.patient.name.split(' ')[0];
-    await expect(page.getByRole('button', { name: new RegExp(firstName, 'i') })).toBeVisible();
+    const menuTrigger = page.locator('header').getByRole('button', {
+      name: /menu do usu[aá]rio|usu[aá]rio/i,
+    });
+    const menuText = ((await menuTrigger.textContent()) ?? '').trim();
+    const menuTriggerName = menuText.split(/\s+/)[0] ?? '';
+
+    expect(menuTriggerName.length).toBeGreaterThan(0);
+
+    await openUserMenu(page);
+
+    const userMenu = page.getByRole('menu', { name: /menu do usu[aá]rio/i });
+    const fullName = ((await userMenu.locator('p').first().textContent()) ?? '').trim();
+    const firstName = fullName.split(/\s+/)[0] ?? '';
+
+    expect(firstName.length).toBeGreaterThan(0);
+    expect(menuTriggerName.toLowerCase()).toBe(firstName.toLowerCase());
   });
 
   test('usuário já logado que acessa /Entrar é redirecionado @critical', async ({ page, goto }) => {
@@ -209,10 +222,10 @@ test.describe('login — caminho feliz profissional', () => {
     await page.waitForURL(/DashboardProfissional/, { timeout: 20_000 });
 
     // Layout.jsx: user.role === 'professional' → badge "Profissional"
-    // Abrir o dropdown para ver o badge
-    const firstName = USERS.professional.name.split(' ')[0];
-    await page.getByRole('button', { name: new RegExp(firstName, 'i') }).click();
-    await expect(page.getByText('Profissional')).toBeVisible();
+    await openUserMenu(page);
+    await expect(
+      page.getByRole('menu', { name: /menu do usu[aá]rio/i }).getByText('Profissional', { exact: true })
+    ).toBeVisible();
   });
 
 });

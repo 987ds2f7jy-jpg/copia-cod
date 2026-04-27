@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { useAuth } from '@/components/AuthContext';
+import ProtectedRoute from '@/components/ProtectedRoute';
 import { deleteUploadedFiles, uploadFile } from '@/client-api/uploads';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -38,6 +39,14 @@ const FREQUENCIAS = [
 ];
 
 export default function RenovacaoReceitas() {
+  return (
+    <ProtectedRoute>
+      <RenovacaoReceitasInner />
+    </ProtectedRoute>
+  );
+}
+
+function RenovacaoReceitasInner() {
   const { user } = useAuth();
   const [accepted, setAccepted] = useState(false);
   const [medicamento, setMedicamento] = useState('');

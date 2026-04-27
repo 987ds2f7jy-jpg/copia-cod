@@ -205,7 +205,11 @@ function LayoutInner({ children, currentPageName }) {
               {user ? (
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
-                    <Button variant="ghost" className="flex items-center gap-2 px-2">
+                    <Button
+                      variant="ghost"
+                      className="flex items-center gap-2 px-2"
+                      aria-label="Menu do usuário"
+                    >
                       <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
                         <User className="w-4 h-4 text-emerald-600" />
                       </div>

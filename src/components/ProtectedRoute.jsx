@@ -1,5 +1,5 @@
 import React from 'react';
-import { useAuth } from '@/components/AuthContext';
+import { isLogoutRedirectInProgress, useAuth } from '@/components/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import AppLoadingScreen from '@/components/AppLoadingScreen';
 
@@ -12,6 +12,10 @@ export default function ProtectedRoute({ children, requiredRole }) {
   }
 
   if (!isAuthenticated) {
+    if (isLogoutRedirectInProgress()) {
+      return null;
+    }
+
     redirectToLogin(window.location.pathname + window.location.search);
     return null;
   }
