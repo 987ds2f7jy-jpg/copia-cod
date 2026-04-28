@@ -40,17 +40,17 @@ export default function AppointmentsChart({ appointments }) {
   const data = view === 'week' ? weekData : monthData;
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
+    <Card className="border-border shadow-sm bg-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-gray-900">Atendimentos</CardTitle>
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <CardTitle className="text-base font-semibold text-foreground">Atendimentos</CardTitle>
+          <div className="flex gap-1 bg-muted rounded-lg p-1">
             {['week', 'month'].map(v => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {v === 'week' ? '7 dias' : '6 meses'}
@@ -62,10 +62,10 @@ export default function AppointmentsChart({ appointments }) {
       <CardContent className="pt-0 pb-4">
         <ResponsiveContainer width="100%" height={200}>
           <BarChart data={data} margin={{ top: 5, right: 5, bottom: 0, left: 0 }} barGap={2}>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} allowDecimals={false} width={25} />
-            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} allowDecimals={false} width={25} />
+            <Tooltip contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }} />
             <Legend iconType="circle" iconSize={8} wrapperStyle={{ fontSize: 11 }} />
             <Bar dataKey="agendado" name="Agendado" fill="#6366F1" radius={[4, 4, 0, 0]} />
             <Bar dataKey="plantao" name="Plantão" fill="#10B981" radius={[4, 4, 0, 0]} />

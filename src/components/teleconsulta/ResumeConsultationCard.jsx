@@ -57,15 +57,15 @@ export default function ResumeConsultationCard({
   const copy = buildResumeCopy(activeConsultation);
 
   return (
-    <Card className={`border-emerald-200 bg-emerald-50/90 shadow-sm ${className}`.trim()}>
+    <Card className={`border-emerald-200 bg-emerald-50/90 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/30 ${className}`.trim()}>
       <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
         <div className="min-w-0">
-          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-emerald-700">
+          <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-emerald-700 dark:bg-emerald-900/60 dark:text-emerald-200">
             <Clock3 className="h-3.5 w-3.5" />
             Consulta ativa detectada
           </div>
-          <h3 className="text-base font-semibold text-emerald-950">{copy.title}</h3>
-          <p className="mt-1 text-sm text-emerald-800">{copy.description}</p>
+          <h3 className="text-base font-semibold text-emerald-950 dark:text-emerald-100">{copy.title}</h3>
+          <p className="mt-1 text-sm text-emerald-800 dark:text-emerald-200">{copy.description}</p>
         </div>
 
         <Button

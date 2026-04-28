@@ -159,13 +159,13 @@ function RenovacaoReceitasInner() {
 
   if (success) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="min-h-screen bg-background py-12">
         <div className="max-w-lg mx-auto px-4 text-center">
           <div className="w-16 h-16 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
             <CheckCircle className="w-8 h-8 text-emerald-600" />
           </div>
-          <h2 className="text-2xl font-bold text-gray-900 mb-3">Solicitacao Enviada!</h2>
-          <p className="text-gray-600 mb-6">
+          <h2 className="text-2xl font-bold text-foreground mb-3">Solicitacao Enviada!</h2>
+          <p className="text-muted-foreground mb-6">
             Seu pedido de renovacao de receita foi enviado para analise medica. Voce sera notificado quando houver resposta.
           </p>
           <Button onClick={() => window.history.back()} variant="outline">Voltar</Button>
@@ -176,7 +176,7 @@ function RenovacaoReceitasInner() {
 
   if (pendingSolicitacao) {
     return (
-      <div className="min-h-screen bg-gray-50 py-12">
+      <div className="min-h-screen bg-background py-12 text-foreground">
         <div className="max-w-lg mx-auto px-4">
           <PaymentStep
             payment={pendingSolicitacao.payment || pendingSolicitacao}
@@ -196,19 +196,19 @@ function RenovacaoReceitasInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-12">
+    <div className="min-h-screen bg-background py-12 text-foreground">
       <div className="max-w-2xl mx-auto px-4">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-3">Renovacao de Receitas</h1>
-          <p className="text-gray-600 max-w-xl mx-auto">
+          <h1 className="text-3xl font-bold text-foreground mb-3">Renovacao de Receitas</h1>
+          <p className="text-muted-foreground max-w-xl mx-auto">
             Renove suas receitas de medicamentos de uso continuo de forma rapida e digital, com envio direto ao medico.
           </p>
         </div>
 
         {!accepted ? (
-          <Card className="border-0 shadow-md">
+          <Card className="border-border shadow-md">
             <CardContent className="p-6 space-y-4">
-              <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl space-y-4 text-sm text-amber-900">
+              <div className="p-4 bg-amber-50 border border-amber-300 rounded-xl space-y-4 text-sm text-amber-900 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                 <div className="flex items-start gap-3">
                   <AlertTriangle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                   <div>
@@ -248,7 +248,7 @@ function RenovacaoReceitasInner() {
             </CardContent>
           </Card>
         ) : (
-          <Card className="border-0 shadow-md">
+          <Card className="border-border shadow-md">
             <CardContent className="p-6">
               <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="space-y-2">
@@ -290,7 +290,7 @@ function RenovacaoReceitasInner() {
                 <div className="space-y-2">
                   <Label htmlFor="arquivo">Upload da ultima receita *</Label>
                   <div
-                    className="border-2 border-dashed border-gray-300 rounded-xl p-6 text-center hover:border-emerald-400 transition-colors cursor-pointer"
+                    className="border-2 border-dashed border-border rounded-xl p-6 text-center hover:border-emerald-400 transition-colors cursor-pointer"
                     onClick={() => document.getElementById('arquivo')?.click()}
                   >
                     <input
@@ -305,22 +305,22 @@ function RenovacaoReceitasInner() {
                         {previewUrl && (
                           <img src={previewUrl} alt="Preview" className="max-h-48 mx-auto rounded-lg" />
                         )}
-                        <p className="text-sm text-gray-700 font-medium">{arquivo.name}</p>
-                        <p className="text-xs text-gray-500">Clique para trocar o arquivo</p>
+                        <p className="text-sm text-foreground font-medium">{arquivo.name}</p>
+                        <p className="text-xs text-muted-foreground">Clique para trocar o arquivo</p>
                       </div>
                     ) : (
                       <div className="space-y-2">
-                        <Upload className="w-8 h-8 text-gray-400 mx-auto" />
-                        <p className="text-sm text-gray-500">Clique para enviar JPG, PNG ou PDF</p>
+                        <Upload className="w-8 h-8 text-muted-foreground mx-auto" />
+                        <p className="text-sm text-muted-foreground">Clique para enviar JPG, PNG ou PDF</p>
                       </div>
                     )}
                   </div>
                 </div>
 
-                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+                <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
                   <div className="flex items-center justify-between">
-                    <span className="text-emerald-700">Valor oficial</span>
-                    <span className="font-bold text-emerald-800">
+                    <span className="text-emerald-700 dark:text-emerald-300">Valor oficial</span>
+                    <span className="font-bold text-emerald-800 dark:text-emerald-200">
                       {quoteLoading
                         ? 'Carregando...'
                         : serviceQuote?.grossPrice
@@ -329,7 +329,7 @@ function RenovacaoReceitasInner() {
                     </span>
                   </div>
                   {quoteError && (
-                    <p className="mt-2 text-red-600">
+                    <p className="mt-2 text-red-600 dark:text-red-300">
                       {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
                     </p>
                   )}

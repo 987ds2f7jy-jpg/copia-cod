@@ -2,6 +2,7 @@ import { Suspense, lazy } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
+import { ThemeProvider } from 'next-themes'
 import NavigationTracker from '@/lib/NavigationTracker'
 import { pagesConfig } from './pages.config'
 import { BrowserRouter as Router, Route, Routes, Navigate, useSearchParams } from 'react-router-dom';
@@ -46,64 +47,71 @@ function withRouteProtection(pageName, element) {
 
 function App() {
   return (
-    <QueryClientProvider client={queryClientInstance}>
-      <AuthProvider>
-        <Router>
-          <NavigationTracker />
-          <Suspense fallback={<AppLoadingScreen />}>
-            <Routes>
-              <Route path="/" element={
-                <LayoutWrapper currentPageName={mainPageKey}>
-                  <MainPage />
-                </LayoutWrapper>
-              } />
-              {Object.entries(Pages).map(([path, Page]: [string, any]) => (
+    <ThemeProvider
+      attribute="class"
+      defaultTheme="system"
+      enableSystem
+      storageKey="rapido-doutor-theme"
+    >
+      <QueryClientProvider client={queryClientInstance}>
+        <AuthProvider>
+          <Router>
+            <NavigationTracker />
+            <Suspense fallback={<AppLoadingScreen />}>
+              <Routes>
+                <Route path="/" element={
+                  <LayoutWrapper currentPageName={mainPageKey}>
+                    <MainPage />
+                  </LayoutWrapper>
+                } />
+                {Object.entries(Pages).map(([path, Page]: [string, any]) => (
+                  <Route
+                    key={path}
+                    path={`/${path}`}
+                    element={
+                      <LayoutWrapper currentPageName={path}>
+                        {withRouteProtection(path, <Page />)}
+                      </LayoutWrapper>
+                    }
+                  />
+                ))}
+                <Route path="/Agendamento" element={<AgendamentoRedirect />} />
                 <Route
-                  key={path}
-                  path={`/${path}`}
+                  path="/pagamento/:status"
                   element={
-                    <LayoutWrapper currentPageName={path}>
-                      {withRouteProtection(path, <Page />)}
+                    <LayoutWrapper currentPageName="PagamentoRetorno">
+                      <PagamentoRetorno />
                     </LayoutWrapper>
                   }
                 />
-              ))}
-              <Route path="/Agendamento" element={<AgendamentoRedirect />} />
-              <Route
-                path="/pagamento/:status"
-                element={
-                  <LayoutWrapper currentPageName="PagamentoRetorno">
-                    <PagamentoRetorno />
-                  </LayoutWrapper>
-                }
-              />
-              <Route
-                path="/consulta/:consultaId"
-                element={
-                  <LayoutWrapper currentPageName="Teleconsulta">
-                    <ProtectedRoute>
-                      <Teleconsulta />
-                    </ProtectedRoute>
-                  </LayoutWrapper>
-                }
-              />
-              <Route
-                path="/FinanceiroProfissional"
-                element={
-                  <LayoutWrapper currentPageName="FinanceiroProfissional">
-                    <ProtectedRoute requiredRole="professional">
-                      <FinanceiroProfissional />
-                    </ProtectedRoute>
-                  </LayoutWrapper>
-                }
-              />
-              <Route path="*" element={<PageNotFound />} />
-            </Routes>
-          </Suspense>
-        </Router>
-        <Toaster />
-      </AuthProvider>
-    </QueryClientProvider>
+                <Route
+                  path="/consulta/:consultaId"
+                  element={
+                    <LayoutWrapper currentPageName="Teleconsulta">
+                      <ProtectedRoute>
+                        <Teleconsulta />
+                      </ProtectedRoute>
+                    </LayoutWrapper>
+                  }
+                />
+                <Route
+                  path="/FinanceiroProfissional"
+                  element={
+                    <LayoutWrapper currentPageName="FinanceiroProfissional">
+                      <ProtectedRoute requiredRole="professional">
+                        <FinanceiroProfissional />
+                      </ProtectedRoute>
+                    </LayoutWrapper>
+                  }
+                />
+                <Route path="*" element={<PageNotFound />} />
+              </Routes>
+            </Suspense>
+          </Router>
+          <Toaster />
+        </AuthProvider>
+      </QueryClientProvider>
+    </ThemeProvider>
   )
 }
 

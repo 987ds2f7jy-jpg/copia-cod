@@ -432,15 +432,15 @@ function ConsultaAgoraInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8 text-foreground dark:from-emerald-950/35 dark:via-background dark:to-teal-950/25">
       <div className="mx-auto max-w-3xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8 text-center">
-          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700">
+          <div className="mb-4 inline-flex items-center gap-2 rounded-full bg-emerald-100 px-4 py-2 text-sm font-medium text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">
             <Clock className="h-4 w-4" />
             Atendimento Imediato
           </div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Consulta Agora</h1>
-          <p className="text-gray-600">Conecte-se com um medico disponivel em minutos</p>
+          <h1 className="mb-2 text-3xl font-bold text-foreground">Consulta Agora</h1>
+          <p className="text-muted-foreground">Conecte-se com um medico disponivel em minutos</p>
         </div>
 
         {activePlantaoConsultation && (
@@ -456,18 +456,18 @@ function ConsultaAgoraInner() {
         <AnimatePresence mode="wait">
           {step === 'form' && (
             <motion.div key="form" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              <Card className="mb-6 border-0 shadow-sm">
+              <Card className="mb-6 border-border shadow-sm">
                 <CardContent className="p-4">
                   <div className="flex items-center justify-between">
                     <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100">
-                        <Stethoscope className="h-5 w-5 text-emerald-600" />
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
+                        <Stethoscope className="h-5 w-5 text-emerald-600 dark:text-emerald-300" />
                       </div>
                       <div>
-                        <p className="font-semibold text-gray-900">
+                        <p className="font-semibold text-foreground">
                           {medicosDisponiveis} medicos disponiveis
                         </p>
-                        <p className="text-sm text-gray-500">
+                        <p className="text-sm text-muted-foreground">
                           {selectedSpecialty
                             ? `Plantao ativo em ${selectedSpecialtyLabel}`
                             : 'Prontos para atendimento'}
@@ -476,15 +476,15 @@ function ConsultaAgoraInner() {
                     </div>
                     {queueStats && (
                       <div className="text-right">
-                        <p className="text-sm text-gray-500">Na fila</p>
-                        <p className="font-semibold text-gray-900">{queueStats.count} pacientes</p>
+                        <p className="text-sm text-muted-foreground">Na fila</p>
+                        <p className="font-semibold text-foreground">{queueStats.count} pacientes</p>
                       </div>
                     )}
                   </div>
                 </CardContent>
               </Card>
 
-              <Card className="border-0 shadow-md">
+              <Card className="border-border shadow-md">
                 <CardHeader>
                   <CardTitle>Entrar na Fila de Atendimento</CardTitle>
                 </CardHeader>
@@ -516,14 +516,14 @@ function ConsultaAgoraInner() {
                   </div>
 
                   {selectedSpecialty && !hasAvailableProfessionals && (
-                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700">
+                    <div className="rounded-xl border border-red-200 bg-red-50 p-4 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                       Nenhum profissional dessa especialidade esta com plantao ativo agora. Selecione outra especialidade para entrar na fila.
                     </div>
                   )}
 
                   {selectedSpecialty && queueStats && hasAvailableProfessionals && (
-                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4">
-                      <div className="flex items-center gap-2 text-amber-700">
+                    <div className="rounded-xl border border-amber-200 bg-amber-50 p-4 dark:border-amber-900/60 dark:bg-amber-950/40">
+                      <div className="flex items-center gap-2 text-amber-700 dark:text-amber-300">
                         <Clock className="h-5 w-5" />
                         <span className="font-medium">
                           Tempo estimado de espera: ~{queueStats.estimatedWait || 10} minutos
@@ -533,10 +533,10 @@ function ConsultaAgoraInner() {
                   )}
 
                   {selectedSpecialty && hasAvailableProfessionals && (
-                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+                    <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
                       <div className="flex items-center justify-between gap-3">
-                        <span className="text-emerald-700">Valor oficial do plantao</span>
-                        <span className="font-bold text-emerald-800">
+                        <span className="text-emerald-700 dark:text-emerald-300">Valor oficial do plantao</span>
+                        <span className="font-bold text-emerald-800 dark:text-emerald-200">
                           {quoteLoading
                             ? 'Carregando...'
                             : serviceQuote?.grossPrice
@@ -545,7 +545,7 @@ function ConsultaAgoraInner() {
                         </span>
                       </div>
                       {quoteError && (
-                        <p className="mt-2 text-red-600">
+                        <p className="mt-2 text-red-600 dark:text-red-300">
                           {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
                         </p>
                       )}
@@ -588,25 +588,25 @@ function ConsultaAgoraInner() {
 
           {step === 'queue' && queueEntry && (
             <motion.div key="queue" initial={{ opacity: 0, y: 20 }} animate={{ opacity: 1, y: 0 }} exit={{ opacity: 0, y: -20 }}>
-              <Card className="border-0 shadow-md">
+              <Card className="border-border shadow-md">
                 <CardContent className="p-8 text-center">
                   <div className="relative mx-auto mb-6 h-32 w-32">
-                    <div className="absolute inset-0 rounded-full border-4 border-emerald-100" />
+                    <div className="absolute inset-0 rounded-full border-4 border-emerald-100 dark:border-emerald-500/20" />
                     <div className="absolute inset-0 animate-spin rounded-full border-4 border-emerald-500 border-t-transparent" />
-                    <div className="absolute inset-4 flex items-center justify-center rounded-full bg-emerald-50">
-                      <span className="text-4xl font-bold text-emerald-600">
+                    <div className="absolute inset-4 flex items-center justify-center rounded-full bg-emerald-50 dark:bg-emerald-500/10">
+                      <span className="text-4xl font-bold text-emerald-600 dark:text-emerald-300">
                         {queueEntry.position || 1}
                       </span>
                     </div>
                   </div>
 
-                  <h2 className="mb-2 text-2xl font-bold text-gray-900">Voce esta na fila</h2>
-                  <p className="mb-6 text-gray-600">
+                  <h2 className="mb-2 text-2xl font-bold text-foreground">Voce esta na fila</h2>
+                  <p className="mb-6 text-muted-foreground">
                     Posicao {queueEntry.position} - Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
                   </p>
 
-                  <div className="mb-6 rounded-xl bg-gray-50 p-4">
-                    <div className="flex items-center justify-center gap-3 text-gray-600">
+                  <div className="mb-6 rounded-xl bg-muted/40 p-4">
+                    <div className="flex items-center justify-center gap-3 text-muted-foreground">
                       <AlertCircle className="h-5 w-5 text-amber-500" />
                       <span className="text-sm">
                         Mantenha esta pagina aberta. Voce sera redirecionado automaticamente.
@@ -618,7 +618,7 @@ function ConsultaAgoraInner() {
                     variant="outline"
                     onClick={() => leaveQueue.mutate(queueEntry.id)}
                     disabled={leaveQueue.isPending}
-                    className="border-red-200 text-red-600 hover:bg-red-50"
+                    className="border-red-200 text-red-600 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
                     {leaveQueue.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Sair da Fila
@@ -631,25 +631,25 @@ function ConsultaAgoraInner() {
         )}
 
         <div className="mt-8 grid gap-4 sm:grid-cols-3">
-          <Card className="border-0 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Clock className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
-              <p className="font-medium text-gray-900">Atendimento 24h</p>
-              <p className="text-sm text-gray-500">Todos os dias</p>
+              <p className="font-medium text-foreground">Atendimento 24h</p>
+              <p className="text-sm text-muted-foreground">Todos os dias</p>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Stethoscope className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
-              <p className="font-medium text-gray-900">Medicos Verificados</p>
-              <p className="text-sm text-gray-500">CRM ativo</p>
+              <p className="font-medium text-foreground">Medicos Verificados</p>
+              <p className="text-sm text-muted-foreground">CRM ativo</p>
             </CardContent>
           </Card>
-          <Card className="border-0 shadow-sm">
+          <Card className="border-border shadow-sm">
             <CardContent className="p-4 text-center">
               <Video className="mx-auto mb-2 h-8 w-8 text-emerald-600" />
-              <p className="font-medium text-gray-900">Teleconsulta</p>
-              <p className="text-sm text-gray-500">Video em HD</p>
+              <p className="font-medium text-foreground">Teleconsulta</p>
+              <p className="text-sm text-muted-foreground">Video em HD</p>
             </CardContent>
           </Card>
         </div>

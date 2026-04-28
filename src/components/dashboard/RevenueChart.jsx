@@ -28,17 +28,17 @@ export default function RevenueChart({ appointments }) {
   const data = view === 'week' ? weekData : monthData;
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
+    <Card className="border-border shadow-sm bg-card">
       <CardHeader className="pb-2">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-gray-900">Receita</CardTitle>
-          <div className="flex gap-1 bg-gray-100 rounded-lg p-1">
+          <CardTitle className="text-base font-semibold text-foreground">Receita</CardTitle>
+          <div className="flex gap-1 bg-muted rounded-lg p-1">
             {['week', 'month'].map(v => (
               <button
                 key={v}
                 onClick={() => setView(v)}
                 className={`px-3 py-1 text-xs font-medium rounded-md transition-colors ${
-                  view === v ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                  view === v ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                 }`}
               >
                 {v === 'week' ? '7 dias' : '6 meses'}
@@ -56,10 +56,10 @@ export default function RevenueChart({ appointments }) {
                 <stop offset="95%" stopColor="#10B981" stopOpacity={0} />
               </linearGradient>
             </defs>
-            <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-            <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} />
-            <YAxis tick={{ fontSize: 11, fill: '#9CA3AF' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${v}`} width={45} />
-            <Tooltip formatter={(v) => [fmt(v), 'Receita']} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid #e5e7eb' }} />
+            <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+            <XAxis dataKey="name" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} />
+            <YAxis tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} axisLine={false} tickLine={false} tickFormatter={v => `R$${v}`} width={45} />
+            <Tooltip formatter={(v) => [fmt(v), 'Receita']} contentStyle={{ fontSize: 12, borderRadius: 8, border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }} />
             <Area type="monotone" dataKey="receita" stroke="#10B981" strokeWidth={2} fill="url(#receitaGrad)" />
           </AreaChart>
         </ResponsiveContainer>

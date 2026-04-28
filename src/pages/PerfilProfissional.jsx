@@ -83,7 +83,7 @@ export default function PerfilProfissional() {
   // ── Loading ──────────────────────────────────────────────────────────────
   if (loadingProf) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
@@ -92,10 +92,10 @@ export default function PerfilProfissional() {
   // ── Not found / inactive ─────────────────────────────────────────────────
   if (!professional) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 px-4 text-center">
-        <Stethoscope className="w-14 h-14 text-gray-200" />
-        <h2 className="text-xl font-semibold text-gray-900">Profissional não encontrado</h2>
-        <p className="text-gray-400 max-w-xs">Este perfil pode estar inativo ou o link pode estar incorreto.</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <Stethoscope className="w-14 h-14 text-muted-foreground/30" />
+        <h2 className="text-xl font-semibold text-foreground">Profissional não encontrado</h2>
+        <p className="text-muted-foreground max-w-xs">Este perfil pode estar inativo ou o link pode estar incorreto.</p>
         <Link to={createPageUrl('Especialidades')}>
           <Button variant="outline" className="gap-2">
             <ArrowLeft className="w-4 h-4" />
@@ -111,7 +111,7 @@ export default function PerfilProfissional() {
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="min-h-screen bg-gray-50 pb-24 lg:pb-10">
+    <div className="min-h-screen bg-background pb-24 lg:pb-10">
       {/* Hero */}
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }}>
         <ProfileHero professional={professional} />
@@ -163,7 +163,7 @@ export default function PerfilProfissional() {
       {/* Mobile sticky CTA */}
       <div className="lg:hidden fixed bottom-16 left-0 right-0 z-40 px-4 pb-2">
         <Link to={createPageUrl(`AgendamentoPerfil?professional=${professional.id}`)}>
-          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 shadow-lg shadow-emerald-200 text-base font-semibold gap-2">
+          <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white h-12 shadow-lg shadow-emerald-200 text-base font-semibold gap-2 dark:shadow-emerald-950/40">
             Agendar Consulta
           </Button>
         </Link>

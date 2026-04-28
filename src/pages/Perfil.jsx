@@ -27,6 +27,7 @@ import {
   AlertDialogTitle,
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
+import ThemeModeSetting from '@/components/theme/ThemeModeSetting';
 
 function PerfilInner() {
   const { user, updateUser, deactivateAccount } = useAuth();
@@ -101,22 +102,22 @@ function PerfilInner() {
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="mx-auto max-w-2xl px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-2xl font-bold text-gray-900">Meu perfil</h1>
-          <p className="text-gray-600">Gerencie suas informacoes pessoais.</p>
+          <h1 className="text-2xl font-bold text-foreground">Meu perfil</h1>
+          <p className="text-muted-foreground">Gerencie suas informacoes pessoais.</p>
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader>
             <div className="flex items-center gap-4">
-              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100">
-                <User className="h-8 w-8 text-emerald-600" />
+              <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-100 dark:bg-emerald-500/15">
+                <User className="h-8 w-8 text-emerald-600 dark:text-emerald-300" />
               </div>
               <div>
                 <CardTitle>{user.full_name}</CardTitle>
-                <p className="text-sm text-gray-500">{user.email}</p>
+                <p className="text-sm text-muted-foreground">{user.email}</p>
               </div>
             </div>
           </CardHeader>
@@ -203,7 +204,7 @@ function PerfilInner() {
               </div>
 
               {submitError ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                   {submitError}
                 </div>
               ) : null}
@@ -226,14 +227,18 @@ function PerfilInner() {
               </div>
             </form>
 
-            <div className="mt-8 border-t border-gray-200 pt-6">
-              <h3 className="mb-3 text-sm font-medium text-gray-500">Zona de cuidado</h3>
-              <p className="mb-4 text-sm text-gray-600">
+            <div className="mt-8">
+              <ThemeModeSetting />
+            </div>
+
+            <div className="mt-8 border-t border-border pt-6">
+              <h3 className="mb-3 text-sm font-medium text-muted-foreground">Zona de cuidado</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
                 A desativacao faz soft-delete da conta e encerra suas sessoes atuais.
               </p>
 
               {deactivateError ? (
-                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                <div className="mb-4 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                   {deactivateError}
                 </div>
               ) : null}
@@ -242,7 +247,7 @@ function PerfilInner() {
                 <AlertDialogTrigger asChild>
                   <Button
                     variant="outline"
-                    className="h-12 w-full border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50"
+                    className="h-12 w-full border-red-200 text-red-600 hover:border-red-300 hover:bg-red-50 dark:border-red-900/70 dark:text-red-300 dark:hover:bg-red-950/40"
                   >
                     <Trash2 className="mr-2 h-4 w-4" />
                     Desativar conta

@@ -16,14 +16,14 @@ export default function ProfileAvailability({ professional }) {
   }
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <Clock className="w-5 h-5 text-indigo-500" />
           Disponibilidade
         </h2>
         {professional.is_on_duty && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full dark:bg-emerald-950/40 dark:text-emerald-300">
             <Zap className="w-3 h-3" />
             Plantão ativo
           </span>
@@ -35,8 +35,8 @@ export default function ProfileAvailability({ professional }) {
         {ALL_DAYS.map((day, i) => {
           const available = isDayAvailable(day);
           return (
-            <div key={day} className={`rounded-xl py-2.5 text-center transition-colors ${available ? 'bg-emerald-50 border border-emerald-200' : 'bg-gray-50 border border-gray-100'}`}>
-              <p className={`text-xs font-semibold ${available ? 'text-emerald-700' : 'text-gray-400'}`}>{LABELS[i]}</p>
+            <div key={day} className={`rounded-xl py-2.5 text-center transition-colors ${available ? 'bg-emerald-50 border border-emerald-200 dark:bg-emerald-950/30 dark:border-emerald-900/60' : 'bg-muted/50 border border-border'}`}>
+              <p className={`text-xs font-semibold ${available ? 'text-emerald-700 dark:text-emerald-300' : 'text-muted-foreground'}`}>{LABELS[i]}</p>
               {available && <CheckCircle className="w-3 h-3 text-emerald-500 mx-auto mt-1" />}
             </div>
           );
@@ -46,10 +46,10 @@ export default function ProfileAvailability({ professional }) {
       {/* Hours */}
       {professional.available_hours?.length > 0 && (
         <div>
-          <p className="text-sm text-gray-500 mb-2">Horários disponíveis</p>
+          <p className="text-sm text-muted-foreground mb-2">Horários disponíveis</p>
           <div className="flex flex-wrap gap-2">
             {professional.available_hours.map(hour => (
-              <span key={hour} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-sm rounded-lg font-medium border border-indigo-100">
+              <span key={hour} className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-sm rounded-lg font-medium border border-indigo-100 dark:bg-indigo-950/30 dark:text-indigo-300 dark:border-indigo-900/60">
                 {hour}
               </span>
             ))}

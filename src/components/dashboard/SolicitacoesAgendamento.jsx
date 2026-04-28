@@ -114,16 +114,16 @@ export default function SolicitacoesAgendamento({ professional }) {
 
   if (isLoading) {
     return (
-      <div className="bg-white rounded-xl shadow-sm p-5 flex items-center justify-center h-32">
-        <Loader2 className="w-5 h-5 animate-spin text-gray-400" />
+      <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex items-center justify-center h-32">
+        <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" />
       </div>
     );
   }
 
   return (
-    <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-      <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-        <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+    <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+      <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+        <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
           <Users className="w-4 h-4 text-blue-500" />
           Solicitacoes de Agendamento
         </h3>
@@ -131,31 +131,31 @@ export default function SolicitacoesAgendamento({ professional }) {
       </div>
 
       {errorMsg && (
-        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+        <div className="mx-4 mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:bg-red-950/30 dark:border-red-900/60 dark:text-red-300">
           <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
           {errorMsg}
           <button onClick={() => setErrorMsg(null)} className="ml-auto text-red-400 hover:text-red-600">x</button>
         </div>
       )}
 
-      <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+      <div className="divide-y divide-border max-h-80 overflow-y-auto">
         {solicitacoes.length === 0 ? (
-          <p className="px-5 py-8 text-sm text-gray-400 text-center">
+          <p className="px-5 py-8 text-sm text-muted-foreground text-center">
             Nenhuma solicitacao pendente para {professional.specialty}
           </p>
         ) : solicitacoes.map((sol) => (
           <div key={sol.id} className="px-5 py-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
-              <p className="text-xs text-gray-400">{sol.patient_name}</p>
-              <p className="text-sm font-medium text-gray-700">{sol.specialty}</p>
-              <div className="flex items-center gap-3 mt-1 text-xs text-gray-500">
+              <p className="text-xs text-muted-foreground">{sol.patient_name}</p>
+              <p className="text-sm font-medium text-foreground">{sol.specialty}</p>
+              <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <CalendarDays className="w-3.5 h-3.5" />
                   {formatDt(sol.scheduled_datetime)}
                 </span>
               </div>
               {sol.symptoms && (
-                <p className="text-xs text-gray-400 mt-1 line-clamp-1">"{sol.symptoms}"</p>
+                <p className="text-xs text-muted-foreground mt-1 line-clamp-1">"{sol.symptoms}"</p>
               )}
             </div>
             <Button

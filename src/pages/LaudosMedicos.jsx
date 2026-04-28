@@ -543,14 +543,14 @@ function LaudosMedicosInner() {
             </p>
           </div>
 
-          <Card className="border-orange-300 bg-orange-50">
+          <Card className="border-orange-300 bg-orange-50 dark:border-orange-900/60 dark:bg-orange-950/40">
             <CardContent className="p-6 space-y-4">
-              <div className="flex items-center gap-2 text-orange-700 font-semibold">
+              <div className="flex items-center gap-2 text-orange-700 font-semibold dark:text-orange-300">
                 <AlertTriangle className="w-5 h-5" />
                 <span>Avisos importantes</span>
               </div>
 
-              <div className="space-y-3 text-sm text-orange-900">
+              <div className="space-y-3 text-sm text-orange-900 dark:text-orange-200">
                 <div>
                   <strong>Autonomia medica</strong>
                   <br />
@@ -802,10 +802,10 @@ function LaudosMedicosInner() {
         </Card>
 
         {step === STEPS.length - 1 ? (
-          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm">
+          <div className="rounded-xl border border-emerald-100 bg-emerald-50 p-4 text-sm dark:border-emerald-900/60 dark:bg-emerald-950/40">
             <div className="flex items-center justify-between">
-              <span className="text-emerald-700">Valor oficial do laudo</span>
-              <span className="font-bold text-emerald-800">
+              <span className="text-emerald-700 dark:text-emerald-300">Valor oficial do laudo</span>
+              <span className="font-bold text-emerald-800 dark:text-emerald-200">
                 {quoteLoading
                   ? 'Carregando...'
                   : serviceQuote?.grossPrice
@@ -814,7 +814,7 @@ function LaudosMedicosInner() {
               </span>
             </div>
             {quoteError && (
-              <p className="mt-2 text-red-600">
+              <p className="mt-2 text-red-600 dark:text-red-300">
                 {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
               </p>
             )}

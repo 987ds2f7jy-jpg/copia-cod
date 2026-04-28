@@ -23,10 +23,10 @@ export default function PlantaoBlock({ professional, isOnDuty = false, canToggle
     : 0;
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
+    <Card className="border-border shadow-sm bg-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
             <Zap className="w-4 h-4 text-yellow-500" />
             Plantão
           </CardTitle>
@@ -36,7 +36,7 @@ export default function PlantaoBlock({ professional, isOnDuty = false, canToggle
               onCheckedChange={onToggle}
               disabled={!podeAtualPlantao || !canToggle}
             />
-            <Badge className={isOnDuty ? 'bg-emerald-100 text-emerald-700' : 'bg-gray-100 text-gray-500'}>
+            <Badge className={isOnDuty ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' : 'bg-muted text-muted-foreground'}>
               {isOnDuty ? 'Ativo' : 'Inativo'}
             </Badge>
           </div>
@@ -44,27 +44,27 @@ export default function PlantaoBlock({ professional, isOnDuty = false, canToggle
       </CardHeader>
       <CardContent className="space-y-3">
         {!podeAtualPlantao && (
-          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg">
+          <div className="flex items-start gap-2 p-3 bg-amber-50 border border-amber-200 rounded-lg dark:bg-amber-950/30 dark:border-amber-900/60">
             <AlertCircle className="w-4 h-4 text-amber-600 shrink-0 mt-0.5" />
-            <p className="text-xs text-amber-700">
+            <p className="text-xs text-amber-700 dark:text-amber-300">
               Plantão disponível apenas para: Clínico Geral, Pediatria, Psicologia e Psiquiatria.
             </p>
           </div>
         )}
         <div className="grid grid-cols-2 gap-3">
           {[
-            { label: 'Atendidos via plantão', value: instantAppts.length, icon: Users, color: 'text-emerald-600 bg-emerald-50' },
-            { label: 'Taxa de conversão fila', value: `${conversionRate}%`, icon: TrendingUp, color: 'text-indigo-600 bg-indigo-50' },
-            { label: 'Tempo médio de espera', value: avgWait ? `${avgWait} min` : '—', icon: Clock, color: 'text-amber-600 bg-amber-50' },
-            { label: 'Receita via plantão', value: fmt(revenue), icon: DollarSign, color: 'text-purple-600 bg-purple-50' },
+            { label: 'Atendidos via plantão', value: instantAppts.length, icon: Users, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
+            { label: 'Taxa de conversão fila', value: `${conversionRate}%`, icon: TrendingUp, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' },
+            { label: 'Tempo médio de espera', value: avgWait ? `${avgWait} min` : '—', icon: Clock, color: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
+            { label: 'Receita via plantão', value: fmt(revenue), icon: DollarSign, color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:text-purple-300' },
           ].map(item => (
-            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-gray-50">
+            <div key={item.label} className="flex items-center gap-3 p-3 rounded-xl bg-muted/50">
               <div className={`w-8 h-8 rounded-lg ${item.color} flex items-center justify-center shrink-0`}>
                 <item.icon className="w-4 h-4" />
               </div>
               <div className="min-w-0">
-                <p className="text-sm font-bold text-gray-900">{item.value}</p>
-                <p className="text-xs text-gray-400 leading-tight">{item.label}</p>
+                <p className="text-sm font-bold text-foreground">{item.value}</p>
+                <p className="text-xs text-muted-foreground leading-tight">{item.label}</p>
               </div>
             </div>
           ))}

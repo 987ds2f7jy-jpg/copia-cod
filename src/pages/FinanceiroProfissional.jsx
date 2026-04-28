@@ -38,13 +38,13 @@ const TIPO_LABELS = {
 };
 
 const STATUS_PAYMENT = {
-  completed: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700' },
-  CONCLUIDO: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700' },
-  accepted: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
-  confirmed: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
-  CONFIRMADO: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700' },
-  in_progress: { label: 'Retido', cls: 'bg-blue-100 text-blue-700' },
-  em_atendimento: { label: 'Retido', cls: 'bg-blue-100 text-blue-700' },
+  completed: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  CONCLUIDO: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  accepted: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  confirmed: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  CONFIRMADO: { label: 'Pendente', cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  in_progress: { label: 'Retido', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
+  em_atendimento: { label: 'Retido', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
 };
 
 function FinanceiroProfissionalInner() {
@@ -179,52 +179,52 @@ function FinanceiroProfissionalInner() {
   });
 
   const kpis = [
-    { label: 'Receita disponivel', value: fmt(netMonth), icon: CheckCircle, cls: 'bg-emerald-50 text-emerald-600' },
-    { label: 'Receita pendente', value: fmt(revenuePending), icon: Clock, cls: 'bg-amber-50 text-amber-600' },
-    { label: 'Taxa plataforma (15%)', value: fmt(platformFeeMonth), icon: DollarSign, cls: 'bg-red-50 text-red-500' },
-    { label: 'Receita acumulada', value: fmt(allTimeRevenue), icon: TrendingUp, cls: 'bg-indigo-50 text-indigo-600' },
-    { label: 'Total recebido (mes)', value: fmt(revenueMonth), icon: BarChart2, cls: 'bg-purple-50 text-purple-600' },
-    { label: 'Media por consulta', value: fmt(avgPerConsult), icon: DollarSign, cls: 'bg-sky-50 text-sky-600' },
+    { label: 'Receita disponivel', value: fmt(netMonth), icon: CheckCircle, cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300' },
+    { label: 'Receita pendente', value: fmt(revenuePending), icon: Clock, cls: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300' },
+    { label: 'Taxa plataforma (15%)', value: fmt(platformFeeMonth), icon: DollarSign, cls: 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-300' },
+    { label: 'Receita acumulada', value: fmt(allTimeRevenue), icon: TrendingUp, cls: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300' },
+    { label: 'Total recebido (mes)', value: fmt(revenueMonth), icon: BarChart2, cls: 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300' },
+    { label: 'Media por consulta', value: fmt(avgPerConsult), icon: DollarSign, cls: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300' },
   ];
 
   if (isLoading || !professional) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen bg-gray-50 py-6">
+    <div className="min-h-screen bg-background py-6">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 space-y-6">
         <div className="flex items-center gap-4">
           <Button variant="ghost" size="sm" onClick={() => navigate(-1)} className="gap-1">
             <ArrowLeft className="w-4 h-4" /> Voltar
           </Button>
           <div>
-            <h1 className="text-2xl font-bold text-gray-900">Relatorio Financeiro</h1>
-            <p className="text-sm text-gray-500">Resumo de receitas, saques e historico de consultas</p>
+            <h1 className="text-2xl font-bold text-foreground">Relatorio Financeiro</h1>
+            <p className="text-sm text-muted-foreground">Resumo de receitas, saques e historico de consultas</p>
           </div>
         </div>
 
         <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
           {kpis.map((kpi) => (
-            <Card key={kpi.label} className="border-0 shadow-sm">
+            <Card key={kpi.label} className="border-border shadow-sm">
               <CardContent className="p-4">
                 <div className={`w-8 h-8 rounded-lg ${kpi.cls} flex items-center justify-center mb-2`}>
                   <kpi.icon className="w-4 h-4" />
                 </div>
-                <p className="text-lg font-bold text-gray-900">{kpi.value}</p>
-                <p className="text-xs text-gray-400 mt-0.5">{kpi.label}</p>
+                <p className="text-lg font-bold text-foreground">{kpi.value}</p>
+                <p className="text-xs text-muted-foreground mt-0.5">{kpi.label}</p>
               </CardContent>
             </Card>
           ))}
         </div>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
               <BarChart2 className="w-4 h-4 text-emerald-500" />
               Receita dos ultimos 6 meses
             </CardTitle>
@@ -232,24 +232,24 @@ function FinanceiroProfissionalInner() {
           <CardContent>
             <ResponsiveContainer width="100%" height={200}>
               <BarChart data={chartData} barSize={20}>
-                <CartesianGrid strokeDasharray="3 3" stroke="#f0f0f0" />
-                <XAxis dataKey="mes" tick={{ fontSize: 12 }} />
-                <YAxis tick={{ fontSize: 12 }} tickFormatter={(value) => `R$${value}`} />
-                <Tooltip formatter={(value) => fmt(value)} />
+                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" />
+                <XAxis dataKey="mes" tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} />
+                <YAxis tick={{ fontSize: 12, fill: 'hsl(var(--muted-foreground))' }} tickFormatter={(value) => `R$${value}`} />
+                <Tooltip formatter={(value) => fmt(value)} contentStyle={{ border: '1px solid hsl(var(--border))', backgroundColor: 'hsl(var(--card))', color: 'hsl(var(--foreground))' }} />
                 <Bar dataKey="bruto" fill="#d1fae5" name="Bruto" radius={[4, 4, 0, 0]} />
                 <Bar dataKey="liquido" fill="#10b981" name="Liquido" radius={[4, 4, 0, 0]} />
               </BarChart>
             </ResponsiveContainer>
-            <div className="flex gap-4 mt-2 justify-center text-xs text-gray-500">
+            <div className="flex gap-4 mt-2 justify-center text-xs text-muted-foreground">
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-200 inline-block" /> Bruto</span>
               <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-500 inline-block" /> Liquido</span>
             </div>
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader>
-            <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+            <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-indigo-500" />
               Historico de Consultas
             </CardTitle>
@@ -258,7 +258,7 @@ function FinanceiroProfissionalInner() {
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="text-xs text-gray-400 border-b border-gray-100">
+                  <tr className="text-xs text-muted-foreground border-b border-border">
                     <th className="px-5 py-3 text-left font-medium">Data</th>
                     <th className="px-5 py-3 text-left font-medium">Paciente</th>
                     <th className="px-5 py-3 text-left font-medium">Tipo</th>
@@ -268,28 +268,28 @@ function FinanceiroProfissionalInner() {
                     <th className="px-5 py-3 text-center font-medium">Status</th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-gray-50">
+                <tbody className="divide-y divide-border">
                   {historyAppts.length === 0 ? (
-                    <tr><td colSpan={7} className="px-5 py-8 text-center text-gray-400">Nenhuma consulta encontrada</td></tr>
+                    <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhuma consulta encontrada</td></tr>
                   ) : historyAppts.map((appointment) => {
                     const bruto = appointment.price || appointment.preco || 0;
                     const taxa = bruto * PLATFORM_FEE;
                     const liquido = bruto - taxa;
                     const tipo = appointment.appointment_type || appointment.tipo_consulta;
-                    const payStatus = STATUS_PAYMENT[appointment.status] || { label: appointment.status, cls: 'bg-gray-100 text-gray-600' };
+                    const payStatus = STATUS_PAYMENT[appointment.status] || { label: appointment.status, cls: 'bg-muted text-muted-foreground' };
 
                     return (
-                      <tr key={appointment.id} className="hover:bg-gray-50 transition-colors">
-                        <td className="px-5 py-3 text-gray-600 whitespace-nowrap">
+                      <tr key={appointment.id} className="hover:bg-muted/50 transition-colors">
+                        <td className="px-5 py-3 text-muted-foreground whitespace-nowrap">
                           {appointment.date ? format(new Date(`${appointment.date}T00:00`), 'dd/MM/yyyy') : '—'}
                         </td>
-                        <td className="px-5 py-3 text-gray-900 font-medium truncate max-w-[150px]">
+                        <td className="px-5 py-3 text-foreground font-medium truncate max-w-[150px]">
                           {appointment.patient_name || appointment.paciente_nome || '—'}
                         </td>
-                        <td className="px-5 py-3 text-gray-500">
+                        <td className="px-5 py-3 text-muted-foreground">
                           {TIPO_LABELS[tipo] || tipo || '—'}
                         </td>
-                        <td className="px-5 py-3 text-right text-gray-900">{fmt(bruto)}</td>
+                        <td className="px-5 py-3 text-right text-foreground">{fmt(bruto)}</td>
                         <td className="px-5 py-3 text-right text-red-500">-{fmt(taxa)}</td>
                         <td className="px-5 py-3 text-right font-semibold text-emerald-700">{fmt(liquido)}</td>
                         <td className="px-5 py-3 text-center">
@@ -306,10 +306,10 @@ function FinanceiroProfissionalInner() {
           </CardContent>
         </Card>
 
-        <Card className="border-0 shadow-sm">
+        <Card className="border-border shadow-sm">
           <CardHeader>
             <div className="flex items-center justify-between">
-              <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+              <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
                 <Download className="w-4 h-4 text-purple-500" />
                 Saques
               </CardTitle>
@@ -318,7 +318,7 @@ function FinanceiroProfissionalInner() {
                   <Landmark className="w-3 h-3" /> Dados Bancarios
                 </Button>
                 <div className="text-right">
-                  <p className="text-xs text-gray-400">Saldo disponivel</p>
+                  <p className="text-xs text-muted-foreground">Saldo disponivel</p>
                   <p className="font-bold text-emerald-700">{fmt(saldoDisponivel)}</p>
                 </div>
                 <Button
@@ -333,18 +333,18 @@ function FinanceiroProfissionalInner() {
             </div>
           </CardHeader>
           <CardContent className="p-0">
-            <div className="divide-y divide-gray-50">
+            <div className="divide-y divide-border">
               {saques.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-gray-400 text-center">Nenhum saque solicitado</p>
+                <p className="px-5 py-6 text-sm text-muted-foreground text-center">Nenhum saque solicitado</p>
               ) : saques.map((saque) => {
-                const statusMeta = SAQUE_STATUS_META[saque.status] || { label: saque.status, cls: 'bg-gray-100 text-gray-600' };
+                const statusMeta = SAQUE_STATUS_META[saque.status] || { label: saque.status, cls: 'bg-muted text-muted-foreground' };
                 const descriptor = getSaqueDescriptor(saque);
 
                 return (
                   <div key={saque.id} className="px-5 py-3 flex items-center justify-between gap-3">
                     <div>
-                      <p className="text-sm font-medium text-gray-900">{fmt(saque.valor)}</p>
-                      <p className="text-xs text-gray-400">
+                      <p className="text-sm font-medium text-foreground">{fmt(saque.valor)}</p>
+                      <p className="text-xs text-muted-foreground">
                         {saque.created_date ? format(new Date(saque.created_date), 'dd/MM/yyyy HH:mm') : '—'}
                         {descriptor ? ` · ${descriptor}` : ''}
                       </p>
@@ -361,7 +361,7 @@ function FinanceiroProfissionalInner() {
       <BankingDataModal open={bankingModal} onOpenChange={setBankingModal} professionalId={professional?.id} />
 
       {bankingData && (
-        <div className="mx-4 sm:mx-6 lg:mx-8 mb-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-sm text-emerald-800">
+        <div className="mx-4 sm:mx-6 lg:mx-8 mb-2 p-3 bg-emerald-50 border border-emerald-200 rounded-xl flex items-center gap-3 text-sm text-emerald-800 dark:bg-emerald-950/30 dark:border-emerald-900/60 dark:text-emerald-200">
           <Landmark className="w-4 h-4 shrink-0" />
           {buildWithdrawalMethodSummary(bankingData)}
         </div>
@@ -401,14 +401,14 @@ function FinanceiroProfissionalInner() {
             </div>
 
             {!bankingData && !chavePix && (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-xs text-amber-700">
+              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 Cadastre seus dados bancarios ou informe uma chave PIX para continuar.
               </div>
             )}
 
             {saldoDisponivel <= 0 && (
-              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-xs text-amber-700">
+              <div className="flex items-center gap-2 p-3 bg-amber-50 rounded-lg text-xs text-amber-700 dark:bg-amber-950/30 dark:text-amber-300">
                 <AlertCircle className="w-4 h-4 shrink-0" />
                 Voce nao tem saldo disponivel para saque no momento.
               </div>

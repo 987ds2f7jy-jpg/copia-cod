@@ -170,10 +170,10 @@ function AgendamentoPerfilInner() {
   // Guards after all hooks
   if (user?.role === 'professional') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center gap-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center gap-4">
         <AlertCircle className="w-14 h-14 text-amber-400" />
-        <h2 className="text-xl font-semibold text-gray-900">Ação não permitida</h2>
-        <p className="text-gray-500 max-w-sm">
+        <h2 className="text-xl font-semibold text-foreground">Ação não permitida</h2>
+        <p className="text-muted-foreground max-w-sm">
           Para agendar uma consulta, crie ou utilize uma conta de paciente.
         </p>
         <Button onClick={() => navigate(createPageUrl('Home'))} variant="outline">
@@ -185,7 +185,7 @@ function AgendamentoPerfilInner() {
 
   if (loadingPublic) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
@@ -193,10 +193,10 @@ function AgendamentoPerfilInner() {
 
   if (!publicProfile) {
     return (
-      <div className="min-h-screen bg-gray-50 py-8">
+      <div className="min-h-screen bg-background py-8">
         <div className="max-w-2xl mx-auto px-4 text-center">
-          <Stethoscope className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900">Profissional não encontrado</h2>
+          <Stethoscope className="w-16 h-16 text-muted-foreground mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground">Profissional não encontrado</h2>
           <Button onClick={() => navigate(createPageUrl('Especialidades'))} className="mt-4">
             Ver todos os profissionais
           </Button>
@@ -235,7 +235,7 @@ function AgendamentoPerfilInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-3xl mx-auto px-4 sm:px-6">
 
         {/* Progress */}
@@ -244,31 +244,31 @@ function AgendamentoPerfilInner() {
             <React.Fragment key={i}>
               <div className="flex flex-col items-center gap-1">
                 <div className={`w-9 h-9 rounded-full flex items-center justify-center font-semibold text-sm transition-colors ${
-                  step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-emerald-600 text-white' : 'bg-gray-200 text-gray-400'
+                  step > i + 1 ? 'bg-emerald-500 text-white' : step === i + 1 ? 'bg-emerald-600 text-white' : 'bg-muted text-muted-foreground'
                 }`}>
                   {step > i + 1 ? <CheckCircle className="w-5 h-5" /> : i + 1}
                 </div>
-                <span className="text-xs text-gray-500 hidden sm:block">{label}</span>
+                <span className="text-xs text-muted-foreground hidden sm:block">{label}</span>
               </div>
-              {i < 2 && <div className={`h-0.5 w-16 ${step > i + 1 ? 'bg-emerald-500' : 'bg-gray-200'}`} />}
+              {i < 2 && <div className={`h-0.5 w-16 ${step > i + 1 ? 'bg-emerald-500' : 'bg-muted'}`} />}
             </React.Fragment>
           ))}
         </div>
 
         {/* Professional card */}
-        <Card className="border-0 shadow-sm mb-6">
+        <Card className="border-border shadow-sm mb-6">
           <CardContent className="p-4 flex items-center gap-4">
-            <div className="w-14 h-14 rounded-xl overflow-hidden bg-gray-100 flex-shrink-0">
+            <div className="w-14 h-14 rounded-xl overflow-hidden bg-muted flex-shrink-0">
               {publicProfile.photo_url
                 ? <img src={publicProfile.photo_url} alt={publicProfile.full_name} className="w-full h-full object-cover" />
-                : <div className="w-full h-full flex items-center justify-center"><Stethoscope className="w-7 h-7 text-gray-300" /></div>
+                : <div className="w-full h-full flex items-center justify-center"><Stethoscope className="w-7 h-7 text-muted-foreground" /></div>
               }
             </div>
             <div>
-              <h3 className="font-semibold text-gray-900">
+              <h3 className="font-semibold text-foreground">
                 {publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}{publicProfile.full_name}
               </h3>
-              <p className="text-sm text-gray-500">{publicProfile.specialty}</p>
+              <p className="text-sm text-muted-foreground">{publicProfile.specialty}</p>
               <div className="flex items-center gap-1 mt-0.5">
                 <Star className="w-3.5 h-3.5 fill-yellow-400 text-yellow-400" />
                 <span className="text-sm">{publicProfile.rating?.toFixed(1) || '—'}</span>
@@ -281,7 +281,7 @@ function AgendamentoPerfilInner() {
 
           {/* Step 1: Data e Hora */}
           {step === 1 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardHeader>
                 <CardTitle>Escolha data e horário</CardTitle>
               </CardHeader>
@@ -291,14 +291,14 @@ function AgendamentoPerfilInner() {
                   <button
                     onClick={() => { setAppointmentType('standard'); setSelectedDate(null); setSelectedTime(null); }}
                     className={`p-4 rounded-xl border-2 text-left transition-all ${
-                      appointmentType === 'standard' ? 'border-emerald-500 bg-emerald-50' : 'border-gray-200 hover:border-gray-300'
+                      appointmentType === 'standard' ? 'border-emerald-500 bg-emerald-50 dark:bg-emerald-500/10' : 'border-border hover:border-muted-foreground/40'
                     }`}
                   >
-                    <CalendarDaysIcon className={`w-5 h-5 mb-2 ${appointmentType === 'standard' ? 'text-emerald-600' : 'text-gray-400'}`} />
-                    <div className={`font-semibold text-sm ${appointmentType === 'standard' ? 'text-emerald-700' : 'text-gray-700'}`}>Padrão</div>
-                    <div className="text-xs text-gray-500 mt-0.5">Agendamento com 36h+ de antecedência</div>
+                    <CalendarDaysIcon className={`w-5 h-5 mb-2 ${appointmentType === 'standard' ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'}`} />
+                    <div className={`font-semibold text-sm ${appointmentType === 'standard' ? 'text-emerald-700 dark:text-emerald-300' : 'text-foreground'}`}>Padrão</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Agendamento com 36h+ de antecedência</div>
                     {publicProfile.price_standard > 0 && (
-                      <div className={`text-sm font-bold mt-1 ${appointmentType === 'standard' ? 'text-emerald-600' : 'text-gray-600'}`}>
+                      <div className={`text-sm font-bold mt-1 ${appointmentType === 'standard' ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'}`}>
                         R$ {publicProfile.price_standard.toFixed(2)}
                       </div>
                     )}
@@ -312,20 +312,20 @@ function AgendamentoPerfilInner() {
                     disabled={!publicProfile.prioritario_ativo}
                     className={`p-4 rounded-xl border-2 text-left transition-all ${
                       !publicProfile.prioritario_ativo
-                        ? 'border-gray-100 bg-gray-50 opacity-50 cursor-not-allowed'
+                        ? 'border-border bg-muted/40 opacity-50 cursor-not-allowed'
                         : appointmentType === 'priority'
-                        ? 'border-amber-500 bg-amber-50'
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-amber-500 bg-amber-50 dark:bg-amber-500/10'
+                        : 'border-border hover:border-muted-foreground/40'
                     }`}
                   >
-                    <Zap className={`w-5 h-5 mb-2 ${appointmentType === 'priority' ? 'text-amber-500' : 'text-gray-400'}`} />
-                    <div className={`font-semibold text-sm ${appointmentType === 'priority' ? 'text-amber-700' : 'text-gray-700'}`}>
+                    <Zap className={`w-5 h-5 mb-2 ${appointmentType === 'priority' ? 'text-amber-500 dark:text-amber-300' : 'text-muted-foreground'}`} />
+                    <div className={`font-semibold text-sm ${appointmentType === 'priority' ? 'text-amber-700 dark:text-amber-300' : 'text-foreground'}`}>
                       Prioritária
-                      {!publicProfile.prioritario_ativo && <span className="ml-1 text-xs font-normal text-gray-400">(indisponível)</span>}
+                      {!publicProfile.prioritario_ativo && <span className="ml-1 text-xs font-normal text-muted-foreground">(indisponível)</span>}
                     </div>
-                    <div className="text-xs text-gray-500 mt-0.5">Próximas 36h · Requer aceite</div>
+                    <div className="text-xs text-muted-foreground mt-0.5">Próximas 36h · Requer aceite</div>
                     {publicProfile.price_priority > 0 && (
-                      <div className={`text-sm font-bold mt-1 ${appointmentType === 'priority' ? 'text-amber-600' : 'text-gray-600'}`}>
+                      <div className={`text-sm font-bold mt-1 ${appointmentType === 'priority' ? 'text-amber-600 dark:text-amber-300' : 'text-muted-foreground'}`}>
                         R$ {publicProfile.price_priority.toFixed(2)}
                       </div>
                     )}
@@ -357,7 +357,7 @@ function AgendamentoPerfilInner() {
                         : 'Selecione uma data primeiro'}
                     </Label>
                     {selectedDate && availableSlots.length === 0 && (
-                      <p className="text-sm text-gray-500 py-4">Nenhum horário disponível neste dia.</p>
+                      <p className="text-sm text-muted-foreground py-4">Nenhum horário disponível neste dia.</p>
                     )}
                     <div className="grid grid-cols-2 gap-2">
                       {availableSlots.map((slot) => (
@@ -365,7 +365,7 @@ function AgendamentoPerfilInner() {
                           key={slot}
                           onClick={() => setSelectedTime(slot)}
                           className={`p-3 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
-                            selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-muted hover:bg-accent text-foreground'
                           }`}
                         >
                           <Clock className="w-3.5 h-3.5" />
@@ -392,26 +392,26 @@ function AgendamentoPerfilInner() {
 
           {/* Step 2: Confirmação */}
           {step === 2 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardHeader>
                 <CardTitle>Confirmar agendamento</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-gray-50 rounded-xl mb-4 space-y-2 text-sm">
+                <div className="p-4 bg-muted/40 rounded-xl mb-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Data</span>
+                    <span className="text-muted-foreground">Data</span>
                     <span className="font-medium">{selectedDate && format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Horário</span>
+                    <span className="text-muted-foreground">Horário</span>
                     <span className="font-medium">{selectedTime}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Especialidade</span>
+                    <span className="text-muted-foreground">Especialidade</span>
                     <span className="font-medium">{publicProfile.specialty}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Tipo</span>
+                    <span className="text-muted-foreground">Tipo</span>
                     <span className="font-medium">
                       {appointmentType === 'priority'
                         ? <span className="flex items-center gap-1 text-amber-600"><Zap className="w-3.5 h-3.5" />Prioritária</span>
@@ -420,8 +420,8 @@ function AgendamentoPerfilInner() {
                     </span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Valor</span>
-                    <span className="font-semibold text-emerald-600">
+                    <span className="text-muted-foreground">Valor</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-300">
                       {quoteLoading
                         ? 'Carregando valor oficial...'
                         : serviceQuote?.grossPrice
@@ -432,7 +432,7 @@ function AgendamentoPerfilInner() {
                 </div>
 
                 {quoteError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
                   </div>
@@ -449,7 +449,7 @@ function AgendamentoPerfilInner() {
                 </div>
 
                 {submitError && (
-                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     {submitError}
                   </div>
@@ -491,45 +491,45 @@ function AgendamentoPerfilInner() {
                 onContinue={() => navigate(createPageUrl('DashboardPaciente'))}
               />
             ) : (
-              <Card className="border-0 shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-8 text-center">
                 <div className={`w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6 ${
-                  appointmentType === 'priority' ? 'bg-amber-100' : 'bg-emerald-100'
+                  appointmentType === 'priority' ? 'bg-amber-100 dark:bg-amber-500/15' : 'bg-emerald-100 dark:bg-emerald-500/15'
                 }`}>
                   {appointmentType === 'priority'
                     ? <Zap className="w-10 h-10 text-amber-500" />
                     : <CheckCircle className="w-10 h-10 text-emerald-600" />
                   }
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">
+                <h2 className="text-2xl font-bold text-foreground mb-2">
                   {appointmentType === 'priority' ? 'Solicitação Enviada!' : 'Agendamento Confirmado!'}
                 </h2>
-                <p className="text-gray-500 mb-2">
+                <p className="text-muted-foreground mb-2">
                   {appointmentType === 'priority'
                     ? `Sua solicitação de consulta prioritária foi enviada para ${publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}${publicProfile.full_name}.`
                     : `Sua consulta com ${publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}${publicProfile.full_name} foi confirmada.`
                   }
                 </p>
                 {appointmentType === 'priority' && (
-                  <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-start gap-2 text-left">
+                  <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-start gap-2 text-left dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     O profissional precisa aceitar sua solicitação. Você será notificado quando isso acontecer.
                   </div>
                 )}
-                <div className="p-4 bg-gray-50 rounded-xl text-left mb-6 text-sm space-y-2">
+                <div className="p-4 bg-muted/40 rounded-xl text-left mb-6 text-sm space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Data</span>
+                    <span className="text-muted-foreground">Data</span>
                     <span className="font-medium">{selectedDate && format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Horário</span>
+                    <span className="text-muted-foreground">Horário</span>
                     <span className="font-medium">{selectedTime}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Status</span>
+                    <span className="text-muted-foreground">Status</span>
                     {appointmentType === 'priority'
-                      ? <Badge className="bg-amber-100 text-amber-700">Aguardando aceite</Badge>
-                      : <Badge className="bg-emerald-100 text-emerald-700">Confirmado</Badge>
+                      ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Aguardando aceite</Badge>
+                      : <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Confirmado</Badge>
                     }
                   </div>
                 </div>

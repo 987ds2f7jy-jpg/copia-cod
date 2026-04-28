@@ -53,7 +53,7 @@ function ForumCard({ question, index }) {
       animate={{ opacity: 1, y: 0 }}
       transition={{ delay: index * 0.05 }}
     >
-      <Card className="border-0 shadow-sm hover:shadow-md transition-shadow">
+      <Card className="border border-border shadow-sm hover:shadow-md transition-shadow">
         <CardContent className="p-6">
           <div className="flex flex-col lg:flex-row gap-5">
             {/* Pergunta e resposta */}
@@ -61,25 +61,25 @@ function ForumCard({ question, index }) {
               <Badge variant="outline" className="text-xs mb-3">
                 {question.specialty}
               </Badge>
-              <p className="font-medium text-gray-900 mb-4 leading-relaxed">
+              <p className="font-medium text-foreground mb-4 leading-relaxed">
                 {question.question_text}
               </p>
-              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+              <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
                 <div className="flex items-center gap-2 mb-2">
                   <Stethoscope className="w-4 h-4 text-emerald-600 shrink-0" />
-                  <span className="text-sm font-semibold text-emerald-700">
+                  <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                     Dr(a). {question.answered_by_name}
                   </span>
                   {question.answered_by_specialty && (
                     <span className="text-xs text-emerald-600">· {question.answered_by_specialty}</span>
                   )}
                 </div>
-                <p className="text-gray-700 text-sm leading-relaxed">
+                <p className="text-foreground text-sm leading-relaxed">
                   {question.answer_text}
                 </p>
               </div>
               {question.answered_at && (
-                <p className="text-xs text-gray-400 mt-2">
+                <p className="text-xs text-muted-foreground mt-2">
                   Respondida em {format(new Date(question.answered_at), "dd 'de' MMMM 'de' yyyy", { locale: ptBR })}
                 </p>
               )}
@@ -88,8 +88,8 @@ function ForumCard({ question, index }) {
             {/* Card lateral do profissional */}
             {question.answered_by_name && (
               <div className="lg:w-48 shrink-0">
-                <div className="border border-gray-100 rounded-xl p-4 text-center bg-gray-50">
-                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3">
+                <div className="border border-border rounded-xl p-4 text-center bg-muted/50">
+                  <div className="w-14 h-14 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-3 dark:bg-emerald-950/40">
                     {question.answered_by_photo ? (
                       <img src={question.answered_by_photo} alt={question.answered_by_name} 
                         className="w-14 h-14 rounded-full object-cover" />
@@ -97,11 +97,11 @@ function ForumCard({ question, index }) {
                       <Stethoscope className="w-7 h-7 text-emerald-600" />
                     )}
                   </div>
-                  <p className="text-sm font-semibold text-gray-900 leading-tight mb-1">
+                  <p className="text-sm font-semibold text-foreground leading-tight mb-1">
                     Dr(a). {question.answered_by_name}
                   </p>
                   {question.answered_by_specialty && (
-                    <p className="text-xs text-gray-500 mb-3">{question.answered_by_specialty}</p>
+                    <p className="text-xs text-muted-foreground mb-3">{question.answered_by_specialty}</p>
                   )}
                   <div className="space-y-2">
                     {question.answered_by_public_profile_id && (
@@ -222,7 +222,7 @@ export default function PergunteEspecialista() {
       <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
         {/* Header */}
         <div className="text-center mb-8">
-          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-4">
+          <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-4 dark:bg-emerald-950/40 dark:text-emerald-300">
             <MessageSquare className="w-4 h-4" />
             Fórum Médico
           </div>
@@ -250,7 +250,7 @@ export default function PergunteEspecialista() {
             {/* Filtro de especialidade */}
             <div className="mb-5">
               <Select value={filterSpecialty} onValueChange={setFilterSpecialty}>
-                <SelectTrigger className="h-11 max-w-xs border-0 shadow-sm bg-card">
+                <SelectTrigger className="h-11 max-w-xs border border-border shadow-sm bg-card">
                   <SelectValue placeholder="Filtrar por especialidade" />
                 </SelectTrigger>
                 <SelectContent>
@@ -264,21 +264,21 @@ export default function PergunteEspecialista() {
             {isLoading ? (
               <div className="space-y-4">
                 {[1, 2, 3].map((i) => (
-                  <Card key={i} className="border-0 shadow-sm animate-pulse">
+                  <Card key={i} className="border border-border shadow-sm animate-pulse">
                     <CardContent className="p-6">
-                      <div className="h-4 bg-gray-200 rounded w-1/4 mb-4" />
-                      <div className="h-4 bg-gray-200 rounded w-3/4 mb-2" />
-                      <div className="h-16 bg-gray-100 rounded mt-4" />
+                      <div className="h-4 bg-muted rounded w-1/4 mb-4" />
+                      <div className="h-4 bg-muted rounded w-3/4 mb-2" />
+                      <div className="h-16 bg-muted/70 rounded mt-4" />
                     </CardContent>
                   </Card>
                 ))}
               </div>
             ) : filteredForum.length === 0 ? (
-              <Card className="border-0 shadow-sm">
+              <Card className="border border-border shadow-sm">
                 <CardContent className="p-12 text-center">
-                  <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">Nenhuma pergunta respondida ainda.</p>
-                  <p className="text-sm text-gray-400 mt-1">Seja o primeiro a perguntar!</p>
+                  <MessageSquare className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhuma pergunta respondida ainda.</p>
+                  <p className="text-sm text-muted-foreground mt-1">Seja o primeiro a perguntar!</p>
                 </CardContent>
               </Card>
             ) : (
@@ -292,20 +292,20 @@ export default function PergunteEspecialista() {
 
           {/* ── ABA: FAZER PERGUNTA ── */}
           <TabsContent value="perguntar">
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardContent className="p-6 space-y-5">
                 {!user ? (
                   <div className="text-center py-8">
-                    <User className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-600 mb-4">Faça login para enviar uma pergunta</p>
+                    <User className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="text-muted-foreground mb-4">Faça login para enviar uma pergunta</p>
                     <Link to={createPageUrl('Entrar')}>
                       <Button className="gradient-primary border-0 text-white">Entrar</Button>
                     </Link>
                   </div>
                 ) : user.role !== 'patient' ? (
-                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3">
+                  <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 flex items-start gap-3 dark:bg-amber-950/30 dark:border-amber-900/60">
                     <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
-                    <p className="text-sm text-amber-700">
+                    <p className="text-sm text-amber-700 dark:text-amber-300">
                       Apenas pacientes podem fazer perguntas. Profissionais respondem pelo dashboard.
                     </p>
                   </div>
@@ -324,7 +324,7 @@ export default function PergunteEspecialista() {
                         </SelectContent>
                       </Select>
                       {selectedSpecialty === 'Todas' && (
-                        <p className="text-xs text-gray-500 mt-1">
+                        <p className="text-xs text-muted-foreground mt-1">
                           Qualquer especialista poderá responder sua pergunta.
                         </p>
                       )}
@@ -339,19 +339,19 @@ export default function PergunteEspecialista() {
                         className="min-h-[150px]"
                         maxLength={2000}
                       />
-                      <p className="text-xs text-gray-400 mt-1 text-right">{questionText.length}/2000</p>
+                      <p className="text-xs text-muted-foreground mt-1 text-right">{questionText.length}/2000</p>
                     </div>
 
-                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200">
-                      <p className="text-sm text-amber-700">
+                    <div className="p-4 bg-amber-50 rounded-xl border border-amber-200 dark:bg-amber-950/30 dark:border-amber-900/60">
+                      <p className="text-sm text-amber-700 dark:text-amber-300">
                         <strong>Importante:</strong> As respostas são orientações gerais e não substituem uma consulta médica. Em caso de emergência, ligue para o SAMU (192).
                       </p>
                     </div>
 
                     {submitted && (
-                      <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-2">
+                      <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-200 flex items-center gap-2 dark:bg-emerald-950/30 dark:border-emerald-900/60">
                         <CheckCircle className="w-5 h-5 text-emerald-600" />
-                        <span className="text-emerald-700 text-sm">
+                        <span className="text-emerald-700 text-sm dark:text-emerald-300">
                           Pergunta enviada! Acompanhe em "Minhas Perguntas".
                         </span>
                       </div>
@@ -379,24 +379,24 @@ export default function PergunteEspecialista() {
           {user && (
             <TabsContent value="minhas">
               {normalizedMyQuestions.length === 0 ? (
-                <Card className="border-0 shadow-sm">
+                <Card className="border border-border shadow-sm">
                   <CardContent className="p-12 text-center">
-                    <MessageSquare className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                    <p className="text-gray-500">Você ainda não fez nenhuma pergunta.</p>
+                    <MessageSquare className="w-12 h-12 text-muted-foreground/40 mx-auto mb-3" />
+                    <p className="text-muted-foreground">Você ainda não fez nenhuma pergunta.</p>
                   </CardContent>
                 </Card>
               ) : (
                 <div className="space-y-4">
                 {normalizedMyQuestions.map((q) => (
-                    <Card key={q.id} className="border-0 shadow-sm">
+                    <Card key={q.id} className="border border-border shadow-sm">
                       <CardContent className="p-6">
                         <div className="flex items-start justify-between gap-3 mb-3">
                           <div className="flex items-center gap-2 flex-wrap">
                             <Badge variant="outline" className="text-xs">{q.specialty}</Badge>
                             <Badge className={
                               q.status === 'RESPONDIDA'
-                                ? 'bg-emerald-100 text-emerald-700'
-                                : 'bg-amber-100 text-amber-700'
+                                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300'
+                                : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
                             }>
                               {q.status === 'RESPONDIDA' ? (
                                 <><CheckCircle className="w-3 h-3 mr-1" />Respondida</>
@@ -409,7 +409,7 @@ export default function PergunteEspecialista() {
                           {q.status === 'PENDENTE' && (
                             <button
                               onClick={() => deleteQuestion.mutate(q.id)}
-                              className="text-gray-300 hover:text-red-500 transition-colors"
+                              className="text-muted-foreground/50 hover:text-red-500 transition-colors"
                               title="Excluir pergunta"
                             >
                               <Trash2 className="w-4 h-4" />
@@ -417,24 +417,24 @@ export default function PergunteEspecialista() {
                           )}
                         </div>
 
-                        <p className="font-medium text-gray-900 mb-3 leading-relaxed">
+                        <p className="font-medium text-foreground mb-3 leading-relaxed">
                           {q.question_text}
                         </p>
 
                         {q.status === 'RESPONDIDA' && q.answer_text && (
-                          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100">
+                          <div className="p-4 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
                             <div className="flex items-center gap-2 mb-2">
                               <Stethoscope className="w-4 h-4 text-emerald-600" />
-                              <span className="text-sm font-semibold text-emerald-700">
+                              <span className="text-sm font-semibold text-emerald-700 dark:text-emerald-300">
                                 Dr(a). {q.answered_by_name || 'Especialista'}
                               </span>
                             </div>
-                            <p className="text-gray-700 text-sm leading-relaxed">{q.answer_text}</p>
+                            <p className="text-foreground text-sm leading-relaxed">{q.answer_text}</p>
                           </div>
                         )}
 
                         {q.status === 'PENDENTE' && (
-                          <p className="text-xs text-gray-400 mt-2 flex items-center gap-1">
+                          <p className="text-xs text-muted-foreground mt-2 flex items-center gap-1">
                             <Clock className="w-3 h-3" />
                             Enviada {q.created_date ? format(new Date(q.created_date), "dd/MM/yyyy 'às' HH:mm") : ''}
                           </p>

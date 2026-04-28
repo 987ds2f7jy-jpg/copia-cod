@@ -11,22 +11,22 @@ export default function ProfileMetrics({ appointments, reviews }) {
   const recRate = reviews.length > 0 ? Math.round((recommended / reviews.length) * 100) : 0;
 
   const metrics = [
-    { icon: CheckCircle, label: 'Consultas realizadas', value: completed.length, color: 'text-emerald-600 bg-emerald-50' },
-    { icon: Users, label: 'Pacientes atendidos', value: uniquePatients, color: 'text-indigo-600 bg-indigo-50' },
-    { icon: Star, label: 'Nota média', value: avgRating > 0 ? avgRating.toFixed(1) : '—', color: 'text-yellow-600 bg-yellow-50' },
-    { icon: ThumbsUp, label: 'Taxa de recomendação', value: reviews.length > 0 ? `${recRate}%` : '—', color: 'text-purple-600 bg-purple-50' },
+    { icon: CheckCircle, label: 'Consultas realizadas', value: completed.length, color: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
+    { icon: Users, label: 'Pacientes atendidos', value: uniquePatients, color: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' },
+    { icon: Star, label: 'Nota média', value: avgRating > 0 ? avgRating.toFixed(1) : '—', color: 'text-yellow-600 bg-yellow-50 dark:bg-yellow-950/40 dark:text-yellow-300' },
+    { icon: ThumbsUp, label: 'Taxa de recomendação', value: reviews.length > 0 ? `${recRate}%` : '—', color: 'text-purple-600 bg-purple-50 dark:bg-purple-950/40 dark:text-purple-300' },
   ];
 
   return (
     <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
       {metrics.map(m => (
-        <div key={m.label} className="bg-white rounded-2xl p-4 shadow-sm flex items-center gap-3">
+        <div key={m.label} className="bg-card rounded-2xl border border-border p-4 shadow-sm flex items-center gap-3">
           <div className={`w-10 h-10 rounded-xl ${m.color} flex items-center justify-center shrink-0`}>
             <m.icon className="w-5 h-5" />
           </div>
           <div className="min-w-0">
-            <p className="text-xl font-bold text-gray-900 leading-none">{m.value}</p>
-            <p className="text-xs text-gray-500 mt-0.5 leading-tight">{m.label}</p>
+            <p className="text-xl font-bold text-foreground leading-none">{m.value}</p>
+            <p className="text-xs text-muted-foreground mt-0.5 leading-tight">{m.label}</p>
           </div>
         </div>
       ))}

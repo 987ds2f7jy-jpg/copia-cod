@@ -13,11 +13,11 @@ import {
 import { toast } from '@/components/ui/use-toast';
 
 const STATUS_BADGE_CLASSES = {
-  amber: 'bg-amber-100 text-amber-700',
-  blue: 'bg-blue-100 text-blue-700',
-  emerald: 'bg-emerald-100 text-emerald-700',
-  red: 'bg-red-100 text-red-700',
-  gray: 'bg-gray-100 text-gray-700',
+  amber: 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300',
+  blue: 'bg-blue-100 text-blue-700 dark:bg-blue-500/15 dark:text-blue-300',
+  emerald: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300',
+  red: 'bg-red-100 text-red-700 dark:bg-red-500/15 dark:text-red-300',
+  gray: 'bg-muted text-foreground',
 };
 
 export default function PaymentStep({
@@ -84,9 +84,9 @@ export default function PaymentStep({
 
   if (!currentPayment) {
     return (
-      <Card className={`border-red-100 bg-red-50 shadow-sm ${className}`}>
+      <Card className={`border-red-100 bg-red-50 shadow-sm dark:border-red-900/60 dark:bg-red-950/40 ${className}`}>
         <CardContent className="p-5">
-          <div className="flex items-start gap-3 text-red-700">
+          <div className="flex items-start gap-3 text-red-700 dark:text-red-300">
             <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0" />
             <div>
               <p className="font-semibold">Pagamento indisponivel</p>
@@ -99,18 +99,20 @@ export default function PaymentStep({
   }
 
   return (
-    <Card className={`border-0 shadow-sm ${className}`}>
+    <Card className={`border-border shadow-sm ${className}`}>
       <CardContent className="p-5">
         <div className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
           <div className="flex items-start gap-3">
             <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-full ${
-              isPaid ? 'bg-emerald-100 text-emerald-700' : 'bg-amber-100 text-amber-700'
+              isPaid
+                ? 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300'
+                : 'bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300'
             }`}>
               {isPaid ? <CheckCircle className="h-5 w-5" /> : <CreditCard className="h-5 w-5" />}
             </div>
             <div>
-              <h3 className="text-lg font-semibold text-gray-900">{isPaid ? paidTitle : title}</h3>
-              <p className="mt-1 text-sm text-gray-600">{isPaid ? paidDescription : description}</p>
+              <h3 className="text-lg font-semibold text-foreground">{isPaid ? paidTitle : title}</h3>
+              <p className="mt-1 text-sm text-muted-foreground">{isPaid ? paidDescription : description}</p>
             </div>
           </div>
           <Badge className={STATUS_BADGE_CLASSES[statusInfo.tone] || STATUS_BADGE_CLASSES.amber}>
@@ -118,16 +120,16 @@ export default function PaymentStep({
           </Badge>
         </div>
 
-        <div className="mb-4 rounded-xl bg-gray-50 p-4 text-sm">
+        <div className="mb-4 rounded-xl bg-muted/40 p-4 text-sm">
           <div className="flex items-center justify-between">
-            <span className="text-gray-500">Valor oficial</span>
-            <span className="text-lg font-bold text-emerald-700">
+            <span className="text-muted-foreground">Valor oficial</span>
+            <span className="text-lg font-bold text-emerald-700 dark:text-emerald-300">
               {formatMoney(currentPayment.amount, currentPayment.currency)}
             </span>
           </div>
           <div className="mt-2 flex items-center justify-between">
-            <span className="text-gray-500">Status</span>
-            <span className="font-medium text-gray-800">{statusInfo.description}</span>
+            <span className="text-muted-foreground">Status</span>
+            <span className="font-medium text-foreground">{statusInfo.description}</span>
           </div>
         </div>
 
@@ -146,7 +148,7 @@ export default function PaymentStep({
                 variant="outline"
                 onClick={handleSimulatePayment}
                 disabled={simulationLoading}
-                className="h-12 w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100"
+                className="h-12 w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
               >
                 {simulationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Simular pagamento aprovado
@@ -154,7 +156,7 @@ export default function PaymentStep({
             )}
 
             {!currentPayment.checkoutUrl && !canSimulate && (
-              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700">
+              <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
                 A cobranca foi criada, mas ainda nao ha checkout disponivel para este ambiente.
               </div>
             )}

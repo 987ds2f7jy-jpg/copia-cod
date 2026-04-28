@@ -33,10 +33,10 @@ const MODALITIES = [
 function ReadOnlyField({ label, value }) {
   return (
     <div>
-      <Label className="flex items-center gap-1 text-gray-500">
+      <Label className="flex items-center gap-1 text-muted-foreground">
         <Lock className="w-3 h-3" /> {label}
       </Label>
-      <div className="mt-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-md text-sm text-gray-700">
+      <div className="mt-1 px-3 py-2 bg-muted/50 border border-border rounded-md text-sm text-foreground">
         {value || '—'}
       </div>
     </div>
@@ -433,10 +433,10 @@ export default function MeuPerfil({ professional, publicProfile }) {
 
       {/* Link to public profile */}
       {publicProfile?.id && publicProfile?.status === 'approved' && form.perfil_ativo && (
-        <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-xl">
+        <div className="flex items-center justify-between p-4 bg-emerald-50 border border-emerald-200 rounded-xl dark:bg-emerald-950/30 dark:border-emerald-900/60">
           <div>
-            <p className="text-sm font-medium text-emerald-800">Seu perfil está visível na busca</p>
-            <p className="text-xs text-emerald-600 mt-0.5">Pacientes podem te encontrar e agendar consultas</p>
+            <p className="text-sm font-medium text-emerald-800 dark:text-emerald-200">Seu perfil está visível na busca</p>
+            <p className="text-xs text-emerald-600 mt-0.5 dark:text-emerald-300">Pacientes podem te encontrar e agendar consultas</p>
           </div>
           <Link to={createPageUrl(`PerfilProfissional?id=${publicProfile.id}`)}>
             <button className="flex items-center gap-1.5 text-sm text-emerald-700 font-medium hover:underline">
@@ -447,13 +447,13 @@ export default function MeuPerfil({ professional, publicProfile }) {
       )}
 
       {/* Read-only fields */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
-            <Lock className="w-4 h-4 text-gray-400" />
+            <Lock className="w-4 h-4 text-muted-foreground" />
             Dados Imutáveis
           </CardTitle>
-          <p className="text-xs text-gray-400">Esses dados só podem ser alterados pelo suporte</p>
+          <p className="text-xs text-muted-foreground">Esses dados só podem ser alterados pelo suporte</p>
         </CardHeader>
         <CardContent className="grid sm:grid-cols-2 gap-4">
           <ReadOnlyField label="Nome completo" value={professional?.full_name} />
@@ -468,7 +468,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       </Card>
 
       {/* Photo */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Foto de Perfil</CardTitle></CardHeader>
         <CardContent>
           <div className="flex items-center gap-4">
@@ -478,19 +478,19 @@ export default function MeuPerfil({ professional, publicProfile }) {
                 <button onClick={() => { set('photo_url', ''); setPhotoPreviewUrl(''); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
               </div>
             ) : (
-              <label className="cursor-pointer w-24 h-24 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 hover:border-emerald-400 transition-colors">
+              <label className="cursor-pointer w-24 h-24 rounded-xl border-2 border-dashed border-border flex flex-col items-center justify-center gap-1 hover:border-emerald-400 transition-colors">
                 <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                {uploading ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : <Camera className="w-5 h-5 text-gray-400" />}
-                <span className="text-xs text-gray-400">Upload</span>
+                {uploading ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : <Camera className="w-5 h-5 text-muted-foreground" />}
+                <span className="text-xs text-muted-foreground">Upload</span>
               </label>
             )}
-            <p className="text-sm text-gray-500">Foto profissional, fundo neutro, boa iluminação</p>
+            <p className="text-sm text-muted-foreground">Foto profissional, fundo neutro, boa iluminação</p>
           </div>
         </CardContent>
       </Card>
 
       {/* Bio & Instagram */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Apresentação</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -505,7 +505,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       </Card>
 
       {/* Patient types & Tags */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Público e Especialização</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -514,7 +514,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
               {PATIENT_TYPES.map(type => (
                 <button key={type} onClick={() => togglePatientType(type)}
                   className={`px-3 py-1.5 rounded-full text-sm font-medium border transition-all ${
-                    form.patient_types.includes(type) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'
+                    form.patient_types.includes(type) ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-card text-muted-foreground border-border hover:border-emerald-400'
                   }`}>
                   {type}
                 </button>
@@ -542,7 +542,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       </Card>
 
       {/* Modality & Address */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Modalidade e Local</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div>
@@ -551,7 +551,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
               {MODALITIES.map(m => (
                 <button key={m.value} onClick={() => set('modality', m.value)}
                   className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
-                    form.modality === m.value ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'
+                    form.modality === m.value ? 'bg-emerald-500 text-white border-emerald-500' : 'bg-card text-muted-foreground border-border hover:border-emerald-400'
                   }`}>
                   {m.label}
                 </button>
@@ -559,14 +559,14 @@ export default function MeuPerfil({ professional, publicProfile }) {
             </div>
           </div>
           {needsLocation && (
-            <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
+            <div className="space-y-3 p-4 bg-muted/50 rounded-xl">
               <Label className="flex items-center gap-1"><MapPin className="w-3 h-3" />Endereço do consultório</Label>
 
               {/* Mapbox address search */}
               <div className="relative">
                 <div className="flex gap-2">
                   <div className="relative flex-1">
-                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-gray-400" />
+                    <Search className="w-4 h-4 absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                     <Input
                       value={addressSearch}
                       onChange={e => { setAddressSearch(e.target.value); searchAddress(e.target.value); }}
@@ -576,15 +576,15 @@ export default function MeuPerfil({ professional, publicProfile }) {
                   </div>
                 </div>
                 {searchResults.length > 0 && (
-                  <div className="absolute z-50 w-full mt-1 bg-white border border-gray-200 rounded-lg shadow-lg max-h-48 overflow-y-auto">
+                  <div className="absolute z-50 w-full mt-1 bg-card border border-border rounded-lg shadow-lg max-h-48 overflow-y-auto">
                     {searchResults.map((feat) => (
                       <button
                         key={feat.id}
                         onClick={() => selectAddress(feat)}
-                        className="w-full text-left px-3 py-2 text-sm hover:bg-gray-50 border-b border-gray-100 last:border-0"
+                        className="w-full text-left px-3 py-2 text-sm hover:bg-muted/50 border-b border-border last:border-0"
                       >
                         <span className="font-medium">{feat.text}</span>
-                        <span className="text-gray-400 ml-1 text-xs">{feat.place_name}</span>
+                        <span className="text-muted-foreground ml-1 text-xs">{feat.place_name}</span>
                       </button>
                     ))}
                   </div>
@@ -594,35 +594,35 @@ export default function MeuPerfil({ professional, publicProfile }) {
               {/* Structured address fields */}
               <div className="grid grid-cols-2 gap-2">
                 <div className="col-span-2 sm:col-span-1">
-                  <Label className="text-xs text-gray-500">Rua *</Label>
+                  <Label className="text-xs text-muted-foreground">Rua *</Label>
                   <Input value={officeForm.address_line} onChange={e => setOffice('address_line', e.target.value)} placeholder="Rua / Avenida" />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Número</Label>
+                  <Label className="text-xs text-muted-foreground">Número</Label>
                   <Input value={officeForm.number} onChange={e => setOffice('number', e.target.value)} placeholder="Nº" />
                 </div>
               </div>
               <div className="grid grid-cols-2 gap-2">
                 <div>
-                  <Label className="text-xs text-gray-500">Complemento</Label>
+                  <Label className="text-xs text-muted-foreground">Complemento</Label>
                   <Input value={officeForm.complement} onChange={e => setOffice('complement', e.target.value)} placeholder="Sala, andar..." />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">Bairro</Label>
+                  <Label className="text-xs text-muted-foreground">Bairro</Label>
                   <Input value={officeForm.neighborhood} onChange={e => setOffice('neighborhood', e.target.value)} placeholder="Bairro" />
                 </div>
               </div>
               <div className="grid grid-cols-3 gap-2">
                 <div>
-                  <Label className="text-xs text-gray-500">Cidade *</Label>
+                  <Label className="text-xs text-muted-foreground">Cidade *</Label>
                   <Input value={officeForm.city} onChange={e => setOffice('city', e.target.value)} placeholder="Cidade" />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">UF *</Label>
+                  <Label className="text-xs text-muted-foreground">UF *</Label>
                   <Input value={officeForm.state} onChange={e => setOffice('state', e.target.value.toUpperCase())} placeholder="UF" maxLength={2} />
                 </div>
                 <div>
-                  <Label className="text-xs text-gray-500">CEP</Label>
+                  <Label className="text-xs text-muted-foreground">CEP</Label>
                   <Input value={officeForm.postal_code} onChange={e => setOffice('postal_code', e.target.value)} placeholder="00000-000" />
                 </div>
               </div>
@@ -632,7 +632,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
                   type="button"
                   variant="outline"
                   onClick={() => setIsMapOpen((current) => !current)}
-                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  className="border-emerald-200 text-emerald-700 hover:bg-emerald-50 dark:border-emerald-900/60 dark:text-emerald-300 dark:hover:bg-emerald-950/30"
                 >
                   <MapPin className="w-4 h-4 mr-2" />
                   {isMapOpen ? 'Fechar mapa' : 'Abrir mapa'}
@@ -656,7 +656,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
                     toast.success('Marcador confirmado para o consultorio.');
                   }}
                   disabled={!hasPendingCoordinates}
-                  className="border-sky-200 text-sky-700 hover:bg-sky-50"
+                  className="border-sky-200 text-sky-700 hover:bg-sky-50 dark:border-sky-900/60 dark:text-sky-300 dark:hover:bg-sky-950/30"
                 >
                   <CheckCircle2 className="w-4 h-4 mr-2" />
                   Confirmar marcador
@@ -676,7 +676,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
               {/* Map with draggable marker */}
               {isMapOpen ? (
               <div className="mt-2">
-                <p className="text-xs text-gray-500 mb-2">Arraste o marcador para ajustar a posição exata do consultório</p>
+                <p className="text-xs text-muted-foreground mb-2">Arraste o marcador para ajustar a posição exata do consultório</p>
                 <MapboxMap
                   center={mapCenter}
                   zoom={15}
@@ -705,7 +705,7 @@ export default function MeuPerfil({ professional, publicProfile }) {
       </Card>
 
       {/* Gallery */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Galeria do Consultório</CardTitle></CardHeader>
         <CardContent>
           <div className="flex flex-wrap gap-2">
@@ -715,16 +715,16 @@ export default function MeuPerfil({ professional, publicProfile }) {
                 <button onClick={() => removeGalleryImage(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">✕</button>
               </div>
             ))}
-            <label className="cursor-pointer w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-emerald-400 transition-colors">
+            <label className="cursor-pointer w-16 h-16 rounded-lg border-2 border-dashed border-border flex items-center justify-center hover:border-emerald-400 transition-colors">
               <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-              {uploadingGallery ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : <Plus className="w-4 h-4 text-gray-400" />}
+              {uploadingGallery ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Plus className="w-4 h-4 text-muted-foreground" />}
             </label>
           </div>
         </CardContent>
       </Card>
 
       {/* Pricing */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Valores das Consultas</CardTitle></CardHeader>
         <CardContent>
           <div className="grid sm:grid-cols-2 gap-4">
@@ -744,13 +744,13 @@ export default function MeuPerfil({ professional, publicProfile }) {
       <DisponibilidadeEditor professional={professional} />
 
       {/* Controles de visibilidade */}
-      <Card className="border-0 shadow-sm">
+      <Card className="border-border shadow-sm">
         <CardHeader className="pb-3"><CardTitle className="text-base">Controles de Visibilidade</CardTitle></CardHeader>
         <CardContent className="space-y-4">
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">Perfil ativo na busca</p>
-              <p className="text-xs text-gray-500 mt-0.5">Quando ativo, pacientes podem te encontrar e agendar consultas.</p>
+              <p className="text-sm font-medium text-foreground">Perfil ativo na busca</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Quando ativo, pacientes podem te encontrar e agendar consultas.</p>
               {perfilAtivoError && (
                 <div className="flex items-center gap-1.5 mt-1.5 text-xs text-red-600">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />
@@ -775,8 +775,8 @@ export default function MeuPerfil({ professional, publicProfile }) {
           </div>
           <div className="flex items-start justify-between gap-4">
             <div className="flex-1">
-              <p className="text-sm font-medium text-gray-800">Consulta prioritária disponível</p>
-              <p className="text-xs text-gray-500 mt-0.5">Permite que pacientes solicitem atendimento em até 36h com valor diferenciado.</p>
+              <p className="text-sm font-medium text-foreground">Consulta prioritária disponível</p>
+              <p className="text-xs text-muted-foreground mt-0.5">Permite que pacientes solicitem atendimento em até 36h com valor diferenciado.</p>
               {form.prioritario_ativo && !parseFloat(form.price_priority) && (
                 <div className="flex items-center gap-1.5 mt-1.5 text-xs text-amber-600">
                   <AlertCircle className="w-3.5 h-3.5 shrink-0" />

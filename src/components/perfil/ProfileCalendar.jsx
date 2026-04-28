@@ -97,14 +97,14 @@ export default function ProfileCalendar({ professional }) {
   const hasSlots = slots.length > 0;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
       <div className="flex items-center justify-between mb-5">
-        <h2 className="text-lg font-semibold text-gray-900 flex items-center gap-2">
+        <h2 className="text-lg font-semibold text-foreground flex items-center gap-2">
           <CalendarDays className="w-5 h-5 text-indigo-500" />
           Disponibilidade
         </h2>
         {professional?.is_on_duty && (
-          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">
+          <span className="flex items-center gap-1.5 text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full dark:bg-emerald-950/40 dark:text-emerald-300">
             <Zap className="w-3 h-3" />
             Plantão ativo
           </span>
@@ -112,26 +112,26 @@ export default function ProfileCalendar({ professional }) {
       </div>
 
       {!hasSlots ? (
-        <p className="text-sm text-gray-400 text-center py-6">Nenhum horário configurado ainda.</p>
+        <p className="text-sm text-muted-foreground text-center py-6">Nenhum horário configurado ainda.</p>
       ) : (
         <>
           {/* Month navigation */}
           <div className="flex items-center justify-between mb-4">
-            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-gray-100">
-              <ChevronLeft className="w-4 h-4 text-gray-600" />
+            <button onClick={prevMonth} className="p-1.5 rounded-lg hover:bg-muted">
+              <ChevronLeft className="w-4 h-4 text-muted-foreground" />
             </button>
-            <span className="text-sm font-semibold text-gray-800">
+            <span className="text-sm font-semibold text-foreground">
               {MONTH_NAMES[month]} {year}
             </span>
-            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-gray-100">
-              <ChevronRight className="w-4 h-4 text-gray-600" />
+            <button onClick={nextMonth} className="p-1.5 rounded-lg hover:bg-muted">
+              <ChevronRight className="w-4 h-4 text-muted-foreground" />
             </button>
           </div>
 
           {/* Day headers */}
           <div className="grid grid-cols-7 mb-1">
             {DAY_HEADERS.map(h => (
-              <div key={h} className="text-center text-xs font-medium text-gray-400 py-1">{h}</div>
+              <div key={h} className="text-center text-xs font-medium text-muted-foreground py-1">{h}</div>
             ))}
           </div>
 
@@ -150,9 +150,9 @@ export default function ProfileCalendar({ professional }) {
                   className={`
                     aspect-square rounded-xl text-sm font-medium transition-all flex flex-col items-center justify-center
                     ${selected ? 'bg-emerald-600 text-white shadow-sm' : ''}
-                    ${available && !selected ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200' : ''}
-                    ${past ? 'text-gray-300 cursor-default' : ''}
-                    ${!available && !past ? 'text-gray-300 cursor-default' : ''}
+                    ${available && !selected ? 'bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-200 dark:bg-emerald-950/30 dark:text-emerald-300 dark:border-emerald-900/60 dark:hover:bg-emerald-950/50' : ''}
+                    ${past ? 'text-muted-foreground/40 cursor-default' : ''}
+                    ${!available && !past ? 'text-muted-foreground/40 cursor-default' : ''}
                     ${isToday(day) && !selected ? 'ring-2 ring-emerald-400 ring-offset-1' : ''}
                   `}
                 >
@@ -167,19 +167,19 @@ export default function ProfileCalendar({ professional }) {
 
           {/* Selected day time slots */}
           {selectedDay !== null && (
-            <div className="border-t border-gray-100 pt-4">
-              <p className="text-sm font-medium text-gray-700 mb-3 flex items-center gap-2">
+            <div className="border-t border-border pt-4">
+              <p className="text-sm font-medium text-foreground mb-3 flex items-center gap-2">
                 <Clock className="w-4 h-4 text-indigo-400" />
                 Horários disponíveis — {selectedDay}/{month + 1}/{year}
               </p>
               {selectedSlots.length === 0 ? (
-                <p className="text-sm text-gray-400">Sem horários nesse dia.</p>
+                <p className="text-sm text-muted-foreground">Sem horários nesse dia.</p>
               ) : (
                 <div className="flex flex-wrap gap-2">
                   {selectedSlots.map(time => (
                     <span
                       key={time}
-                      className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-sm rounded-lg font-medium border border-indigo-100"
+                      className="px-3 py-1.5 bg-indigo-50 text-indigo-700 text-sm rounded-lg font-medium border border-indigo-100 dark:bg-indigo-950/40 dark:text-indigo-300 dark:border-indigo-900/60"
                     >
                       {time}
                     </span>
@@ -190,7 +190,7 @@ export default function ProfileCalendar({ professional }) {
           )}
 
           {/* Legend */}
-          <div className="mt-4 flex items-center gap-4 text-xs text-gray-400">
+          <div className="mt-4 flex items-center gap-4 text-xs text-muted-foreground">
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-50 border border-emerald-200 inline-block" /> Disponível</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded bg-emerald-600 inline-block" /> Selecionado</span>
             <span className="flex items-center gap-1"><span className="w-3 h-3 rounded ring-2 ring-emerald-400 inline-block" /> Hoje</span>

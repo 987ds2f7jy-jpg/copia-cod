@@ -41,11 +41,11 @@ export default function ProfileHero({ professional }) {
         <div className="relative -mt-16 sm:-mt-20 pb-6">
           <div className="flex flex-col sm:flex-row gap-5 items-start">
             {/* Avatar */}
-            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-white shadow-xl border-4 border-white shrink-0">
+            <div className="w-28 h-28 sm:w-36 sm:h-36 rounded-2xl overflow-hidden bg-card shadow-xl border-4 border-background shrink-0">
               {professional.photo_url ? (
                 <img src={professional.photo_url} alt={professional.full_name} className="w-full h-full object-cover" />
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-300 text-4xl font-bold">
+                <div className="w-full h-full flex items-center justify-center bg-emerald-50 text-emerald-300 text-4xl font-bold dark:bg-emerald-950/40 dark:text-emerald-300">
                   {professional.full_name?.[0] || '?'}
                 </div>
               )}
@@ -56,11 +56,11 @@ export default function ProfileHero({ professional }) {
               <div className="flex flex-col lg:flex-row lg:items-start lg:justify-between gap-4">
                 <div>
                   <div className="flex flex-wrap items-center gap-2 mb-1">
-                    <h1 className="text-2xl sm:text-3xl font-bold text-gray-900">
+                    <h1 className="text-2xl sm:text-3xl font-bold text-foreground">
                       {prefix}{professional.full_name}
                     </h1>
                     {professional.is_on_duty && (
-                      <span className="flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-medium animate-pulse">
+                      <span className="flex items-center gap-1 bg-emerald-100 text-emerald-700 text-xs px-2.5 py-1 rounded-full font-medium animate-pulse dark:bg-emerald-950/50 dark:text-emerald-300">
                         <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 inline-block" />
                         Online agora
                       </span>
@@ -68,17 +68,17 @@ export default function ProfileHero({ professional }) {
                   </div>
 
                   <div className="flex flex-wrap gap-2 mb-2">
-                    <Badge className="bg-emerald-100 text-emerald-700 border-0">{professional.profession}</Badge>
-                    <Badge variant="outline" className="text-gray-600">{professional.specialty}</Badge>
+                    <Badge className="bg-emerald-100 text-emerald-700 border-0 dark:bg-emerald-950/50 dark:text-emerald-300">{professional.profession}</Badge>
+                    <Badge variant="outline" className="text-muted-foreground">{professional.specialty}</Badge>
                     {professional.register_state && (
-                      <span className="flex items-center gap-1 text-sm text-gray-500">
+                      <span className="flex items-center gap-1 text-sm text-muted-foreground">
                         <MapPin className="w-3.5 h-3.5" />
                         {professional.office_state || professional.register_state}
                       </span>
                     )}
                   </div>
 
-                  <div className="flex flex-wrap items-center gap-4 text-sm text-gray-600">
+                  <div className="flex flex-wrap items-center gap-4 text-sm text-muted-foreground">
                     {professional.register_number && (
                       <span className="font-medium">
                         {regLabel}: {professional.register_number}
@@ -86,10 +86,10 @@ export default function ProfileHero({ professional }) {
                       </span>
                     )}
                     {professional.rqe && (
-                      <span className="text-gray-500">RQE: {professional.rqe}</span>
+                      <span className="text-muted-foreground">RQE: {professional.rqe}</span>
                     )}
                     {professional.graduation_year > 0 && (
-                      <span className="flex items-center gap-1 text-gray-500">
+                      <span className="flex items-center gap-1 text-muted-foreground">
                         <Award className="w-4 h-4 text-amber-500" />
                         {new Date().getFullYear() - professional.graduation_year}+ anos de experiência
                       </span>
@@ -111,14 +111,14 @@ export default function ProfileHero({ professional }) {
                 {/* Rating + CTA */}
                 <div className="flex flex-col gap-3 lg:items-end">
                   {totalReviews > 0 && (
-                    <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-100 px-4 py-2 rounded-xl">
+                    <div className="flex items-center gap-2 bg-yellow-50 border border-yellow-100 px-4 py-2 rounded-xl dark:bg-yellow-950/30 dark:border-yellow-900/60">
                       <div className="flex">
                         {[1,2,3,4,5].map(i => (
-                          <Star key={i} className={`w-4 h-4 ${i <= Math.round(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-gray-200'}`} />
+                          <Star key={i} className={`w-4 h-4 ${i <= Math.round(rating) ? 'fill-yellow-400 text-yellow-400' : 'text-muted-foreground/30'}`} />
                         ))}
                       </div>
-                      <span className="text-lg font-bold text-gray-900">{rating.toFixed(1)}</span>
-                      <span className="text-sm text-gray-500">({totalReviews})</span>
+                      <span className="text-lg font-bold text-foreground">{rating.toFixed(1)}</span>
+                      <span className="text-sm text-muted-foreground">({totalReviews})</span>
                     </div>
                   )}
 

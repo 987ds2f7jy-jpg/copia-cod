@@ -12,12 +12,12 @@ import {
 } from 'lucide-react';
 
 const specialties = [
-  { name: 'Clínico Geral', icon: Stethoscope, color: 'bg-emerald-100 text-emerald-600' },
-  { name: 'Cardiologia', icon: Heart, color: 'bg-red-100 text-red-600' },
-  { name: 'Neurologia', icon: Brain, color: 'bg-purple-100 text-purple-600' },
-  { name: 'Ortopedia', icon: Bone, color: 'bg-blue-100 text-blue-600' },
-  { name: 'Oftalmologia', icon: Eye, color: 'bg-amber-100 text-amber-600' },
-  { name: 'Pediatria', icon: Baby, color: 'bg-pink-100 text-pink-600' },
+  { name: 'Clínico Geral', icon: Stethoscope, color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-500/15 dark:text-emerald-300' },
+  { name: 'Cardiologia', icon: Heart, color: 'bg-red-100 text-red-600 dark:bg-red-500/15 dark:text-red-300' },
+  { name: 'Neurologia', icon: Brain, color: 'bg-purple-100 text-purple-600 dark:bg-purple-500/15 dark:text-purple-300' },
+  { name: 'Ortopedia', icon: Bone, color: 'bg-blue-100 text-blue-600 dark:bg-blue-500/15 dark:text-blue-300' },
+  { name: 'Oftalmologia', icon: Eye, color: 'bg-amber-100 text-amber-600 dark:bg-amber-500/15 dark:text-amber-300' },
+  { name: 'Pediatria', icon: Baby, color: 'bg-pink-100 text-pink-600 dark:bg-pink-500/15 dark:text-pink-300' },
 ];
 
 const features = [
@@ -51,9 +51,9 @@ const steps = [
 
 export default function Home() {
   return (
-    <div className="min-h-screen">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Hero Section */}
-      <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-teal-50 pt-20 pb-32">
+      <section className="relative overflow-hidden bg-gradient-to-br from-emerald-50 via-white to-teal-50 pt-20 pb-32 dark:from-emerald-950/35 dark:via-background dark:to-teal-950/25">
         <div className="absolute inset-0 overflow-hidden">
           <div className="absolute -top-40 -right-40 w-96 h-96 bg-emerald-200/30 rounded-full blur-3xl" />
           <div className="absolute top-60 -left-20 w-72 h-72 bg-teal-200/30 rounded-full blur-3xl" />
@@ -66,18 +66,18 @@ export default function Home() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.6 }}
             >
-              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-6">
+              <div className="inline-flex items-center gap-2 px-4 py-2 bg-emerald-100 rounded-full text-emerald-700 text-sm font-medium mb-6 dark:bg-emerald-500/15 dark:text-emerald-300">
                 <Clock className="w-4 h-4" />
                 Atendimento 24 horas
               </div>
               
-              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-gray-900 leading-tight mb-6">
+              <h1 className="text-4xl sm:text-5xl lg:text-6xl font-bold text-foreground leading-tight mb-6">
                 Seu médico a um
                 <span className="text-emerald-600"> clique </span>
                 de distância
               </h1>
               
-              <p className="text-lg text-gray-600 mb-8 max-w-lg">
+              <p className="text-lg text-muted-foreground mb-8 max-w-lg">
                 Conectamos você aos melhores profissionais de saúde. Agende consultas, 
                 entre na fila para atendimento imediato ou tire suas dúvidas com especialistas.
               </p>
@@ -100,8 +100,8 @@ export default function Home() {
               <div className="flex items-center gap-6 mt-10">
                 <div className="flex -space-x-3">
                   {[1,2,3,4].map((i) => (
-                    <div key={i} className="w-10 h-10 rounded-full bg-gray-200 border-2 border-white flex items-center justify-center">
-                      <UserRound className="w-5 h-5 text-gray-500" />
+                    <div key={i} className="w-10 h-10 rounded-full bg-muted border-2 border-background flex items-center justify-center">
+                      <UserRound className="w-5 h-5 text-muted-foreground" />
                     </div>
                   ))}
                 </div>
@@ -111,7 +111,7 @@ export default function Home() {
                       <Star key={i} className="w-4 h-4 fill-yellow-400 text-yellow-400" />
                     ))}
                   </div>
-                  <p className="text-sm text-gray-600">+10.000 pacientes satisfeitos</p>
+                  <p className="text-sm text-muted-foreground">+10.000 pacientes satisfeitos</p>
                 </div>
               </div>
             </motion.div>
@@ -144,13 +144,13 @@ export default function Home() {
       </section>
 
       {/* Specialties Grid */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-12">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-foreground mb-4">
               Encontre o especialista ideal
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Mais de 15 especialidades médicas disponíveis para você escolher
             </p>
           </div>
@@ -165,12 +165,12 @@ export default function Home() {
                 viewport={{ once: true }}
               >
                 <Link to={createPageUrl(`Especialidades?especialidade=${encodeURIComponent(specialty.name)}`)}>
-                  <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm">
+                  <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-border shadow-sm">
                     <CardContent className="p-6 text-center">
                       <div className={`w-14 h-14 rounded-2xl ${specialty.color} flex items-center justify-center mx-auto mb-4`}>
                         <specialty.icon className="w-7 h-7" />
                       </div>
-                      <p className="font-medium text-gray-900 text-sm">{specialty.name}</p>
+                      <p className="font-medium text-foreground text-sm">{specialty.name}</p>
                     </CardContent>
                   </Card>
                 </Link>
@@ -190,10 +190,10 @@ export default function Home() {
       </section>
 
       {/* Serviços Section */}
-      <section className="py-16 bg-gray-50">
+      <section className="py-16 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-10">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">Serviços</h2>
+            <h2 className="text-3xl font-bold text-foreground mb-4">Serviços</h2>
           </div>
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 max-w-4xl mx-auto">
             <motion.div
@@ -202,13 +202,13 @@ export default function Home() {
               viewport={{ once: true }}
             >
               <Link to="/SolicitacaoExames">
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-border shadow-sm h-full">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-teal-100 text-teal-600 flex items-center justify-center mx-auto mb-4 dark:bg-teal-500/15 dark:text-teal-300">
                       <ClipboardList className="w-7 h-7" />
                     </div>
-                    <p className="font-medium text-gray-900 text-sm mb-1">Solicitação de Exames</p>
-                    <p className="text-xs text-gray-500">Pedidos digitais para exames laboratoriais e de imagem com orientação médica.</p>
+                    <p className="font-medium text-foreground text-sm mb-1">Solicitação de Exames</p>
+                    <p className="text-xs text-muted-foreground">Pedidos digitais para exames laboratoriais e de imagem com orientação médica.</p>
                   </CardContent>
                 </Card>
               </Link>
@@ -220,13 +220,13 @@ export default function Home() {
               viewport={{ once: true }}
             >
               <Link to="/RenovacaoReceitas">
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-border shadow-sm h-full">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-violet-100 text-violet-600 flex items-center justify-center mx-auto mb-4 dark:bg-violet-500/15 dark:text-violet-300">
                       <span className="text-2xl">💊</span>
                     </div>
-                    <p className="font-medium text-gray-900 text-sm mb-1">Renovação de Receitas</p>
-                    <p className="text-xs text-gray-500">Prescrições rápidas com envio digital para medicações de uso contínuo.</p>
+                    <p className="font-medium text-foreground text-sm mb-1">Renovação de Receitas</p>
+                    <p className="text-xs text-muted-foreground">Prescrições rápidas com envio digital para medicações de uso contínuo.</p>
                   </CardContent>
                 </Card>
               </Link>
@@ -238,13 +238,13 @@ export default function Home() {
               viewport={{ once: true }}
             >
               <Link to="/LaudosMedicos">
-                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-0 shadow-sm h-full">
+                <Card className="hover:shadow-lg transition-all duration-300 hover:-translate-y-1 cursor-pointer border-border shadow-sm h-full">
                   <CardContent className="p-6 text-center">
-                    <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-4">
+                    <div className="w-14 h-14 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center mx-auto mb-4 dark:bg-sky-500/15 dark:text-sky-300">
                       <span className="text-2xl">📄</span>
                     </div>
-                    <p className="font-medium text-gray-900 text-sm mb-1">Laudos Médicos</p>
-                    <p className="text-xs text-gray-500">Emissão digital com assinatura eletrônica certificada e envio imediato.</p>
+                    <p className="font-medium text-foreground text-sm mb-1">Laudos Médicos</p>
+                    <p className="text-xs text-muted-foreground">Emissão digital com assinatura eletrônica certificada e envio imediato.</p>
                   </CardContent>
                 </Card>
               </Link>
@@ -254,7 +254,7 @@ export default function Home() {
       </section>
 
       {/* Features Section */}
-      <section className="py-20 bg-gray-50">
+      <section className="py-20 bg-muted/30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8">
             {features.map((feature, index) => (
@@ -265,13 +265,13 @@ export default function Home() {
                 transition={{ delay: index * 0.1 }}
                 viewport={{ once: true }}
               >
-                <Card className="h-full border-0 shadow-sm hover:shadow-md transition-shadow">
+                <Card className="h-full border-border shadow-sm hover:shadow-md transition-shadow">
                   <CardContent className="p-6">
-                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4">
-                      <feature.icon className="w-6 h-6 text-emerald-600" />
+                    <div className="w-12 h-12 rounded-2xl bg-emerald-100 flex items-center justify-center mb-4 dark:bg-emerald-500/15">
+                      <feature.icon className="w-6 h-6 text-emerald-600 dark:text-emerald-300" />
                     </div>
-                    <h3 className="font-semibold text-gray-900 mb-2">{feature.title}</h3>
-                    <p className="text-gray-600 text-sm">{feature.description}</p>
+                    <h3 className="font-semibold text-foreground mb-2">{feature.title}</h3>
+                    <p className="text-muted-foreground text-sm">{feature.description}</p>
                   </CardContent>
                 </Card>
               </motion.div>
@@ -281,13 +281,13 @@ export default function Home() {
       </section>
 
       {/* How It Works */}
-      <section className="py-20 bg-white">
+      <section className="py-20 bg-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="text-center mb-16">
-            <h2 className="text-3xl font-bold text-gray-900 mb-4">
+            <h2 className="text-3xl font-bold text-foreground mb-4">
               Como funciona
             </h2>
-            <p className="text-gray-600 max-w-2xl mx-auto">
+            <p className="text-muted-foreground max-w-2xl mx-auto">
               Em poucos passos você já estará conectado com seu médico
             </p>
           </div>
@@ -302,11 +302,11 @@ export default function Home() {
                 viewport={{ once: true }}
                 className="relative"
               >
-                <div className="text-6xl font-bold text-emerald-100 mb-4">{step.number}</div>
-                <h3 className="text-xl font-semibold text-gray-900 mb-2">{step.title}</h3>
-                <p className="text-gray-600">{step.description}</p>
+                <div className="text-6xl font-bold text-emerald-100 mb-4 dark:text-emerald-500/20">{step.number}</div>
+                <h3 className="text-xl font-semibold text-foreground mb-2">{step.title}</h3>
+                <p className="text-muted-foreground">{step.description}</p>
                 {index < steps.length - 1 && (
-                  <div className="hidden md:block absolute top-8 right-0 w-1/2 h-0.5 bg-emerald-100" />
+                  <div className="hidden md:block absolute top-8 right-0 w-1/2 h-0.5 bg-emerald-100 dark:bg-emerald-500/20" />
                 )}
               </motion.div>
             ))}

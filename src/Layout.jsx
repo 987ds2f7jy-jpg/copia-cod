@@ -20,7 +20,7 @@ import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 
 function BrandMark({ className = 'h-8 w-8' }) {
   return (
-    <span className={`${className} inline-flex overflow-hidden rounded-xl shadow-sm ring-1 ring-black/5`}>
+    <span className={`${className} inline-flex overflow-hidden rounded-xl bg-white shadow-sm ring-1 ring-black/5 dark:ring-white/10`}>
       <img
         src="/rapido-doutor-logo.png"
         alt="Rápido Doutor"
@@ -63,11 +63,11 @@ function ActiveConsultationBanner({ activeConsultation, onResume }) {
   }
 
   return (
-    <div className="border-b border-emerald-100 bg-emerald-50/90">
+    <div className="border-b border-emerald-100 bg-emerald-50/90 dark:border-emerald-900/50 dark:bg-emerald-950/60">
       <div className="mx-auto flex max-w-7xl flex-col gap-3 px-4 py-3 sm:px-6 lg:flex-row lg:items-center lg:justify-between lg:px-8">
         <div className="min-w-0">
-          <p className="text-sm font-semibold text-emerald-900">{title}</p>
-          <p className="text-sm text-emerald-700">{description}</p>
+          <p className="text-sm font-semibold text-emerald-900 dark:text-emerald-100">{title}</p>
+          <p className="text-sm text-emerald-700 dark:text-emerald-300">{description}</p>
         </div>
 
         <Button
@@ -137,11 +137,11 @@ function LayoutInner({ children, currentPageName }) {
   );
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background text-foreground">
       {/* Header */}
       <header
         className={`fixed top-0 left-0 right-0 z-50 transition-all duration-300 safe-area-top ${
-          isScrolled ? 'bg-white/95 backdrop-blur-md shadow-sm' : 'bg-white'
+          isScrolled ? 'border-b border-border bg-background/95 shadow-sm backdrop-blur-md' : 'bg-background'
         }`}
       >
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
@@ -152,17 +152,17 @@ function LayoutInner({ children, currentPageName }) {
               {!isRootPage ? (
                 <>
                   <button
-                    className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-gray-100 active:bg-gray-200"
+                    className="lg:hidden p-2 -ml-2 rounded-lg hover:bg-accent active:bg-accent/80"
                     onClick={() => navigate(-1)}
                     aria-label="Voltar"
                   >
-                    <ArrowLeft className="w-5 h-5 text-gray-700" />
+                    <ArrowLeft className="w-5 h-5 text-foreground" />
                   </button>
                   <Link to={createPageUrl('Home')} className="hidden lg:flex items-center gap-2">
                     <BrandMark className="h-9 w-9" />
-                    <span className="text-xl font-bold text-gray-900">Rápido Doutor</span>
+                    <span className="text-xl font-bold text-foreground">Rápido Doutor</span>
                   </Link>
-                  <span className="lg:hidden text-base font-semibold text-gray-900">
+                  <span className="lg:hidden text-base font-semibold text-foreground">
                     {currentPageName === 'DashboardPaciente' ? 'Minhas Consultas'
                       : currentPageName === 'DashboardProfissional' ? 'Área Profissional'
                       : currentPageName === 'PerfilProfissional' ? 'Perfil do Médico'
@@ -178,7 +178,7 @@ function LayoutInner({ children, currentPageName }) {
               ) : (
                 <Link to={createPageUrl('Home')} className="flex items-center gap-2">
                   <BrandMark className="h-8 w-8 lg:h-9 lg:w-9" />
-                  <span className="text-lg lg:text-xl font-bold text-gray-900">Rápido Doutor</span>
+                  <span className="text-lg lg:text-xl font-bold text-foreground">Rápido Doutor</span>
                 </Link>
               )}
             </div>
@@ -191,8 +191,8 @@ function LayoutInner({ children, currentPageName }) {
                   to={createPageUrl(link.page)}
                   className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
                     currentPageName === link.page
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
                 >
                   {link.name}
@@ -211,7 +211,7 @@ function LayoutInner({ children, currentPageName }) {
                       aria-label="Menu do usuário"
                     >
                       <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <User className="w-4 h-4 text-emerald-600" />
+                        <User className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
                       </div>
                       <span className="hidden sm:inline text-sm font-medium">
                         {user.full_name?.split(' ')[0] || 'Usuário'}
@@ -219,12 +219,12 @@ function LayoutInner({ children, currentPageName }) {
                 
                     </Button>
                   </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end" className="w-56">
+                  <DropdownMenuContent align="end" className="w-56 border-border bg-popover text-popover-foreground">
                     <div className="px-3 py-2">
                       <p className="text-sm font-medium">{user.full_name}</p>
-                      <p className="text-xs text-gray-500">{user.email}</p>
+                      <p className="text-xs text-muted-foreground">{user.email}</p>
                       {user.role === 'professional' && (
-                        <span className="inline-block mt-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full">Profissional</span>
+                        <span className="inline-block mt-1 text-xs bg-emerald-100 text-emerald-700 px-2 py-0.5 rounded-full dark:bg-emerald-500/10 dark:text-emerald-300">Profissional</span>
                       )}
                     </div>
                     <DropdownMenuSeparator />
@@ -266,7 +266,7 @@ function LayoutInner({ children, currentPageName }) {
               ) : (
                 <div className="flex items-center gap-2">
                   <Link to={createPageUrl('Entrar')}>
-                    <Button variant="ghost" className="flex items-center gap-2 px-3 h-9 border border-gray-200">
+                    <Button variant="ghost" className="flex items-center gap-2 px-3 h-9 border border-border">
                       <User className="w-4 h-4" />
                       <span className="text-sm font-medium">Entrar</span>
                     </Button>
@@ -282,7 +282,7 @@ function LayoutInner({ children, currentPageName }) {
               {/* Mobile hamburger — only on root pages */}
               {isRootPage && (
                 <button
-                  className="lg:hidden p-2 rounded-lg hover:bg-gray-100"
+                  className="lg:hidden p-2 rounded-lg hover:bg-accent"
                   onClick={() => setIsMenuOpen(!isMenuOpen)}
                 >
                   {isMenuOpen ? <X className="w-6 h-6" /> : <Menu className="w-6 h-6" />}
@@ -294,7 +294,7 @@ function LayoutInner({ children, currentPageName }) {
 
         {/* Mobile Slide-down Menu */}
         {isMenuOpen && (
-          <div className="lg:hidden bg-white border-t">
+          <div className="lg:hidden border-t border-border bg-background">
             <div className="px-4 py-4 space-y-2">
               {navLinks.map((link) => (
                 <Link
@@ -303,8 +303,8 @@ function LayoutInner({ children, currentPageName }) {
                   onClick={() => setIsMenuOpen(false)}
                   className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                     currentPageName === link.page
-                      ? 'bg-emerald-50 text-emerald-600'
-                      : 'text-gray-600 hover:bg-gray-100'
+                      ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-500/10 dark:text-emerald-300'
+                      : 'text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                   }`}
                 >
                   <link.icon className="w-5 h-5" />
@@ -373,7 +373,7 @@ function LayoutInner({ children, currentPageName }) {
       </footer>
 
       {/* Mobile Bottom Navigation Bar */}
-      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 bg-white border-t border-gray-200 safe-area-bottom">
+      <nav className="lg:hidden fixed bottom-0 left-0 right-0 z-50 border-t border-border bg-background safe-area-bottom">
         <div className="flex">
           {BOTTOM_NAV.map((item) => {
             const isActive = currentPageName === item.page;
@@ -382,7 +382,7 @@ function LayoutInner({ children, currentPageName }) {
                 key={item.page}
                 to={createPageUrl(item.page)}
                 className={`flex-1 flex flex-col items-center gap-1 py-2 px-1 transition-colors ${
-                  isActive ? 'text-emerald-600' : 'text-gray-400'
+                  isActive ? 'text-emerald-600 dark:text-emerald-300' : 'text-muted-foreground'
                 }`}
               >
                 <item.icon className={`w-6 h-6 ${isActive ? 'stroke-2' : 'stroke-[1.5]'}`} />

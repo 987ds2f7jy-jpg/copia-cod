@@ -161,7 +161,7 @@ export default function CadastroPaciente() {
   );
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-12">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-12 dark:from-slate-950 dark:via-background dark:to-emerald-950/30">
       <div className="mx-auto max-w-lg px-4">
         <motion.div
           initial={{ opacity: 0, y: 12 }}
@@ -171,8 +171,8 @@ export default function CadastroPaciente() {
           <div className="mb-4 inline-flex h-16 w-16 items-center justify-center rounded-2xl bg-emerald-600">
             <UserPlus className="h-8 w-8 text-white" />
           </div>
-          <h1 className="mb-2 text-3xl font-bold text-gray-900">Criar Conta de Paciente</h1>
-          <p className="text-gray-600">
+          <h1 className="mb-2 text-3xl font-bold text-foreground">Criar Conta de Paciente</h1>
+          <p className="text-muted-foreground">
             Ja tem conta?{' '}
             <Link to={createPageUrl('Entrar')} className="text-emerald-600 underline">
               Entrar
@@ -180,7 +180,7 @@ export default function CadastroPaciente() {
           </p>
         </motion.div>
 
-        <Card className="border-0 shadow-md">
+        <Card className="border border-border shadow-md">
           <CardHeader>
             <CardTitle>Dados pessoais</CardTitle>
           </CardHeader>
@@ -210,7 +210,7 @@ export default function CadastroPaciente() {
                   <button
                     type="button"
                     aria-label={showPassword ? 'Ocultar' : 'Mostrar'}
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground"
                     onClick={() => setShowPassword((current) => !current)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -249,7 +249,7 @@ export default function CadastroPaciente() {
               </div>
 
               {errors.submit ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                   {errors.submit}
                 </div>
               ) : null}

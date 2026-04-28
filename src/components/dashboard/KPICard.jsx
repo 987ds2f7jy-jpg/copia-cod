@@ -3,11 +3,11 @@ import { Card, CardContent } from "@/components/ui/card";
 import { TrendingUp, TrendingDown, Minus } from 'lucide-react';
 
 export default function KPICard({ label, value, sub, icon: Icon, color, trend, trendLabel, loading }) {
-  const trendColor = trend > 0 ? 'text-emerald-600' : trend < 0 ? 'text-red-500' : 'text-gray-400';
+  const trendColor = trend > 0 ? 'text-emerald-600' : trend < 0 ? 'text-red-500' : 'text-muted-foreground';
   const TrendIcon = trend > 0 ? TrendingUp : trend < 0 ? TrendingDown : Minus;
 
   return (
-    <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-white">
+    <Card className="border-border shadow-sm hover:shadow-md transition-shadow bg-card">
       <CardContent className="p-5">
         <div className="flex items-start justify-between mb-3">
           <div className={`w-10 h-10 rounded-xl ${color} flex items-center justify-center`}>
@@ -22,15 +22,15 @@ export default function KPICard({ label, value, sub, icon: Icon, color, trend, t
         </div>
         {loading ? (
           <div className="space-y-2">
-            <div className="h-7 bg-gray-100 rounded animate-pulse w-16" />
-            <div className="h-3 bg-gray-100 rounded animate-pulse w-24" />
+            <div className="h-7 bg-muted rounded animate-pulse w-16" />
+            <div className="h-3 bg-muted rounded animate-pulse w-24" />
           </div>
         ) : (
           <>
-            <p className="text-2xl font-bold text-gray-900 leading-none mb-1">{value}</p>
-            <p className="text-sm text-gray-500">{label}</p>
-            {trendLabel && <p className="text-xs text-gray-400 mt-1">{trendLabel}</p>}
-            {sub && <p className="text-xs text-gray-400 mt-1">{sub}</p>}
+            <p className="text-2xl font-bold text-foreground leading-none mb-1">{value}</p>
+            <p className="text-sm text-muted-foreground">{label}</p>
+            {trendLabel && <p className="text-xs text-muted-foreground mt-1">{trendLabel}</p>}
+            {sub && <p className="text-xs text-muted-foreground mt-1">{sub}</p>}
           </>
         )}
       </CardContent>

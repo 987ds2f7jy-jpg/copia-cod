@@ -59,7 +59,7 @@ export default function Entrar() {
   };
 
   return (
-    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 py-12">
+    <div className="flex min-h-screen items-center justify-center bg-gradient-to-br from-emerald-50 via-white to-teal-50 px-4 py-12 dark:from-slate-950 dark:via-background dark:to-emerald-950/30">
       <div className="w-full max-w-md">
         <div className="mb-8 text-center">
           <Link to={createPageUrl('Home')} className="mb-6 inline-flex items-center gap-2">
@@ -70,13 +70,13 @@ export default function Entrar() {
                 className="h-full w-full object-cover"
               />
             </span>
-            <span className="text-2xl font-bold text-gray-900">Rápido Doutor</span>
+            <span className="text-2xl font-bold text-foreground">Rápido Doutor</span>
           </Link>
-          <h1 className="text-2xl font-bold text-gray-900">Entrar na sua conta</h1>
-          <p className="mt-1 text-gray-600">Bem-vindo de volta.</p>
+          <h1 className="text-2xl font-bold text-foreground">Entrar na sua conta</h1>
+          <p className="mt-1 text-muted-foreground">Bem-vindo de volta.</p>
         </div>
 
-        <Card className="border-0 shadow-xl">
+        <Card className="border border-border shadow-xl">
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
               <div>
@@ -106,7 +106,7 @@ export default function Entrar() {
                   />
                   <button
                     type="button"
-                    className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                    className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                     onClick={() => setShowPassword((current) => !current)}
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
@@ -115,7 +115,7 @@ export default function Entrar() {
               </div>
 
               {error ? (
-                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600">
+                <div className="rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-600 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                   {error}
                 </div>
               ) : null}
@@ -130,7 +130,7 @@ export default function Entrar() {
               </Button>
             </form>
 
-            <div className="mt-6 text-center text-sm text-gray-600">
+            <div className="mt-6 text-center text-sm text-muted-foreground">
               Nao tem conta?{' '}
               <Link
                 to={createPageUrl('CadastroPaciente')}
@@ -140,7 +140,7 @@ export default function Entrar() {
               </Link>
             </div>
 
-            <div className="mt-3 text-center text-sm text-gray-600">
+            <div className="mt-3 text-center text-sm text-muted-foreground">
               E profissional de saude?{' '}
               <Link
                 to={createPageUrl('CadastroProfissional')}

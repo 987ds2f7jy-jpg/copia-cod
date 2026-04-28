@@ -18,51 +18,51 @@ export default function ProfileAbout({ professional }) {
   const hasCoords = officeLocation?.latitude && officeLocation?.longitude;
 
   return (
-    <div className="bg-white rounded-2xl shadow-sm p-6">
-      <h2 className="text-lg font-semibold text-gray-900 mb-4">Sobre o Profissional</h2>
+    <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+      <h2 className="text-lg font-semibold text-foreground mb-4">Sobre o Profissional</h2>
 
       {professional.bio && (
-        <p className="text-gray-600 leading-relaxed mb-6">{professional.bio}</p>
+        <p className="text-muted-foreground leading-relaxed mb-6">{professional.bio}</p>
       )}
 
       {/* Formation & Experience grid */}
       <div className="grid sm:grid-cols-2 gap-3 mb-5">
         {(professional.education || professional.university) && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
             <GraduationCap className="w-5 h-5 text-emerald-600 mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Formação</p>
-              <p className="text-sm font-medium text-gray-800">{professional.education || professional.university}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Formação</p>
+              <p className="text-sm font-medium text-foreground">{professional.education || professional.university}</p>
             </div>
           </div>
         )}
 
         {professional.years_experience > 0 && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
             <Award className="w-5 h-5 text-amber-500 mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Experiência</p>
-              <p className="text-sm font-medium text-gray-800">{professional.years_experience}+ anos</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Experiência</p>
+              <p className="text-sm font-medium text-foreground">{professional.years_experience}+ anos</p>
             </div>
           </div>
         )}
 
         {professional.profession && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
             <Briefcase className="w-5 h-5 text-indigo-500 mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Profissão</p>
-              <p className="text-sm font-medium text-gray-800">{professional.profession}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Profissão</p>
+              <p className="text-sm font-medium text-foreground">{professional.profession}</p>
             </div>
           </div>
         )}
 
         {professional.specialty && (
-          <div className="flex items-start gap-3 p-4 rounded-xl bg-gray-50">
+          <div className="flex items-start gap-3 p-4 rounded-xl bg-muted/50">
             <Building2 className="w-5 h-5 text-purple-500 mt-0.5 shrink-0" />
             <div>
-              <p className="text-xs text-gray-400 mb-0.5">Especialidade</p>
-              <p className="text-sm font-medium text-gray-800">{professional.specialty}</p>
+              <p className="text-xs text-muted-foreground mb-0.5">Especialidade</p>
+              <p className="text-sm font-medium text-foreground">{professional.specialty}</p>
             </div>
           </div>
         )}
@@ -71,13 +71,13 @@ export default function ProfileAbout({ professional }) {
       {/* Patients */}
       {professional.patient_types?.length > 0 && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
             <Users className="w-4 h-4 text-teal-500" />
             Público atendido
           </p>
           <div className="flex flex-wrap gap-2">
             {professional.patient_types.map(type => (
-              <span key={type} className="px-3 py-1 bg-teal-50 text-teal-700 text-sm rounded-full border border-teal-100 font-medium">
+              <span key={type} className="px-3 py-1 bg-teal-50 text-teal-700 text-sm rounded-full border border-teal-100 font-medium dark:bg-teal-950/40 dark:border-teal-900/60 dark:text-teal-300">
                 {type}
               </span>
             ))}
@@ -88,7 +88,7 @@ export default function ProfileAbout({ professional }) {
       {/* Experience tags */}
       {professional.tags?.length > 0 && (
         <div className="mb-4">
-          <p className="text-sm font-medium text-gray-700 mb-2 flex items-center gap-2">
+          <p className="text-sm font-medium text-foreground mb-2 flex items-center gap-2">
             <Tag className="w-4 h-4 text-violet-500" />
             Experiência em
           </p>
@@ -104,20 +104,20 @@ export default function ProfileAbout({ professional }) {
 
       {/* Physical office with map */}
       {hasOffice && showMap && (
-        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-          <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2">
+        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
+          <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2 dark:text-emerald-200">
             <MapPin className="w-4 h-4 text-emerald-600" />
             Consultório Físico
           </p>
           {officeLocation?.formatted_address ? (
-            <p className="text-sm text-gray-700">{officeLocation.formatted_address}</p>
+            <p className="text-sm text-foreground">{officeLocation.formatted_address}</p>
           ) : (
             <>
               {professional.office_address && (
-                <p className="text-sm text-gray-700">{professional.office_address}</p>
+                <p className="text-sm text-foreground">{professional.office_address}</p>
               )}
               {(professional.office_city || professional.office_state) && (
-                <p className="text-sm text-gray-600 mt-0.5">
+                <p className="text-sm text-muted-foreground mt-0.5">
                   {[professional.office_city, professional.office_state].filter(Boolean).join(' – ')}
                 </p>
               )}
@@ -144,16 +144,16 @@ export default function ProfileAbout({ professional }) {
 
       {/* Office details without map (online-only with address set) */}
       {hasOffice && !showMap && (
-        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100">
-          <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2">
+        <div className="mt-4 p-4 bg-emerald-50 rounded-xl border border-emerald-100 dark:bg-emerald-950/30 dark:border-emerald-900/60">
+          <p className="text-sm font-medium text-emerald-800 mb-1 flex items-center gap-2 dark:text-emerald-200">
             <MapPin className="w-4 h-4 text-emerald-600" />
             Consultório Físico
           </p>
           {professional.office_address && (
-            <p className="text-sm text-gray-700">{professional.office_address}</p>
+            <p className="text-sm text-foreground">{professional.office_address}</p>
           )}
           {(professional.office_city || professional.office_state) && (
-            <p className="text-sm text-gray-600 mt-0.5">
+            <p className="text-sm text-muted-foreground mt-0.5">
               {[professional.office_city, professional.office_state].filter(Boolean).join(' – ')}
             </p>
           )}

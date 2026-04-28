@@ -66,17 +66,17 @@ export default function DisponibilidadeEditor({ professional }) {
   });
 
   if (isLoading) {
-    return <div className="flex items-center justify-center p-8"><Loader2 className="w-5 h-5 animate-spin text-gray-400" /></div>;
+    return <div className="flex items-center justify-center p-8"><Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /></div>;
   }
 
   return (
-    <Card className="border-0 shadow-sm">
+    <Card className="border-border shadow-sm">
       <CardHeader className="pb-3">
         <CardTitle className="text-base flex items-center gap-2">
           <Clock className="w-4 h-4 text-emerald-600" />
           Disponibilidade por Dia
         </CardTitle>
-        <p className="text-xs text-gray-400">
+        <p className="text-xs text-muted-foreground">
           Selecione os dias e horários que você atende. Cada dia pode ter horários diferentes.
           Slots de 20 minutos · 08:00–17:40
         </p>
@@ -94,8 +94,8 @@ export default function DisponibilidadeEditor({ professional }) {
                   activeDay === wd
                     ? 'bg-emerald-600 text-white'
                     : count > 0
-                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200'
-                    : 'bg-gray-100 text-gray-500 hover:bg-gray-200'
+                    ? 'bg-emerald-50 text-emerald-700 border border-emerald-200 dark:bg-emerald-950/40 dark:text-emerald-300 dark:border-emerald-900/60'
+                    : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
                 }`}
               >
                 {WEEKDAY_LABELS[wd]}
@@ -120,7 +120,7 @@ export default function DisponibilidadeEditor({ professional }) {
               className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
                 isSelected(activeDay, time)
                   ? 'bg-emerald-500 text-white shadow-sm'
-                  : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                  : 'bg-muted hover:bg-accent text-foreground'
               }`}
             >
               {time}
@@ -129,21 +129,21 @@ export default function DisponibilidadeEditor({ professional }) {
         </div>
 
         {/* Summary */}
-        <div className="mb-4 p-3 bg-gray-50 rounded-xl">
-          <p className="text-xs text-gray-500 font-medium mb-2">Resumo da semana:</p>
+        <div className="mb-4 p-3 bg-muted/50 rounded-xl">
+          <p className="text-xs text-muted-foreground font-medium mb-2">Resumo da semana:</p>
           <div className="space-y-1">
             {ALL_WEEKDAYS.map(wd => {
               const slots = slotsForDay(wd);
               if (slots.length === 0) return null;
               return (
                 <div key={wd} className="flex items-center gap-2 text-xs">
-                  <span className="text-gray-500 w-8 shrink-0">{WEEKDAY_LABELS[wd]}:</span>
-                  <span className="text-gray-700">{slots.join(', ')}</span>
+                  <span className="text-muted-foreground w-8 shrink-0">{WEEKDAY_LABELS[wd]}:</span>
+                  <span className="text-foreground">{slots.join(', ')}</span>
                 </div>
               );
             })}
             {selected.size === 0 && (
-              <p className="text-xs text-gray-400">Nenhum horário selecionado.</p>
+              <p className="text-xs text-muted-foreground">Nenhum horário selecionado.</p>
             )}
           </div>
         </div>

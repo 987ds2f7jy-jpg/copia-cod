@@ -340,7 +340,7 @@ function DashboardProfissionalInner() {
   // ── States ─────────────────────────────────────────────────────────────────
   if (loadingProfessional || (professional?.id && loadingPublicProfile)) {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
       </div>
     );
@@ -348,10 +348,10 @@ function DashboardProfissionalInner() {
 
   if (profError || professional === null) {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center gap-4 px-4 text-center">
-        <Stethoscope className="w-12 h-12 text-gray-300" />
-        <h2 className="text-xl font-semibold text-gray-900">Perfil profissional não encontrado</h2>
-        <p className="text-gray-500 max-w-sm">Seu perfil ainda não foi cadastrado ou está em análise.</p>
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <Stethoscope className="w-12 h-12 text-muted-foreground/50" />
+        <h2 className="text-xl font-semibold text-foreground">Perfil profissional não encontrado</h2>
+        <p className="text-muted-foreground max-w-sm">Seu perfil ainda não foi cadastrado ou está em análise.</p>
         <a href={createPageUrl('CadastroProfissional')} className="mt-2 px-6 py-2 bg-emerald-600 text-white rounded-lg text-sm font-medium hover:bg-emerald-700">
           Completar Cadastro
         </a>
@@ -378,14 +378,14 @@ function DashboardProfissionalInner() {
       label: 'Consultas realizadas',
       value: completed.length,
       icon: CheckCircle,
-      color: 'bg-emerald-100 text-emerald-600',
+      color: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300',
       trend: undefined,
     },
     {
       label: 'Receita do período',
       value: `R$ ${revenue.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`,
       icon: DollarSign,
-      color: 'bg-green-100 text-green-600',
+      color: 'bg-green-100 text-green-600 dark:bg-green-950/40 dark:text-green-300',
       trend: trend(revenue, prevRev),
       trendLabel: `vs período anterior`,
     },
@@ -393,61 +393,61 @@ function DashboardProfissionalInner() {
       label: 'Ticket médio',
       value: `R$ ${avgTicket.toLocaleString('pt-BR', { minimumFractionDigits: 0 })}`,
       icon: TrendingUp,
-      color: 'bg-indigo-100 text-indigo-600',
+      color: 'bg-indigo-100 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300',
     },
     {
       label: 'Nota média',
       value: avgRating > 0 ? avgRating.toFixed(1) : '—',
       icon: Star,
-      color: 'bg-yellow-100 text-yellow-600',
+      color: 'bg-yellow-100 text-yellow-600 dark:bg-yellow-950/40 dark:text-yellow-300',
       sub: `${reviews.length} avaliações`,
     },
     {
       label: 'Taxa de cancelamento',
       value: `${cancelRate}%`,
       icon: XCircle,
-      color: cancelRate > 20 ? 'bg-red-100 text-red-500' : 'bg-gray-100 text-gray-500',
+      color: cancelRate > 20 ? 'bg-red-100 text-red-500 dark:bg-red-950/40 dark:text-red-300' : 'bg-muted text-muted-foreground',
     },
     {
       label: 'Perguntas pendentes',
       value: pendingQ,
       icon: MessageSquare,
-      color: 'bg-purple-100 text-purple-600',
+      color: 'bg-purple-100 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300',
     },
     {
       label: 'Fila agora',
       value: queuePatients.length,
       icon: Users,
-      color: 'bg-amber-100 text-amber-600',
+      color: 'bg-amber-100 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300',
     },
     {
       label: 'Total de atendimentos',
       value: appointments.filter(a => ['completed', 'CONCLUIDO'].includes(a.status)).length,
       icon: BarChart2,
-      color: 'bg-sky-100 text-sky-600',
+      color: 'bg-sky-100 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300',
       sub: 'Acumulado',
     },
   ];
 
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Top Header */}
-      <div className="bg-white border-b border-gray-100 sticky top-0 z-30 shadow-sm">
+      <div className="bg-card/95 border-b border-border sticky top-0 z-30 shadow-sm backdrop-blur">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 py-4">
             <div>
-              <h1 className="text-lg font-bold text-gray-900">
+              <h1 className="text-lg font-bold text-foreground">
                 {professional.full_name ? `Dr(a). ${professional.full_name}` : 'Painel Profissional'}
               </h1>
-              <p className="text-sm text-gray-500">{professional.specialty}</p>
+              <p className="text-sm text-muted-foreground">{professional.specialty}</p>
             </div>
             <div className="flex items-center gap-3">
               {/* Tab navigation */}
-              <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+              <div className="flex gap-1 bg-muted rounded-xl p-1">
                 <button
                   onClick={() => setActiveTab('dashboard')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    activeTab === 'dashboard' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    activeTab === 'dashboard' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <LayoutDashboard className="w-3.5 h-3.5" />
@@ -456,7 +456,7 @@ function DashboardProfissionalInner() {
                 <button
                   onClick={() => setActiveTab('perfil')}
                   className={`flex items-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                    activeTab === 'perfil' ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                    activeTab === 'perfil' ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                   }`}
                 >
                   <UserCircle className="w-3.5 h-3.5" />
@@ -465,13 +465,13 @@ function DashboardProfissionalInner() {
               </div>
               {/* Period filter — only on dashboard tab */}
               {activeTab === 'dashboard' && (
-                <div className="flex gap-1 bg-gray-100 rounded-xl p-1">
+                <div className="flex gap-1 bg-muted rounded-xl p-1">
                   {PERIODS.map(p => (
                     <button
                       key={p.key}
                       onClick={() => setPeriod(p.key)}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
-                        period === p.key ? 'bg-white text-gray-900 shadow-sm' : 'text-gray-500 hover:text-gray-700'
+                        period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'
                       }`}
                     >
                       {p.label}
@@ -570,22 +570,22 @@ function DashboardProfissionalInner() {
           <FinancialWidget appointments={appointments} professionalId={professional?.id} />
 
           {/* Questions pending */}
-          <div className="bg-white rounded-xl shadow-sm border-0 overflow-hidden">
-            <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-              <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <div className="bg-card rounded-xl shadow-sm border border-border overflow-hidden">
+            <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+              <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
                 <MessageSquare className="w-4 h-4 text-purple-500" />
                 Perguntas Pendentes
               </h3>
               <Badge className="bg-purple-100 text-purple-700">{pendingQ}</Badge>
             </div>
-            <div className="divide-y divide-gray-50 max-h-80 overflow-y-auto">
+            <div className="divide-y divide-border max-h-80 overflow-y-auto">
               {pendingQuestionsNormalized.length === 0 ? (
-                <p className="px-5 py-6 text-sm text-gray-400 text-center">Nenhuma pendente</p>
+                <p className="px-5 py-6 text-sm text-muted-foreground text-center">Nenhuma pendente</p>
               ) : pendingQuestionsNormalized.slice(0, 6).map(q => (
                 <div key={q.id} className="px-5 py-3 flex items-start justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-xs text-gray-400 truncate">{q.specialty}</p>
-                    <p className="text-sm text-gray-700 line-clamp-2">{q.question_text}</p>
+                    <p className="text-xs text-muted-foreground truncate">{q.specialty}</p>
+                    <p className="text-sm text-foreground line-clamp-2">{q.question_text}</p>
                   </div>
                   <Button
                     size="sm"
@@ -611,7 +611,7 @@ function DashboardProfissionalInner() {
             <DialogDescription>{answerModal.question?.patient_name}</DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="p-4 bg-gray-50 rounded-xl text-sm text-gray-700">
+            <div className="p-4 bg-muted/50 rounded-xl text-sm text-foreground">
               {answerModal.question?.question_text}
             </div>
             <Textarea

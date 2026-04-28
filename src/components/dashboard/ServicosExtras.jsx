@@ -70,22 +70,22 @@ export default function ServicosExtras({ professional, onAtender }) {
   ), [patientContext?.patientSummaries]);
 
   return (
-    <div className="overflow-hidden rounded-xl border-0 bg-white shadow-sm">
-      <div className="flex items-center justify-between border-b border-gray-50 px-5 py-4">
-        <h3 className="flex items-center gap-2 text-base font-semibold text-gray-900">
+    <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+      <div className="flex items-center justify-between border-b border-border px-5 py-4">
+        <h3 className="flex items-center gap-2 text-base font-semibold text-foreground">
           <ClipboardList className="h-4 w-4 text-emerald-500" />
           Servicos Extras
         </h3>
         <Badge className="bg-emerald-100 text-emerald-700">{visibleSolicitacoes.length}</Badge>
       </div>
 
-      <div className="max-h-96 divide-y divide-gray-50 overflow-y-auto">
+      <div className="max-h-96 divide-y divide-border overflow-y-auto">
         {isLoading || loadingPatients ? (
           <div className="flex justify-center px-5 py-6">
-            <Loader2 className="h-5 w-5 animate-spin text-gray-400" />
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
           </div>
         ) : visibleSolicitacoes.length === 0 ? (
-          <p className="px-5 py-6 text-center text-sm text-gray-400">Nenhuma solicitacao pendente</p>
+          <p className="px-5 py-6 text-center text-sm text-muted-foreground">Nenhuma solicitacao pendente</p>
         ) : (
           visibleSolicitacoes.map((solicitacao) => {
             const patient = patientLookup[solicitacao.paciente_id] || null;
@@ -102,8 +102,8 @@ export default function ServicosExtras({ professional, onAtender }) {
               <div key={solicitacao.id} className="space-y-2 px-5 py-3">
                 <div className="flex items-center justify-between gap-2">
                   <div className="flex min-w-0 items-center gap-2">
-                    <User className="h-4 w-4 shrink-0 text-gray-400" />
-                    <span className="truncate text-sm font-medium text-gray-800">{patientName}</span>
+                    <User className="h-4 w-4 shrink-0 text-muted-foreground" />
+                    <span className="truncate text-sm font-medium text-foreground">{patientName}</span>
                   </div>
 
                   <Badge
@@ -118,7 +118,7 @@ export default function ServicosExtras({ professional, onAtender }) {
                   </Badge>
                 </div>
 
-                <div className="space-y-1 text-xs text-gray-500">
+                <div className="space-y-1 text-xs text-muted-foreground">
                   {solicitacao.tipo === 'renovacao_receitas' ? (
                     <>
                       <p>Medicamento: {mergedSolicitacao.nome_medicamento || 'Nao informado'}</p>
@@ -151,7 +151,7 @@ export default function ServicosExtras({ professional, onAtender }) {
                 </div>
 
                 <div className="flex items-center justify-between gap-3">
-                  <span className="text-xs text-gray-400">
+                  <span className="text-xs text-muted-foreground">
                     {solicitacao.created_date ? format(new Date(solicitacao.created_date), 'dd/MM/yyyy HH:mm') : ''}
                   </span>
                   <Button

@@ -8,14 +8,14 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 
 const STATUS_MAP = {
-  pending:       { label: 'Pendente',     cls: 'bg-amber-100 text-amber-700' },
-  SOLICITADO:    { label: 'Solicitado',   cls: 'bg-amber-100 text-amber-700' },
-  accepted:      { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
-  confirmed:     { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
-  CONFIRMADO:    { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700' },
-  in_progress:   { label: 'Em andamento', cls: 'bg-blue-100 text-blue-700' },
-  em_atendimento:{ label: 'Em andamento', cls: 'bg-blue-100 text-blue-700' },
-  aguardando:    { label: 'Aguardando',   cls: 'bg-amber-100 text-amber-700' },
+  pending:       { label: 'Pendente',     cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  SOLICITADO:    { label: 'Solicitado',   cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  accepted:      { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  confirmed:     { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  CONFIRMADO:    { label: 'Confirmada',   cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  in_progress:   { label: 'Em andamento', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
+  em_atendimento:{ label: 'Em andamento', cls: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
+  aguardando:    { label: 'Aguardando',   cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
 };
 
 // Tipos que aparecem em "Próximas" — plantão NUNCA aparece aqui
@@ -76,9 +76,9 @@ export default function UpcomingAppointments({ appointments, onStart }) {
   };
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
+    <Card className="border-border shadow-sm bg-card">
       <CardHeader className="pb-3">
-        <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+        <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
           <Calendar className="w-4 h-4 text-indigo-500" />
           Próximas Consultas
         </CardTitle>
@@ -86,26 +86,26 @@ export default function UpcomingAppointments({ appointments, onStart }) {
       <CardContent className="p-0">
         {upcoming.length === 0 ? (
           <div className="px-6 pb-6 text-center">
-            <p className="text-sm text-gray-400">Nenhuma consulta agendada</p>
+            <p className="text-sm text-muted-foreground">Nenhuma consulta agendada</p>
           </div>
         ) : (
-          <div className="divide-y divide-gray-50">
+          <div className="divide-y divide-border">
             {upcoming.map(a => {
-              const st = STATUS_MAP[a.status] || { label: a.status, cls: 'bg-gray-100 text-gray-600' };
+              const st = STATUS_MAP[a.status] || { label: a.status, cls: 'bg-muted text-muted-foreground' };
               const showStart = canStart(a);
               const tipo = a.appointment_type || a.tipo_consulta;
               return (
                 <div key={a.id} className="px-5 py-3 flex items-center justify-between gap-3">
                   <div className="min-w-0 flex-1">
-                    <p className="text-sm font-medium text-gray-900 truncate">{a.patient_name || a.paciente_nome}</p>
-                    <div className="flex items-center gap-2 text-xs text-gray-400 mt-0.5">
+                    <p className="text-sm font-medium text-foreground truncate">{a.patient_name || a.paciente_nome}</p>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground mt-0.5">
                       <Clock className="w-3 h-3" />
                       {formatApptDate(a)}
-                      {tipo && <span className="text-gray-300">·</span>}
-                      {tipo && <span className="text-gray-400">{TIPO_LABELS[tipo] || tipo}</span>}
+                      {tipo && <span className="text-border">·</span>}
+                      {tipo && <span className="text-muted-foreground">{TIPO_LABELS[tipo] || tipo}</span>}
                     </div>
                     {(a.symptoms || a.descricao_sintomas) && (
-                      <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-0.5 mt-1 truncate">
+                      <p className="text-xs text-amber-700 bg-amber-50 rounded px-2 py-0.5 mt-1 truncate dark:bg-amber-950/30 dark:text-amber-300">
                         {a.symptoms || a.descricao_sintomas}
                       </p>
                     )}

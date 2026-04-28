@@ -91,8 +91,8 @@ function PlanoCard({ plano, index }) {
       <Card
         className={`relative h-full border-0 transition-all duration-300 hover:-translate-y-1 ${
           plano.destaque
-            ? 'shadow-lg ring-2 ring-emerald-500 bg-gradient-to-b from-white to-emerald-50/40'
-            : 'shadow-sm hover:shadow-md bg-white'
+            ? 'shadow-lg ring-2 ring-emerald-500 bg-gradient-to-b from-white to-emerald-50/40 dark:from-card dark:to-emerald-950/30'
+            : 'shadow-sm hover:shadow-md bg-card'
         }`}
       >
         {plano.destaque && (
@@ -111,36 +111,36 @@ function PlanoCard({ plano, index }) {
               className={`w-12 h-12 rounded-xl flex items-center justify-center shrink-0 ${
                 plano.destaque
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-emerald-50 text-emerald-600'
+                  : 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300'
               }`}
             >
               <Icone className="w-6 h-6" />
             </div>
             <div className="min-w-0">
-              <h3 className="text-xl font-bold text-gray-900 leading-tight">
+              <h3 className="text-xl font-bold text-foreground leading-tight">
                 {plano.nome}
               </h3>
-              <p className="text-xs text-gray-500 uppercase tracking-wide">
+              <p className="text-xs text-muted-foreground uppercase tracking-wide">
                 Plano de fidelidade
               </p>
             </div>
           </div>
 
           {/* Descrição */}
-          <p className="text-sm text-gray-600 leading-relaxed mb-6">
+          <p className="text-sm text-muted-foreground leading-relaxed mb-6">
             {plano.descricao}
           </p>
 
           {/* Preço */}
           <div className="mb-6">
             <div className="flex items-baseline gap-1">
-              <span className="text-sm font-medium text-gray-500">R$</span>
-              <span className="text-4xl font-bold text-gray-900 tracking-tight">
+              <span className="text-sm font-medium text-muted-foreground">R$</span>
+              <span className="text-4xl font-bold text-foreground tracking-tight">
                 {formatPreco(plano.preco)}
               </span>
-              <span className="text-sm text-gray-500">/{plano.periodo}</span>
+              <span className="text-sm text-muted-foreground">/{plano.periodo}</span>
             </div>
-            <p className="text-xs text-gray-500 mt-1">
+            <p className="text-xs text-muted-foreground mt-1">
               Cobrado mensalmente · Cancele quando quiser
             </p>
           </div>
@@ -148,8 +148,8 @@ function PlanoCard({ plano, index }) {
           {/* Benefícios */}
           <ul className="space-y-3 mb-8 flex-1">
             {plano.beneficios.map((b) => (
-              <li key={b} className="flex items-start gap-2 text-sm text-gray-700">
-                <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0">
+              <li key={b} className="flex items-start gap-2 text-sm text-foreground">
+                <span className="mt-0.5 w-5 h-5 rounded-full bg-emerald-100 text-emerald-600 flex items-center justify-center shrink-0 dark:bg-emerald-950/40 dark:text-emerald-300">
                   <Check className="w-3 h-3" strokeWidth={3} />
                 </span>
                 <span className="leading-relaxed">{b}</span>
@@ -162,7 +162,7 @@ function PlanoCard({ plano, index }) {
             className={`w-full h-11 ${
               plano.destaque
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
-                : 'bg-gray-900 hover:bg-gray-800 text-white'
+                : 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-700 dark:hover:bg-emerald-600'
             }`}
             onClick={(e) => e.preventDefault()}
           >
@@ -210,17 +210,17 @@ function FormularioEmpresas() {
   };
 
   return (
-    <Card className="border-0 shadow-sm">
+    <Card className="border border-border shadow-sm">
       <CardContent className="p-6 lg:p-8">
         <div className="flex items-start gap-3 mb-6">
-          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0">
+          <div className="w-12 h-12 rounded-xl bg-emerald-50 text-emerald-600 flex items-center justify-center shrink-0 dark:bg-emerald-950/40 dark:text-emerald-300">
             <Building2 className="w-6 h-6" />
           </div>
           <div>
-            <h3 className="text-xl font-bold text-gray-900">
+            <h3 className="text-xl font-bold text-foreground">
               Planos personalizados para sua empresa
             </h3>
-            <p className="text-sm text-gray-600 mt-1">
+            <p className="text-sm text-muted-foreground mt-1">
               Conte um pouco sobre sua empresa e nossa equipe comercial irá
               preparar uma proposta sob medida.
             </p>
@@ -298,7 +298,7 @@ function FormularioEmpresas() {
           </div>
 
           <div className="md:col-span-2 flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3 pt-2">
-            <div className="flex items-center gap-2 text-xs text-gray-500">
+            <div className="flex items-center gap-2 text-xs text-muted-foreground">
               <ShieldCheck className="w-4 h-4 text-emerald-600" />
               Seus dados são tratados com segurança e confidencialidade.
             </div>
@@ -322,22 +322,22 @@ function FormularioEmpresas() {
 // ============================================================
 export default function Planos() {
   return (
-    <div className="min-h-screen bg-gray-50">
+    <div className="min-h-screen bg-background">
       {/* Hero */}
-      <section className="bg-gradient-to-b from-white to-gray-50 border-b border-gray-100">
+      <section className="bg-gradient-to-b from-white to-gray-50 border-b border-border dark:from-card dark:to-background">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 lg:py-16">
           <motion.div
             initial={{ opacity: 0, y: 12 }}
             animate={{ opacity: 1, y: 0 }}
             className="max-w-3xl"
           >
-            <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50">
+            <Badge variant="outline" className="mb-4 border-emerald-200 text-emerald-700 bg-emerald-50 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-300">
               Programa de fidelidade
             </Badge>
-            <h1 className="text-3xl lg:text-5xl font-bold text-gray-900 tracking-tight mb-4">
+            <h1 className="text-3xl lg:text-5xl font-bold text-foreground tracking-tight mb-4">
               Planos pensados para o seu cuidado contínuo
             </h1>
-            <p className="text-base lg:text-lg text-gray-600 leading-relaxed">
+            <p className="text-base lg:text-lg text-muted-foreground leading-relaxed">
               Escolha o plano ideal para você, para sua família ou para sua empresa
               e tenha acesso aos melhores profissionais de saúde quando precisar.
             </p>
@@ -361,7 +361,7 @@ export default function Planos() {
               ))}
             </div>
 
-            <p className="text-center text-xs text-gray-500 mt-8">
+            <p className="text-center text-xs text-muted-foreground mt-8">
               Os valores e benefícios apresentados são ilustrativos e podem ser
               ajustados antes da contratação.
             </p>

@@ -9,7 +9,7 @@ function QRCode({ url, size = 200 }) {
     <img
       src={`https://api.qrserver.com/v1/create-qr-code/?size=${size}x${size}&data=${encoded}&bgcolor=ffffff&color=065f46&margin=10`}
       alt="QR Code do perfil"
-      className="rounded-xl border border-gray-200"
+      className="rounded-xl border border-border bg-white"
       width={size}
       height={size}
     />
@@ -63,7 +63,7 @@ export default function ProfileShare({ professional, profileUrl }) {
         variant="outline"
         size="sm"
         onClick={() => setOpen(true)}
-        className="gap-2 border-gray-200 text-gray-700 hover:bg-gray-50"
+        className="gap-2 border-border text-foreground hover:bg-muted"
       >
         <Share2 className="w-4 h-4" />
         <span className="hidden sm:inline">Compartilhar</span>
@@ -73,13 +73,13 @@ export default function ProfileShare({ professional, profileUrl }) {
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm" onClick={() => setOpen(false)}>
-      <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm p-6 relative" onClick={e => e.stopPropagation()}>
-        <button onClick={() => setOpen(false)} className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-gray-100">
-          <X className="w-4 h-4 text-gray-500" />
+      <div className="bg-card text-card-foreground border border-border rounded-2xl shadow-2xl w-full max-w-sm p-6 relative" onClick={e => e.stopPropagation()}>
+        <button onClick={() => setOpen(false)} className="absolute top-4 right-4 p-1.5 rounded-lg hover:bg-muted">
+          <X className="w-4 h-4 text-muted-foreground" />
         </button>
 
-        <h2 className="text-lg font-semibold text-gray-900 mb-1">Compartilhar Perfil</h2>
-        <p className="text-sm text-gray-500 mb-5">{prefix}{name}</p>
+        <h2 className="text-lg font-semibold text-foreground mb-1">Compartilhar Perfil</h2>
+        <p className="text-sm text-muted-foreground mb-5">{prefix}{name}</p>
 
         {/* QR Code */}
         <div className="flex justify-center mb-5">
@@ -88,7 +88,7 @@ export default function ProfileShare({ professional, profileUrl }) {
 
         {/* URL copy */}
         <div className="flex gap-2 mb-5">
-          <div className="flex-1 px-3 py-2 bg-gray-50 border border-gray-200 rounded-lg text-xs text-gray-600 truncate">
+          <div className="flex-1 px-3 py-2 bg-muted/60 border border-border rounded-lg text-xs text-muted-foreground truncate">
             {url}
           </div>
           <Button size="sm" variant="outline" onClick={handleCopy} className="shrink-0 gap-1">
@@ -99,17 +99,17 @@ export default function ProfileShare({ professional, profileUrl }) {
 
         {/* Share buttons */}
         <div className="grid grid-cols-2 gap-2">
-          <Button variant="outline" onClick={handleWhatsApp} className="gap-2 text-green-700 border-green-200 hover:bg-green-50">
+          <Button variant="outline" onClick={handleWhatsApp} className="gap-2 text-green-700 border-green-200 hover:bg-green-50 dark:text-green-300 dark:border-green-900/60 dark:hover:bg-green-950/30">
             <MessageCircle className="w-4 h-4" />
             WhatsApp
           </Button>
-          <Button variant="outline" onClick={handlePrint} className="gap-2 text-gray-700 border-gray-200 hover:bg-gray-50">
+          <Button variant="outline" onClick={handlePrint} className="gap-2 text-foreground border-border hover:bg-muted">
             <Printer className="w-4 h-4" />
             Imprimir QR
           </Button>
         </div>
 
-        <p className="text-center text-xs text-gray-400 mt-4">
+        <p className="text-center text-xs text-muted-foreground mt-4">
           Compartilhe este link ou imprima o QR Code para seu consultório
         </p>
       </div>

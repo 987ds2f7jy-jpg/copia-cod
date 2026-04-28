@@ -10,29 +10,29 @@ export default function ProfileSidebar({ professional }) {
   return (
     <div className="space-y-4 sticky top-24">
       {/* Booking */}
-      <div className="bg-white rounded-2xl shadow-sm p-5">
-        <h3 className="font-semibold text-gray-900 mb-4 flex items-center gap-2">
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-5">
+        <h3 className="font-semibold text-foreground mb-4 flex items-center gap-2">
           <Calendar className="w-4 h-4 text-emerald-600" />
           Agendar Consulta
         </h3>
 
         {professional.price_standard && (
-          <div className="p-3 rounded-xl bg-gray-50 mb-2">
+          <div className="p-3 rounded-xl bg-muted/50 mb-2">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Padrão</span>
+              <span className="text-sm text-muted-foreground">Padrão</span>
               <span className="font-bold text-emerald-700">{fmt(professional.price_standard)}</span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">Agendamento para data futura</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Agendamento para data futura</p>
           </div>
         )}
 
         {professional.price_priority && (
-          <div className="p-3 rounded-xl bg-amber-50 mb-4">
+          <div className="p-3 rounded-xl bg-amber-50 mb-4 dark:bg-amber-950/30">
             <div className="flex justify-between items-center">
-              <span className="text-sm text-gray-600">Prioritária</span>
-              <span className="font-bold text-amber-700">{fmt(professional.price_priority)}</span>
+              <span className="text-sm text-muted-foreground">Prioritária</span>
+              <span className="font-bold text-amber-700 dark:text-amber-300">{fmt(professional.price_priority)}</span>
             </div>
-            <p className="text-xs text-gray-400 mt-0.5">Atendimento em até 24h</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Atendimento em até 24h</p>
           </div>
         )}
 
@@ -45,7 +45,7 @@ export default function ProfileSidebar({ professional }) {
 
         {professional.is_on_duty && (
           <Link to={createPageUrl('ConsultaAgora')} className="block mt-2">
-            <Button variant="outline" className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 gap-2">
+            <Button variant="outline" className="w-full h-11 border-amber-200 text-amber-700 hover:bg-amber-50 gap-2 dark:border-amber-900/60 dark:text-amber-300 dark:hover:bg-amber-950/30">
               <Zap className="w-4 h-4" />
               Entrar na Fila (Plantão)
             </Button>
@@ -54,16 +54,16 @@ export default function ProfileSidebar({ professional }) {
       </div>
 
       {/* Trust badges */}
-      <div className="bg-white rounded-2xl shadow-sm p-5 space-y-3">
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-5 space-y-3">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Shield className="w-5 h-5 text-emerald-500 shrink-0" />
           <span>Profissional verificado pela plataforma</span>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <DollarSign className="w-5 h-5 text-emerald-500 shrink-0" />
           <span>Pagamento seguro e criptografado</span>
         </div>
-        <div className="flex items-center gap-3 text-sm text-gray-600">
+        <div className="flex items-center gap-3 text-sm text-muted-foreground">
           <Calendar className="w-5 h-5 text-emerald-500 shrink-0" />
           <span>Cancele sem taxa com 24h de antecedência</span>
         </div>

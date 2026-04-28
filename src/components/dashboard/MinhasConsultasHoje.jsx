@@ -10,16 +10,16 @@ import { Label } from "@/components/ui/label";
 import { Video, XCircle, Loader2, Clock, Play } from 'lucide-react';
 
 const STATUS_CONFIG = {
-  CONFIRMADO: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
-  SOLICITADO: { label: 'Aguardando', className: 'bg-amber-100 text-amber-700' },
-  CANCELADO: { label: 'Cancelado', className: 'bg-red-100 text-red-700' },
-  CONCLUIDO: { label: 'Concluido', className: 'bg-gray-100 text-gray-700' },
-  accepted: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
-  confirmed: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700' },
-  pending: { label: 'Pendente', className: 'bg-amber-100 text-amber-700' },
-  completed: { label: 'Concluido', className: 'bg-gray-100 text-gray-700' },
-  cancelled: { label: 'Cancelado', className: 'bg-red-100 text-red-700' },
-  in_progress: { label: 'Em andamento', className: 'bg-blue-100 text-blue-700' },
+  CONFIRMADO: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  SOLICITADO: { label: 'Aguardando', className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  CANCELADO: { label: 'Cancelado', className: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' },
+  CONCLUIDO: { label: 'Concluido', className: 'bg-muted text-muted-foreground' },
+  accepted: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  confirmed: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
+  pending: { label: 'Pendente', className: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
+  completed: { label: 'Concluido', className: 'bg-muted text-muted-foreground' },
+  cancelled: { label: 'Cancelado', className: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300' },
+  in_progress: { label: 'Em andamento', className: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300' },
 };
 
 const TYPE_LABELS = {
@@ -82,7 +82,7 @@ export default function MinhasConsultasHoje({ appointments }) {
     },
   });
 
-  const statusCfg = (status) => STATUS_CONFIG[status] || { label: status, className: 'bg-gray-100 text-gray-600' };
+  const statusCfg = (status) => STATUS_CONFIG[status] || { label: status, className: 'bg-muted text-muted-foreground' };
   const timeOf = (appt) => {
     if (appt.scheduled_datetime) {
       return appt.scheduled_datetime.substring(11, 16);
@@ -93,18 +93,18 @@ export default function MinhasConsultasHoje({ appointments }) {
 
   return (
     <>
-      <div className="bg-white rounded-xl shadow-sm overflow-hidden">
-        <div className="px-5 py-4 border-b border-gray-50 flex items-center justify-between">
-          <h3 className="text-base font-semibold text-gray-900 flex items-center gap-2">
+      <div className="bg-card rounded-xl border border-border shadow-sm overflow-hidden">
+        <div className="px-5 py-4 border-b border-border flex items-center justify-between">
+          <h3 className="text-base font-semibold text-foreground flex items-center gap-2">
             <Clock className="w-4 h-4 text-emerald-500" />
             Minhas Consultas Hoje
           </h3>
           <Badge className="bg-emerald-100 text-emerald-700">{todayAppts.length}</Badge>
         </div>
 
-        <div className="divide-y divide-gray-50 max-h-96 overflow-y-auto">
+        <div className="divide-y divide-border max-h-96 overflow-y-auto">
           {todayAppts.length === 0 ? (
-            <p className="px-5 py-8 text-sm text-gray-400 text-center">
+            <p className="px-5 py-8 text-sm text-muted-foreground text-center">
               Nenhuma consulta agendada para hoje.
             </p>
           ) : todayAppts.map((appt) => {
@@ -117,7 +117,7 @@ export default function MinhasConsultasHoje({ appointments }) {
                 <div className="flex items-start justify-between gap-3">
                   <div className="flex-1 min-w-0">
                     <div className="flex items-center gap-2 mb-1">
-                      <span className="text-sm font-semibold text-gray-700">{timeOf(appt)}</span>
+                      <span className="text-sm font-semibold text-foreground">{timeOf(appt)}</span>
                       <Badge className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
                       {appt.appointment_type && (
                         <Badge variant="outline" className="text-xs">
@@ -125,8 +125,8 @@ export default function MinhasConsultasHoje({ appointments }) {
                         </Badge>
                       )}
                     </div>
-                    <p className="text-sm font-medium text-gray-900">{appt.patient_name || 'Paciente'}</p>
-                    <p className="text-xs text-gray-400 mt-0.5">{appt.specialty}</p>
+                    <p className="text-sm font-medium text-foreground">{appt.patient_name || 'Paciente'}</p>
+                    <p className="text-xs text-muted-foreground mt-0.5">{appt.specialty}</p>
                     {appt.cancellation_reason && (
                       <p className="text-xs text-red-500 mt-1">Motivo: {appt.cancellation_reason}</p>
                     )}
@@ -153,7 +153,7 @@ export default function MinhasConsultasHoje({ appointments }) {
                       <Button
                         size="sm"
                         variant="outline"
-                        className="text-red-600 border-red-200 text-xs h-7 px-2 gap-1"
+                        className="text-red-600 border-red-200 text-xs h-7 px-2 gap-1 dark:border-red-900/60 dark:text-red-300"
                         onClick={() => setCancelModal({ open: true, appointment: appt })}
                       >
                         <XCircle className="w-3.5 h-3.5" /> Cancelar
@@ -176,9 +176,9 @@ export default function MinhasConsultasHoje({ appointments }) {
             </DialogDescription>
           </DialogHeader>
           <div className="space-y-4 mt-2">
-            <div className="p-3 bg-gray-50 rounded-xl text-sm">
+            <div className="p-3 bg-muted/50 rounded-xl text-sm">
               <p className="font-medium">{cancelModal.appointment?.patient_name}</p>
-              <p className="text-gray-500">
+              <p className="text-muted-foreground">
                 {cancelModal.appointment?.specialty} · {cancelModal.appointment?.scheduled_datetime?.substring(11, 16) || cancelModal.appointment?.time}
               </p>
             </div>

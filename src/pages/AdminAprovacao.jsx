@@ -12,11 +12,11 @@ import { mapAdminActionToStatuses } from '@/lib/professionals';
 import { getAdminApprovalQueueRequest, reviewProfessionalApplicationRequest } from '@/client-api/professionalDashboard';
 
 const STATUS_COLORS = {
-  pending_review: 'bg-amber-100 text-amber-700',
-  approved: 'bg-emerald-100 text-emerald-700',
-  rejected: 'bg-red-100 text-red-700',
-  suspended: 'bg-orange-100 text-orange-700',
-  pending: 'bg-amber-100 text-amber-700',
+  pending_review: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
+  approved: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300',
+  rejected: 'bg-red-100 text-red-700 dark:bg-red-950/40 dark:text-red-300',
+  suspended: 'bg-orange-100 text-orange-700 dark:bg-orange-950/40 dark:text-orange-300',
+  pending: 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300',
 };
 
 const STATUS_LABELS = {
@@ -67,11 +67,11 @@ export default function AdminAprovacao() {
 
   if (user?.role !== 'admin') {
     return (
-      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+      <div className="min-h-screen bg-background flex items-center justify-center">
         <div className="text-center">
-          <Shield className="w-16 h-16 text-gray-300 mx-auto mb-4" />
-          <h2 className="text-xl font-semibold text-gray-900">Acesso Restrito</h2>
-          <p className="text-gray-500 mt-2">Esta pagina e exclusiva para administradores.</p>
+          <Shield className="w-16 h-16 text-muted-foreground/40 mx-auto mb-4" />
+          <h2 className="text-xl font-semibold text-foreground">Acesso Restrito</h2>
+          <p className="text-muted-foreground mt-2">Esta pagina e exclusiva para administradores.</p>
         </div>
       </div>
     );
@@ -81,11 +81,11 @@ export default function AdminAprovacao() {
   const pendingCount = profiles.filter((profile) => ['pending_review', 'pending'].includes(profile.status)).length;
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-6xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="mb-8">
-          <h1 className="text-3xl font-bold text-gray-900 mb-1">Aprovacao de Profissionais</h1>
-          <p className="text-gray-500">Gerencie o cadastro dos profissionais na plataforma</p>
+          <h1 className="text-3xl font-bold text-foreground mb-1">Aprovacao de Profissionais</h1>
+          <p className="text-muted-foreground">Gerencie o cadastro dos profissionais na plataforma</p>
         </div>
 
         <div className="flex gap-2 mb-6 flex-wrap">
@@ -102,13 +102,13 @@ export default function AdminAprovacao() {
               className={`px-4 py-2 rounded-xl text-sm font-medium transition-colors flex items-center gap-2 ${
                 filterStatus === filter.key
                   ? 'bg-emerald-600 text-white'
-                  : 'bg-white text-gray-600 hover:bg-gray-100 border border-gray-200'
+                  : 'bg-card text-muted-foreground hover:bg-muted border border-border'
               }`}
             >
               {filter.label}
               {filter.count !== null && filter.count > 0 && (
                 <span className={`text-xs px-1.5 py-0.5 rounded-full font-semibold ${
-                  filterStatus === filter.key ? 'bg-white/20' : 'bg-amber-100 text-amber-700'
+                  filterStatus === filter.key ? 'bg-white/20' : 'bg-amber-100 text-amber-700 dark:bg-amber-950/40 dark:text-amber-300'
                 }`}
                 >
                   {filter.count}
@@ -123,11 +123,11 @@ export default function AdminAprovacao() {
             <Loader2 className="w-8 h-8 animate-spin text-emerald-600" />
           </div>
         ) : profiles.length === 0 ? (
-          <Card className="border-0 shadow-sm">
+          <Card className="border border-border shadow-sm">
             <CardContent className="p-12 text-center">
-              <CheckCircle className="w-16 h-16 text-gray-200 mx-auto mb-4" />
-              <h3 className="text-lg font-medium text-gray-700">Nenhum cadastro neste status</h3>
-              <p className="text-gray-400 text-sm mt-1">Novos cadastros aparecerao aqui para analise</p>
+              <CheckCircle className="w-16 h-16 text-muted-foreground/30 mx-auto mb-4" />
+              <h3 className="text-lg font-medium text-foreground">Nenhum cadastro neste status</h3>
+              <p className="text-muted-foreground text-sm mt-1">Novos cadastros aparecerao aqui para analise</p>
             </CardContent>
           </Card>
         ) : (
@@ -137,51 +137,51 @@ export default function AdminAprovacao() {
               const isPending = ['pending_review', 'pending'].includes(pub.status);
 
               return (
-                <Card key={pub.id} className="border-0 shadow-sm">
+                <Card key={pub.id} className="border border-border shadow-sm">
                   <CardContent className="p-5">
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-gray-100 shrink-0">
+                      <div className="w-16 h-16 rounded-xl overflow-hidden bg-muted shrink-0">
                         {pub.photo_url
                           ? <img src={pub.photo_url} alt={pub.full_name} className="w-full h-full object-cover" />
-                          : <div className="w-full h-full flex items-center justify-center text-gray-400 font-bold text-xl">{pub.full_name?.[0]}</div>}
+                          : <div className="w-full h-full flex items-center justify-center text-muted-foreground font-bold text-xl">{pub.full_name?.[0]}</div>}
                       </div>
 
                       <div className="flex-1 min-w-0">
                         <div className="flex flex-wrap items-start justify-between gap-2 mb-2">
                           <div>
-                            <h3 className="font-semibold text-gray-900 text-lg">
+                            <h3 className="font-semibold text-foreground text-lg">
                               {pub.profession === 'Medicina' ? 'Dr(a). ' : ''}{pub.full_name}
                             </h3>
                             <div className="flex flex-wrap gap-2 mt-1">
                               <Badge variant="outline" className="text-xs">{pub.profession}</Badge>
                               <Badge variant="outline" className="text-xs">{pub.specialty}</Badge>
-                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[pub.status] || 'bg-gray-100 text-gray-600'}`}>
+                              <span className={`text-xs px-2 py-0.5 rounded-full font-medium ${STATUS_COLORS[pub.status] || 'bg-muted text-muted-foreground'}`}>
                                 {STATUS_LABELS[pub.status] || pub.status}
                               </span>
                             </div>
                           </div>
                           <Link to={createPageUrl(`PerfilProfissional?id=${pub.id}`)}>
-                            <button className="flex items-center gap-1 text-xs text-gray-500 hover:text-emerald-600">
+                            <button className="flex items-center gap-1 text-xs text-muted-foreground hover:text-emerald-600 dark:hover:text-emerald-300">
                               <Eye className="w-3.5 h-3.5" />
                               Ver perfil
                             </button>
                           </Link>
                         </div>
 
-                        <div className="grid sm:grid-cols-3 gap-3 text-sm text-gray-600 mb-3">
+                        <div className="grid sm:grid-cols-3 gap-3 text-sm text-muted-foreground mb-3">
                           <div>
-                            <p className="text-xs text-gray-400">Registro</p>
+                            <p className="text-xs text-muted-foreground">Registro</p>
                             <p className="font-medium">{pub.register_number}/{pub.register_state}</p>
                           </div>
                           {priv?.university && (
                             <div>
-                              <p className="text-xs text-gray-400">Universidade</p>
+                              <p className="text-xs text-muted-foreground">Universidade</p>
                               <p className="font-medium">{priv.university}</p>
                             </div>
                           )}
                           {priv?.diploma_url && (
                             <div>
-                              <p className="text-xs text-gray-400">Diploma</p>
+                              <p className="text-xs text-muted-foreground">Diploma</p>
                               <a
                                 href={priv.diploma_url}
                                 target="_blank"
@@ -195,7 +195,7 @@ export default function AdminAprovacao() {
                         </div>
 
                         {pub.bio && (
-                          <p className="text-sm text-gray-500 mb-3 line-clamp-2">{pub.bio}</p>
+                          <p className="text-sm text-muted-foreground mb-3 line-clamp-2">{pub.bio}</p>
                         )}
 
                         {isPending && (
@@ -214,7 +214,7 @@ export default function AdminAprovacao() {
                               variant="outline"
                               onClick={() => approvePublicMutation.mutate({ publicProfileId: pub.id, privateProfileId: pub.professional_profile_id, action: 'reject' })}
                               disabled={approvePublicMutation.isPending}
-                              className="text-red-600 border-red-200 hover:bg-red-50 gap-1.5"
+                              className="text-red-600 border-red-200 hover:bg-red-50 gap-1.5 dark:text-red-300 dark:border-red-900/60 dark:hover:bg-red-950/30"
                             >
                               <XCircle className="w-3.5 h-3.5" />
                               Rejeitar
@@ -226,7 +226,7 @@ export default function AdminAprovacao() {
                             size="sm"
                             variant="outline"
                             onClick={() => approvePublicMutation.mutate({ publicProfileId: pub.id, privateProfileId: pub.professional_profile_id, action: 'suspend' })}
-                            className="text-orange-600 border-orange-200 hover:bg-orange-50"
+                            className="text-orange-600 border-orange-200 hover:bg-orange-50 dark:text-orange-300 dark:border-orange-900/60 dark:hover:bg-orange-950/30"
                           >
                             Suspender
                           </Button>

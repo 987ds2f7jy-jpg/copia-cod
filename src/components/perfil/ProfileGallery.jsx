@@ -11,9 +11,9 @@ export default function ProfileGallery({ gallery_urls }) {
 
   return (
     <>
-      <div className="bg-white rounded-2xl shadow-sm p-6">
-        <h2 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
-          <Images className="w-5 h-5 text-gray-500" />
+      <div className="bg-card rounded-2xl border border-border shadow-sm p-6">
+        <h2 className="text-lg font-semibold text-foreground mb-4 flex items-center gap-2">
+          <Images className="w-5 h-5 text-muted-foreground" />
           Galeria
         </h2>
         <div className="grid grid-cols-3 sm:grid-cols-4 gap-2">
@@ -21,7 +21,7 @@ export default function ProfileGallery({ gallery_urls }) {
             <button
               key={i}
               onClick={() => setLightbox(i)}
-              className="aspect-square rounded-xl overflow-hidden bg-gray-100 hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-emerald-500"
+              className="aspect-square rounded-xl overflow-hidden bg-muted hover:opacity-90 transition-opacity focus:outline-none focus:ring-2 focus:ring-emerald-500"
             >
               <img src={url} alt={`Foto ${i + 1}`} className="w-full h-full object-cover" />
             </button>

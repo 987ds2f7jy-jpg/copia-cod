@@ -234,14 +234,14 @@ export default function CadastroProfissional() {
   const nextStep = () => setStep(s => s + 1);
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8">
+    <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 py-8 dark:from-slate-950 dark:via-background dark:to-emerald-950/30">
       <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
         <div className="text-center mb-8">
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl bg-emerald-600 mb-4">
             <Stethoscope className="w-8 h-8 text-white" />
           </div>
-          <h1 className="text-3xl font-bold text-gray-900 mb-2">Cadastro de Profissional</h1>
-          <p className="text-gray-600">Junte-se à nossa rede de especialistas</p>
+          <h1 className="text-3xl font-bold text-foreground mb-2">Cadastro de Profissional</h1>
+          <p className="text-muted-foreground">Junte-se à nossa rede de especialistas</p>
         </div>
 
         {!isSuccess && (
@@ -250,11 +250,11 @@ export default function CadastroProfissional() {
               {Array.from({ length: totalSteps }, (_, i) => i + 1).map((i) => (
                 <React.Fragment key={i}>
                   <div className={`w-8 h-8 rounded-full flex items-center justify-center text-sm font-medium transition-colors ${
-                    step >= i ? 'bg-emerald-500 text-white' : 'bg-gray-200 text-gray-500'
+                    step >= i ? 'bg-emerald-500 text-white' : 'bg-muted text-muted-foreground'
                   }`}>
                     {step > i ? <CheckCircle className="w-4 h-4" /> : i}
                   </div>
-                  {i < totalSteps && <div className={`flex-1 max-w-[32px] h-1 ${step > i ? 'bg-emerald-500' : 'bg-gray-200'}`} />}
+                  {i < totalSteps && <div className={`flex-1 max-w-[32px] h-1 ${step > i ? 'bg-emerald-500' : 'bg-muted'}`} />}
                 </React.Fragment>
               ))}
             </div>
@@ -265,7 +265,7 @@ export default function CadastroProfissional() {
 
           {/* ── Step: Credentials (not logged in) ── */}
           {isCredentials && (
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardHeader><CardTitle>Criar sua Conta</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -276,7 +276,7 @@ export default function CadastroProfissional() {
                   <Label htmlFor="professional-password">Senha (mínimo 6 caracteres)</Label>
                   <Input id="professional-password" type="password" value={password} onChange={e => setPassword(e.target.value)} placeholder="••••••••" className="mt-1" />
                 </div>
-                <p className="text-sm text-gray-500">
+                <p className="text-sm text-muted-foreground">
                   Já tem conta?{' '}
                   <Link to={createPageUrl('Entrar')} className="text-emerald-600 underline">Entrar</Link>
                 </p>
@@ -291,7 +291,7 @@ export default function CadastroProfissional() {
 
           {/* ── Step: Basic Info ── */}
           {isBasicInfo && (
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardHeader><CardTitle className="flex items-center gap-2"><GraduationCap className="w-5 h-5 text-emerald-600" />Dados Pessoais e Profissionais</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -387,7 +387,7 @@ export default function CadastroProfissional() {
 
           {/* ── Step: Formation & Registration ── */}
           {isFormation && (
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardHeader><CardTitle className="flex items-center gap-2"><Award className="w-5 h-5 text-emerald-600" />Formação e Registro</CardTitle></CardHeader>
               <CardContent className="space-y-4">
                 <div>
@@ -413,7 +413,7 @@ export default function CadastroProfissional() {
                 </div>
                 <div>
                   <Label>Upload do Diploma <span className="text-red-500">*</span></Label>
-                  <div className="mt-1 border-2 border-dashed border-gray-300 rounded-xl p-4 text-center">
+                  <div className="mt-1 border-2 border-dashed border-border rounded-xl p-4 text-center bg-muted/30">
                     {formData.diploma_url ? (
                       <div className="flex items-center justify-center gap-2 text-emerald-600">
                         <CheckCircle className="w-5 h-5" />
@@ -422,7 +422,7 @@ export default function CadastroProfissional() {
                     ) : (
                       <label className="cursor-pointer">
                         <input type="file" accept=".pdf,.jpg,.jpeg,.png" className="hidden" onChange={handleDiplomaUpload} />
-                        <div className="flex flex-col items-center gap-2 text-gray-500">
+                        <div className="flex flex-col items-center gap-2 text-muted-foreground">
                           {uploading ? <Loader2 className="w-6 h-6 animate-spin" /> : <Upload className="w-6 h-6" />}
                           <span className="text-sm">{uploading ? 'Enviando...' : 'Clique para enviar (PDF, JPG, PNG)'}</span>
                         </div>
@@ -442,7 +442,7 @@ export default function CadastroProfissional() {
 
           {/* ── Step: Public Profile ── */}
           {isProfile && (
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardHeader><CardTitle className="flex items-center gap-2"><User className="w-5 h-5 text-emerald-600" />Perfil Público</CardTitle></CardHeader>
               <CardContent className="space-y-5">
 
@@ -456,13 +456,13 @@ export default function CadastroProfissional() {
                         <button onClick={() => { set('photo_url', ''); setPhotoPreviewUrl(''); }} className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-5 h-5 flex items-center justify-center text-xs">✕</button>
                       </div>
                     ) : (
-                      <label className="cursor-pointer w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center gap-1 hover:border-emerald-400 transition-colors">
+                      <label className="cursor-pointer w-20 h-20 rounded-xl border-2 border-dashed border-border bg-muted/30 flex flex-col items-center justify-center gap-1 hover:border-emerald-400 transition-colors">
                         <input type="file" accept="image/*" className="hidden" onChange={handlePhotoUpload} />
-                        {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin text-gray-400" /> : <Camera className="w-5 h-5 text-gray-400" />}
-                        <span className="text-xs text-gray-400">Upload</span>
+                        {uploadingPhoto ? <Loader2 className="w-5 h-5 animate-spin text-muted-foreground" /> : <Camera className="w-5 h-5 text-muted-foreground" />}
+                        <span className="text-xs text-muted-foreground">Upload</span>
                       </label>
                     )}
-                    <p className="text-sm text-gray-500">Foto clara, profissional, fundo neutro</p>
+                    <p className="text-sm text-muted-foreground">Foto clara, profissional, fundo neutro</p>
                   </div>
                 </div>
 
@@ -489,7 +489,7 @@ export default function CadastroProfissional() {
                         className={`px-3 py-1.5 rounded-full text-sm font-medium transition-all border ${
                           formData.patient_types.includes(type)
                             ? 'bg-emerald-500 text-white border-emerald-500'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'
+                            : 'bg-card text-muted-foreground border-border hover:border-emerald-400'
                         }`}
                       >
                         {type}
@@ -534,7 +534,7 @@ export default function CadastroProfissional() {
                         className={`flex-1 py-2 rounded-xl text-sm font-medium border transition-all ${
                           formData.modality === m.value
                             ? 'bg-emerald-500 text-white border-emerald-500'
-                            : 'bg-white text-gray-600 border-gray-300 hover:border-emerald-400'
+                            : 'bg-card text-muted-foreground border-border hover:border-emerald-400'
                         }`}
                       >
                         {m.label}
@@ -545,7 +545,7 @@ export default function CadastroProfissional() {
 
                 {/* Office address (optional) */}
                 {(formData.modality === 'presencial' || formData.modality === 'ambos') && (
-                  <div className="space-y-3 p-4 bg-gray-50 rounded-xl">
+                  <div className="space-y-3 p-4 bg-muted/50 rounded-xl border border-border">
                     <Label className="flex items-center gap-1"><MapPin className="w-3 h-3" />Endereço do consultório</Label>
                     <Input value={formData.office_address} onChange={e => set('office_address', e.target.value)} placeholder="Rua, número, bairro" />
                     <div className="grid grid-cols-2 gap-2">
@@ -565,15 +565,15 @@ export default function CadastroProfissional() {
                         <button onClick={() => removeGalleryImage(i)} className="absolute -top-1 -right-1 bg-red-500 text-white rounded-full w-4 h-4 flex items-center justify-center text-xs">✕</button>
                       </div>
                     ))}
-                    <label className="cursor-pointer w-16 h-16 rounded-lg border-2 border-dashed border-gray-300 flex items-center justify-center hover:border-emerald-400 transition-colors">
+                    <label className="cursor-pointer w-16 h-16 rounded-lg border-2 border-dashed border-border bg-muted/30 flex items-center justify-center hover:border-emerald-400 transition-colors">
                       <input type="file" accept="image/*" multiple className="hidden" onChange={handleGalleryUpload} />
-                      {uploadingGallery ? <Loader2 className="w-4 h-4 animate-spin text-gray-400" /> : <Plus className="w-4 h-4 text-gray-400" />}
+                      {uploadingGallery ? <Loader2 className="w-4 h-4 animate-spin text-muted-foreground" /> : <Plus className="w-4 h-4 text-muted-foreground" />}
                     </label>
                   </div>
                 </div>
 
                 {createProfessional.isError && (
-                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2">
+                  <div className="text-sm text-red-600 bg-red-50 border border-red-200 rounded-lg px-3 py-2 mb-2 dark:border-red-900/60 dark:bg-red-950/30 dark:text-red-300">
                     {createProfessional.error?.message || 'Erro ao enviar cadastro.'}
                   </div>
                 )}
@@ -590,16 +590,16 @@ export default function CadastroProfissional() {
 
           {/* ── Success ── */}
           {isSuccess && (
-            <Card className="border-0 shadow-md">
+            <Card className="border border-border shadow-md">
               <CardContent className="p-8 text-center">
-                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
+                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 dark:bg-emerald-950/40">
                   <CheckCircle className="w-10 h-10 text-emerald-600" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Cadastro Enviado!</h2>
-                <p className="text-gray-600 mb-4">Seu perfil está em análise pela nossa equipe.</p>
-                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left mb-6">
-                  <p className="text-sm text-amber-800 font-medium mb-1">⚠️ Próximo passo importante</p>
-                  <p className="text-sm text-amber-700">
+                <h2 className="text-2xl font-bold text-foreground mb-2">Cadastro Enviado!</h2>
+                <p className="text-muted-foreground mb-4">Seu perfil está em análise pela nossa equipe.</p>
+                <div className="p-4 bg-amber-50 border border-amber-200 rounded-xl text-left mb-6 dark:bg-amber-950/30 dark:border-amber-900/60">
+                  <p className="text-sm text-amber-800 font-medium mb-1 dark:text-amber-200">⚠️ Próximo passo importante</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300">
                     Para ativar seu perfil e aparecer nas buscas, acesse o <strong>Dashboard</strong> em <strong>"Meu Perfil"</strong>, complete seus dados (disponibilidade e valores), e ative seu perfil manualmente.
                   </p>
                 </div>

@@ -108,10 +108,10 @@ function AgendamentoEspecialidadeInner() {
   // Guard after hooks
   if (user?.role === 'professional') {
     return (
-      <div className="min-h-screen bg-gray-50 flex flex-col items-center justify-center px-4 text-center gap-4">
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 text-center gap-4">
         <AlertCircle className="w-14 h-14 text-amber-400" />
-        <h2 className="text-xl font-semibold text-gray-900">Ação não permitida</h2>
-        <p className="text-gray-500 max-w-sm">
+        <h2 className="text-xl font-semibold text-foreground">Ação não permitida</h2>
+        <p className="text-muted-foreground max-w-sm">
           Para agendar uma consulta, crie ou utilize uma conta de paciente.
         </p>
         <Button onClick={() => navigate(createPageUrl('Home'))} variant="outline">Voltar ao início</Button>
@@ -137,12 +137,12 @@ function AgendamentoEspecialidadeInner() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-50 py-8">
+    <div className="min-h-screen bg-background py-8">
       <div className="max-w-2xl mx-auto px-4">
 
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900">Agendamento por Especialidade</h1>
-          <p className="text-gray-500 text-sm mt-1">
+          <h1 className="text-2xl font-bold text-foreground">Agendamento por Especialidade</h1>
+          <p className="text-muted-foreground text-sm mt-1">
             Sua solicitação será enviada a profissionais disponíveis da especialidade escolhida.
           </p>
         </div>
@@ -156,16 +156,16 @@ function AgendamentoEspecialidadeInner() {
                 const Icon = prof.icon;
                 return (
                   <button key={prof.id} onClick={() => handleSelectProfession(prof)} className="w-full text-left">
-                    <Card className="border-0 shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer">
+                    <Card className="border-border shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5 cursor-pointer">
                       <CardContent className="p-5 flex items-center gap-4">
                         <div className={`w-14 h-14 rounded-xl ${prof.color} flex items-center justify-center flex-shrink-0`}>
                           <Icon className="w-7 h-7 text-white" />
                         </div>
                         <div>
-                          <h3 className="font-semibold text-gray-900">{prof.name}</h3>
-                          <p className="text-sm text-gray-500">{prof.description}</p>
+                          <h3 className="font-semibold text-foreground">{prof.name}</h3>
+                          <p className="text-sm text-muted-foreground">{prof.description}</p>
                         </div>
-                        <ArrowRight className="w-5 h-5 text-gray-300 ml-auto" />
+                        <ArrowRight className="w-5 h-5 text-muted-foreground ml-auto" />
                       </CardContent>
                     </Card>
                   </button>
@@ -176,7 +176,7 @@ function AgendamentoEspecialidadeInner() {
 
           {/* Step 2: Subespecialidades */}
           {step === 2 && selectedProfession && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardHeader>
                 <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-1" onClick={() => setStep(1)}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
@@ -189,7 +189,7 @@ function AgendamentoEspecialidadeInner() {
                     <button
                       key={spec}
                       onClick={() => { setSelectedSpecialty(spec); setStep(3); }}
-                      className="p-3 rounded-xl bg-gray-50 hover:bg-emerald-50 hover:text-emerald-700 text-left text-sm font-medium text-gray-700 transition-colors border border-transparent hover:border-emerald-200"
+                      className="p-3 rounded-xl bg-muted/40 hover:bg-emerald-50 hover:text-emerald-700 text-left text-sm font-medium text-foreground transition-colors border border-transparent hover:border-emerald-200 dark:hover:bg-emerald-500/10 dark:hover:text-emerald-300 dark:hover:border-emerald-800"
                     >
                       {spec}
                     </button>
@@ -201,7 +201,7 @@ function AgendamentoEspecialidadeInner() {
 
           {/* Step 3: Data e Hora */}
           {step === 3 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardHeader>
                 <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-1"
                   onClick={() => setStep(selectedProfession?.specialties.length === 1 ? 1 : 2)}>
@@ -209,9 +209,9 @@ function AgendamentoEspecialidadeInner() {
                 </Button>
                 <CardTitle>Escolha data e horário</CardTitle>
                 <div className="flex items-center gap-2">
-                  <Badge className="bg-emerald-100 text-emerald-700 text-xs">{selectedSpecialty}</Badge>
+                  <Badge className="bg-emerald-100 text-emerald-700 text-xs dark:bg-emerald-500/15 dark:text-emerald-300">{selectedSpecialty}</Badge>
                 </div>
-                <p className="text-sm text-gray-500 mt-1">
+                <p className="text-sm text-muted-foreground mt-1">
                   36h até 14 dias à frente · 08:00–17:40 · Slots de 20min
                 </p>
               </CardHeader>
@@ -235,7 +235,7 @@ function AgendamentoEspecialidadeInner() {
                         : 'Selecione uma data primeiro'}
                     </Label>
                     {selectedDate && availableSlots.length === 0 && (
-                      <p className="text-sm text-gray-500">Nenhum horário disponível nesta data.</p>
+                      <p className="text-sm text-muted-foreground">Nenhum horário disponível nesta data.</p>
                     )}
                     <div className="grid grid-cols-2 gap-2 max-h-64 overflow-y-auto pr-1">
                       {availableSlots.map((slot) => (
@@ -243,7 +243,7 @@ function AgendamentoEspecialidadeInner() {
                           key={slot}
                           onClick={() => setSelectedTime(slot)}
                           className={`p-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
-                            selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+                            selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-muted hover:bg-accent text-foreground'
                           }`}
                         >
                           <Clock className="w-3.5 h-3.5" />{slot}
@@ -267,7 +267,7 @@ function AgendamentoEspecialidadeInner() {
 
           {/* Step 4: Confirmar */}
           {step === 4 && (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardHeader>
                 <Button variant="ghost" size="sm" className="w-fit -ml-2 mb-1" onClick={() => setStep(3)}>
                   <ArrowLeft className="w-4 h-4 mr-1" /> Voltar
@@ -275,34 +275,34 @@ function AgendamentoEspecialidadeInner() {
                 <CardTitle>Confirmar solicitação</CardTitle>
               </CardHeader>
               <CardContent>
-                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4">
-                  <p className="text-sm text-blue-800 font-medium mb-1">Como funciona?</p>
-                  <p className="text-sm text-blue-700">
+                <div className="p-4 bg-blue-50 border border-blue-100 rounded-xl mb-4 dark:border-blue-900/60 dark:bg-blue-950/35">
+                  <p className="text-sm text-blue-800 font-medium mb-1 dark:text-blue-200">Como funciona?</p>
+                  <p className="text-sm text-blue-700 dark:text-blue-300">
                     Sua solicitação será enviada para profissionais de <strong>{selectedSpecialty}</strong>.
                     O primeiro que aceitar ficará responsável pelo seu atendimento.
                   </p>
                 </div>
 
-                <div className="p-4 bg-gray-50 rounded-xl mb-4 space-y-2 text-sm">
+                <div className="p-4 bg-muted/40 rounded-xl mb-4 space-y-2 text-sm">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Especialidade</span>
+                    <span className="text-muted-foreground">Especialidade</span>
                     <span className="font-medium">{selectedSpecialty}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Data</span>
+                    <span className="text-muted-foreground">Data</span>
                     <span className="font-medium">{selectedDate && format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Horário</span>
+                    <span className="text-muted-foreground">Horário</span>
                     <span className="font-medium">{selectedTime}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Status inicial</span>
-                    <Badge className="bg-amber-100 text-amber-700">Aguardando aceite</Badge>
+                    <span className="text-muted-foreground">Status inicial</span>
+                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Aguardando aceite</Badge>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Valor oficial</span>
-                    <span className="font-semibold text-emerald-600">
+                    <span className="text-muted-foreground">Valor oficial</span>
+                    <span className="font-semibold text-emerald-600 dark:text-emerald-300">
                       {quoteLoading
                         ? 'Carregando...'
                         : serviceQuote?.grossPrice
@@ -313,7 +313,7 @@ function AgendamentoEspecialidadeInner() {
                 </div>
 
                 {quoteError && (
-                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                  <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
                   </div>
@@ -330,7 +330,7 @@ function AgendamentoEspecialidadeInner() {
                 </div>
 
                 {submitError && (
-                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2">
+                  <div className="mt-3 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     {submitError}
                   </div>
@@ -372,30 +372,30 @@ function AgendamentoEspecialidadeInner() {
                 onContinue={() => navigate(createPageUrl('DashboardPaciente'))}
               />
             ) : (
-            <Card className="border-0 shadow-sm">
+            <Card className="border-border shadow-sm">
               <CardContent className="p-8 text-center">
-                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6">
-                  <CheckCircle className="w-10 h-10 text-emerald-600" />
+                <div className="w-20 h-20 rounded-full bg-emerald-100 flex items-center justify-center mx-auto mb-6 dark:bg-emerald-500/15">
+                  <CheckCircle className="w-10 h-10 text-emerald-600 dark:text-emerald-300" />
                 </div>
-                <h2 className="text-2xl font-bold text-gray-900 mb-2">Solicitação Enviada!</h2>
-                <p className="text-gray-500 mb-2">
+                <h2 className="text-2xl font-bold text-foreground mb-2">Solicitação Enviada!</h2>
+                <p className="text-muted-foreground mb-2">
                   Sua solicitação foi enviada para profissionais de <strong>{selectedSpecialty}</strong>.
                 </p>
-                <p className="text-sm text-gray-400 mb-6">
+                <p className="text-sm text-muted-foreground mb-6">
                   Você será notificado quando um profissional aceitar o atendimento.
                 </p>
-                <div className="p-4 bg-gray-50 rounded-xl text-left mb-6 text-sm space-y-2">
+                <div className="p-4 bg-muted/40 rounded-xl text-left mb-6 text-sm space-y-2">
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Data</span>
+                    <span className="text-muted-foreground">Data</span>
                     <span className="font-medium">{selectedDate && format(selectedDate, "dd 'de' MMMM, yyyy", { locale: ptBR })}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Horário</span>
+                    <span className="text-muted-foreground">Horário</span>
                     <span className="font-medium">{selectedTime}</span>
                   </div>
                   <div className="flex justify-between">
-                    <span className="text-gray-500">Status</span>
-                    <Badge className="bg-amber-100 text-amber-700">Aguardando aceite</Badge>
+                    <span className="text-muted-foreground">Status</span>
+                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Aguardando aceite</Badge>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-center">

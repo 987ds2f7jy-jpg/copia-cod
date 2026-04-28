@@ -27,17 +27,17 @@ export default function FinancialWidget({ appointments, professionalId }) {
   const allTime = appointments.filter(a => a.status === 'completed').reduce((s, a) => s + (a.price || 0), 0);
 
   const rows = [
-    { label: 'Receita disponível', value: fmt(net), icon: CheckCircle, cls: 'text-emerald-600 bg-emerald-50' },
-    { label: 'Receita pendente', value: fmt(revenuePending), icon: Clock, cls: 'text-amber-600 bg-amber-50' },
-    { label: 'Taxa plataforma (est. 15%)', value: fmt(platformFee), icon: DollarSign, cls: 'text-red-500 bg-red-50' },
-    { label: 'Receita acumulada', value: fmt(allTime), icon: TrendingUp, cls: 'text-indigo-600 bg-indigo-50' },
+    { label: 'Receita disponível', value: fmt(net), icon: CheckCircle, cls: 'text-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 dark:text-emerald-300' },
+    { label: 'Receita pendente', value: fmt(revenuePending), icon: Clock, cls: 'text-amber-600 bg-amber-50 dark:bg-amber-950/40 dark:text-amber-300' },
+    { label: 'Taxa plataforma (est. 15%)', value: fmt(platformFee), icon: DollarSign, cls: 'text-red-500 bg-red-50 dark:bg-red-950/40 dark:text-red-300' },
+    { label: 'Receita acumulada', value: fmt(allTime), icon: TrendingUp, cls: 'text-indigo-600 bg-indigo-50 dark:bg-indigo-950/40 dark:text-indigo-300' },
   ];
 
   return (
-    <Card className="border-0 shadow-sm bg-white">
+    <Card className="border-border shadow-sm bg-card">
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
-          <CardTitle className="text-base font-semibold text-gray-900 flex items-center gap-2">
+          <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
             <DollarSign className="w-4 h-4 text-emerald-600" />
             Financeiro do Mês
           </CardTitle>
@@ -55,14 +55,14 @@ export default function FinancialWidget({ appointments, professionalId }) {
       </CardHeader>
       <CardContent className="space-y-2">
         {rows.map(row => (
-          <div key={row.label} className="flex items-center justify-between p-3 rounded-xl bg-gray-50">
+          <div key={row.label} className="flex items-center justify-between p-3 rounded-xl bg-muted/50">
             <div className="flex items-center gap-2">
               <div className={`w-7 h-7 rounded-lg ${row.cls} flex items-center justify-center`}>
                 <row.icon className="w-3.5 h-3.5" />
               </div>
-              <span className="text-xs text-gray-500">{row.label}</span>
+              <span className="text-xs text-muted-foreground">{row.label}</span>
             </div>
-            <span className="text-sm font-semibold text-gray-900">{row.value}</span>
+            <span className="text-sm font-semibold text-foreground">{row.value}</span>
           </div>
         ))}
       </CardContent>

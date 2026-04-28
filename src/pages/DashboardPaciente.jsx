@@ -121,17 +121,17 @@ function DashboardPacienteInner() {
 
   const getStatusBadge = (status) => {
     const styles = {
-      SOLICITADO: 'bg-amber-100 text-amber-700',
-      CONFIRMADO: 'bg-emerald-100 text-emerald-700',
-      CANCELADO: 'bg-red-100 text-red-700',
-      CONCLUIDO: 'bg-gray-100 text-gray-700',
-      EXPIRADO: 'bg-gray-100 text-gray-500',
-      accepted: 'bg-emerald-100 text-emerald-700',
-      pending: 'bg-amber-100 text-amber-700',
-      confirmed: 'bg-emerald-100 text-emerald-700',
-      in_progress: 'bg-blue-100 text-blue-700',
-      completed: 'bg-gray-100 text-gray-700',
-      cancelled: 'bg-red-100 text-red-700',
+      SOLICITADO: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+      CONFIRMADO: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+      CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
+      CONCLUIDO: 'bg-muted text-muted-foreground',
+      EXPIRADO: 'bg-muted text-muted-foreground',
+      accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+      pending: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
+      confirmed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
+      in_progress: 'bg-blue-100 text-blue-700 dark:bg-blue-950/50 dark:text-blue-300',
+      completed: 'bg-muted text-muted-foreground',
+      cancelled: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
     };
     const labels = {
       SOLICITADO: 'Aguardando especialista',
@@ -146,7 +146,7 @@ function DashboardPacienteInner() {
       completed: 'Concluída',
       cancelled: 'Cancelada',
     };
-    return <Badge className={styles[status] || 'bg-gray-100 text-gray-600'}>{labels[status] || status}</Badge>;
+    return <Badge className={styles[status] || 'bg-muted text-muted-foreground'}>{labels[status] || status}</Badge>;
   };
 
   const getTypeLabel = (type) => {
@@ -184,7 +184,7 @@ function DashboardPacienteInner() {
   };
 
   const AppointmentCard = ({ appointment, showActions = true }) => (
-    <Card className="border-0 shadow-sm hover:shadow-md transition-shadow bg-card">
+    <Card className="border-border shadow-sm hover:shadow-md transition-shadow bg-card">
       <CardContent className="p-6">
         <div className="flex flex-col sm:flex-row gap-4">
           <div className="w-16 h-16 rounded-xl bg-emerald-100 dark:bg-emerald-900/40 flex items-center justify-center flex-shrink-0">
@@ -220,7 +220,7 @@ function DashboardPacienteInner() {
 
             {/* Status contextual */}
             {appointment.status === 'SOLICITADO' && (
-              <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5">
+              <div className="mt-2 flex items-center gap-1.5 text-xs text-amber-700 bg-amber-50 rounded-lg px-3 py-1.5 dark:bg-amber-950/30 dark:text-amber-300">
                 <AlertCircle className="w-3.5 h-3.5" />
                 Aguardando aceite de um especialista
               </div>
@@ -303,40 +303,40 @@ function DashboardPacienteInner() {
         {/* Quick Actions */}
         <div className="grid sm:grid-cols-3 gap-4 mb-8">
           <Link to={createPageUrl('ConsultaAgora')}>
-            <Card className="border-0 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
+            <Card className="border-border shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-emerald-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-emerald-100 dark:bg-emerald-950/40 flex items-center justify-center">
                   <Clock className="w-6 h-6 text-emerald-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Consulta Agora</p>
-                  <p className="text-xs text-gray-500">Atendimento imediato</p>
+                  <p className="font-medium text-foreground">Consulta Agora</p>
+                  <p className="text-xs text-muted-foreground">Atendimento imediato</p>
                 </div>
               </CardContent>
             </Card>
           </Link>
           <Link to={createPageUrl('AgendamentoEspecialidade')}>
-            <Card className="border-0 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
+            <Card className="border-border shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-blue-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-blue-100 dark:bg-blue-950/40 flex items-center justify-center">
                   <Calendar className="w-6 h-6 text-blue-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Agendar</p>
-                  <p className="text-xs text-gray-500">Nova consulta</p>
+                  <p className="font-medium text-foreground">Agendar</p>
+                  <p className="text-xs text-muted-foreground">Nova consulta</p>
                 </div>
               </CardContent>
             </Card>
           </Link>
           <Link to={createPageUrl('PergunteEspecialista')}>
-            <Card className="border-0 shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
+            <Card className="border-border shadow-sm hover:shadow-md transition-all hover:-translate-y-1 cursor-pointer">
               <CardContent className="p-4 flex items-center gap-3">
-                <div className="w-12 h-12 rounded-xl bg-purple-100 flex items-center justify-center">
+                <div className="w-12 h-12 rounded-xl bg-purple-100 dark:bg-purple-950/40 flex items-center justify-center">
                   <MessageSquare className="w-6 h-6 text-purple-600" />
                 </div>
                 <div>
-                  <p className="font-medium text-gray-900">Perguntar</p>
-                  <p className="text-xs text-gray-500">Tire dúvidas</p>
+                  <p className="font-medium text-foreground">Perguntar</p>
+                  <p className="text-xs text-muted-foreground">Tire dúvidas</p>
                 </div>
               </CardContent>
             </Card>
@@ -361,13 +361,13 @@ function DashboardPacienteInner() {
             {isLoading ? (
               <div className="space-y-4">
                 {[1, 2].map((i) => (
-                  <Card key={i} className="border-0 shadow-sm animate-pulse">
+                  <Card key={i} className="border-border shadow-sm animate-pulse">
                     <CardContent className="p-6">
                       <div className="flex gap-4">
-                        <div className="w-16 h-16 bg-gray-200 rounded-xl" />
+                        <div className="w-16 h-16 bg-muted rounded-xl" />
                         <div className="flex-1 space-y-3">
-                          <div className="h-5 bg-gray-200 rounded w-1/3" />
-                          <div className="h-4 bg-gray-200 rounded w-1/4" />
+                          <div className="h-5 bg-muted rounded w-1/3" />
+                          <div className="h-4 bg-muted rounded w-1/4" />
                         </div>
                       </div>
                     </CardContent>
@@ -375,13 +375,13 @@ function DashboardPacienteInner() {
                 ))}
               </div>
             ) : upcomingAppointments.length === 0 ? (
-              <Card className="border-0 shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-12 text-center">
-                  <Calendar className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <h3 className="font-semibold text-gray-900 mb-2">
+                  <Calendar className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                  <h3 className="font-semibold text-foreground mb-2">
                     Nenhuma consulta agendada
                   </h3>
-                  <p className="text-gray-500 mb-4">
+                  <p className="text-muted-foreground mb-4">
                     Agende uma consulta com um de nossos especialistas
                   </p>
                   <Link to={createPageUrl('AgendamentoEspecialidade')}>
@@ -410,10 +410,10 @@ function DashboardPacienteInner() {
 
           <TabsContent value="historico">
             {pastAppointments.length === 0 ? (
-              <Card className="border-0 shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-12 text-center">
-                  <Clock className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">Nenhuma consulta no histórico</p>
+                  <Clock className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhuma consulta no histórico</p>
                 </CardContent>
               </Card>
             ) : (
@@ -427,10 +427,10 @@ function DashboardPacienteInner() {
 
           <TabsContent value="canceladas">
             {cancelledAppointments.length === 0 ? (
-              <Card className="border-0 shadow-sm">
+              <Card className="border-border shadow-sm">
                 <CardContent className="p-12 text-center">
-                  <XCircle className="w-12 h-12 text-gray-300 mx-auto mb-3" />
-                  <p className="text-gray-500">Nenhuma consulta cancelada</p>
+                  <XCircle className="w-12 h-12 text-muted-foreground/50 mx-auto mb-3" />
+                  <p className="text-muted-foreground">Nenhuma consulta cancelada</p>
                 </CardContent>
               </Card>
             ) : (
@@ -467,7 +467,7 @@ function DashboardPacienteInner() {
                         className={`w-8 h-8 transition-colors ${
                           star <= reviewData.rating 
                             ? 'fill-yellow-400 text-yellow-400' 
-                            : 'text-gray-300'
+                            : 'text-muted-foreground/40'
                         }`}
                       />
                     </button>
