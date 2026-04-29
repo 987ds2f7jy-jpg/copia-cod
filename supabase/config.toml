@@ -137,3 +137,6 @@ verify_jwt = false
 
 [functions.zoom-token]
 verify_jwt = false
+
+[functions.zoom-webhook]
+verify_jwt = false
