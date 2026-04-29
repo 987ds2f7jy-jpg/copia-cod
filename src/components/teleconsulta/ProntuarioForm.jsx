@@ -158,7 +158,7 @@ export default function ProntuarioForm({
         </div>
       ) : null}
 
-      <div className="flex gap-1 rounded-lg bg-gray-800 p-1">
+      <div className="flex gap-1 rounded-lg bg-muted p-1 dark:bg-gray-800">
         {['completo', 'simples'].map((value) => (
           <button
             key={value}
@@ -166,7 +166,7 @@ export default function ProntuarioForm({
             onClick={() => updateModo(value)}
             disabled={!canEdit}
             className={`flex-1 rounded-md py-1.5 text-xs font-medium capitalize transition-colors ${
-              modo === value ? 'bg-emerald-600 text-white' : 'text-gray-400 hover:text-gray-200'
+              modo === value ? 'bg-emerald-600 text-white' : 'text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-gray-200'
             } ${!canEdit ? 'cursor-not-allowed opacity-60' : ''}`}
           >
             {value}
@@ -176,7 +176,7 @@ export default function ProntuarioForm({
 
       {campos.map(({ key, label, required }) => (
         <div key={key}>
-          <Label className="mb-1 block text-xs text-gray-300">
+          <Label className="mb-1 block text-xs text-foreground dark:text-gray-300">
             {label} {required && <span className="text-red-400">*</span>}
           </Label>
           <Textarea
@@ -187,7 +187,7 @@ export default function ProntuarioForm({
             }}
             placeholder={label}
             disabled={!canEdit}
-            className="min-h-[60px] resize-none border-gray-700 bg-gray-800 text-xs text-gray-100 placeholder:text-gray-500"
+            className="min-h-[60px] resize-none border-border bg-background text-xs text-foreground placeholder:text-muted-foreground dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
             rows={2}
           />
         </div>

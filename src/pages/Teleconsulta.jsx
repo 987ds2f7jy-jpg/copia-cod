@@ -392,15 +392,15 @@ function TeleconsultaInner({ consultationId }) {
 
   if (teleconsultaQuery.isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-gray-900">
-        <Loader2 className="h-8 w-8 animate-spin text-white" />
+      <div className="flex min-h-screen items-center justify-center bg-background dark:bg-gray-900">
+        <Loader2 className="h-8 w-8 animate-spin text-emerald-600 dark:text-white" />
       </div>
     );
   }
 
   if (!consulta) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-900 px-4 text-center text-white">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center text-foreground dark:bg-gray-900 dark:text-white">
         <AlertCircle className="h-12 w-12 text-red-400" />
         <p className="text-lg">{teleconsultaQuery.error?.message || 'Consulta nao encontrada'}</p>
         <Button variant="outline" onClick={() => navigate(-1)}>
@@ -412,10 +412,10 @@ function TeleconsultaInner({ consultationId }) {
 
   if (!isParticipant) {
     return (
-      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-900 px-4 text-center text-white">
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center text-foreground dark:bg-gray-900 dark:text-white">
         <AlertCircle className="h-12 w-12 text-red-400" />
         <h2 className="text-xl font-bold">Acesso restrito</h2>
-        <p className="max-w-md text-gray-400">
+        <p className="max-w-md text-muted-foreground dark:text-gray-400">
           Apenas paciente e profissional vinculados a esta consulta podem acessar esta teleconsulta.
         </p>
         <Button variant="outline" onClick={() => navigate('/')}>
@@ -430,13 +430,13 @@ function TeleconsultaInner({ consultationId }) {
 
     return (
       <>
-        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-gray-900 px-4 text-center text-white">
+        <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center text-foreground dark:bg-gray-900 dark:text-white">
           <div className="flex h-16 w-16 items-center justify-center rounded-full bg-emerald-500/20">
             <Video className="h-8 w-8 text-emerald-400" />
           </div>
 
           <h2 className="text-xl font-bold">Consulta encerrada</h2>
-          <p className="text-gray-400">
+          <p className="text-muted-foreground dark:text-gray-400">
             Duracao: {consulta.durationMinutes != null ? `${consulta.durationMinutes} min` : '-'}
           </p>
 
@@ -479,34 +479,34 @@ function TeleconsultaInner({ consultationId }) {
 
   return (
     <>
-      <div className="flex min-h-screen flex-col bg-gray-950">
-        <div className="flex items-center justify-between border-b border-gray-800 bg-gray-900 px-4 py-3">
+      <div className="flex min-h-screen flex-col bg-background dark:bg-gray-950">
+        <div className="flex items-center justify-between border-b border-border bg-card px-4 py-3 dark:border-gray-800 dark:bg-gray-900">
           <div className="flex items-center gap-3">
             <Button
               variant="ghost"
               size="icon"
-              className="text-gray-400 hover:text-white"
+              className="text-muted-foreground hover:text-foreground dark:text-gray-400 dark:hover:text-white"
               onClick={() => navigate(-1)}
             >
               <ChevronLeft className="h-5 w-5" />
             </Button>
 
             <div>
-              <p className="text-sm font-medium text-white">{nomeOutro || 'Consulta'}</p>
+              <p className="text-sm font-medium text-foreground dark:text-white">{nomeOutro || 'Consulta'}</p>
               <div className="flex items-center gap-2">
                 <Badge className="bg-emerald-500/20 text-xs text-emerald-400">
                   {tipoLabels[consulta.consultationType] || consulta.consultationType || 'Teleconsulta'}
                 </Badge>
 
                 {consulta.startedAt && (
-                  <span className="flex items-center gap-1 text-xs text-gray-400">
+                  <span className="flex items-center gap-1 text-xs text-muted-foreground dark:text-gray-400">
                     <Clock className="h-3 w-3" />
                     {format(new Date(consulta.startedAt), 'HH:mm', { locale: ptBR })}
                   </span>
                 )}
 
                 {zoomSession.sessionName && (
-                  <span className="rounded-full bg-gray-800 px-2 py-0.5 text-[11px] text-gray-400">
+                  <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] text-muted-foreground dark:bg-gray-800 dark:text-gray-400">
                     Sala segura
                   </span>
                 )}
@@ -514,7 +514,7 @@ function TeleconsultaInner({ consultationId }) {
             </div>
           </div>
 
-          <Badge className={consulta.status === 'em_atendimento' ? 'animate-pulse bg-green-500/20 text-green-400' : 'bg-gray-700 text-gray-300'}>
+          <Badge className={consulta.status === 'em_atendimento' ? 'animate-pulse bg-green-500/20 text-green-500 dark:text-green-400' : 'bg-muted text-muted-foreground dark:bg-gray-700 dark:text-gray-300'}>
             {renderConsultationStatus(consulta.status)}
           </Badge>
         </div>
@@ -522,7 +522,7 @@ function TeleconsultaInner({ consultationId }) {
         <div className="relative flex flex-1 flex-col overflow-hidden lg:flex-row">
           <div className="relative z-0 flex min-h-[360px] min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4 pb-5 lg:min-h-0">
             {(needsSessionInitialization || startConsulta.isPending) && (
-              <div className="rounded-xl border border-amber-500/20 bg-amber-500/10 px-4 py-3 text-sm text-amber-100">
+              <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
                 {startConsulta.isPending
                   ? 'Preparando a sala segura e registrando o inicio da consulta...'
                   : 'Inicializando a sessao clinica segura no backend...'}
@@ -530,22 +530,22 @@ function TeleconsultaInner({ consultationId }) {
             )}
 
             {isPaciente && !isZoomRoomReady && !startConsulta.isPending && (
-              <div className="rounded-xl border border-sky-500/20 bg-sky-500/10 px-4 py-3 text-sm text-sky-100">
+              <div className="rounded-xl border border-sky-500/30 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
                 Aguardando o profissional iniciar a sala segura para liberar a videochamada.
               </div>
             )}
 
             {zoomSession.error && (
-              <div className="rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-3 text-sm text-red-100">
+              <div className="rounded-xl border border-red-500/30 bg-red-50 px-4 py-3 text-sm text-red-700 dark:border-red-500/20 dark:bg-red-500/10 dark:text-red-100">
                 <div className="flex items-start justify-between gap-3">
                   <div>
                     <p className="font-medium">Falha ao conectar a videochamada</p>
-                    <p className="mt-1 text-red-200/80">{zoomSession.error}</p>
+                    <p className="mt-1 text-red-600/80 dark:text-red-200/80">{zoomSession.error}</p>
                   </div>
                   <Button
                     variant="outline"
                     size="sm"
-                    className="border-red-300/20 text-white hover:bg-red-500/10"
+                    className="border-red-300/50 text-red-700 hover:bg-red-500/10 dark:border-red-300/20 dark:text-white"
                     onClick={() => void retryZoomJoin()}
                   >
                     Tentar novamente
@@ -607,16 +607,16 @@ function TeleconsultaInner({ consultationId }) {
             </div>
           </div>
 
-          <div className="relative z-10 isolate flex h-[36vh] min-h-[260px] min-w-0 max-h-[360px] flex-col border-t border-gray-800 bg-gray-900 lg:h-auto lg:max-h-none lg:w-96 lg:border-l lg:border-t-0">
+          <div className="relative z-10 isolate flex h-[36vh] min-h-[260px] min-w-0 max-h-[360px] flex-col border-t border-border bg-card lg:h-auto lg:max-h-none lg:w-96 lg:border-l lg:border-t-0 dark:border-gray-800 dark:bg-gray-900">
             <Tabs value={activeSidebarTab} onValueChange={setActiveSidebarTab} className="relative flex min-h-0 flex-1 flex-col overflow-hidden">
-              <TabsList className="m-2 shrink-0 rounded-lg bg-gray-800">
-                <TabsTrigger value="chat" className="flex-1 text-gray-300 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
+              <TabsList className="m-2 shrink-0 rounded-lg bg-muted dark:bg-gray-800">
+                <TabsTrigger value="chat" className="flex-1 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground dark:text-gray-300 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white">
                   <MessageSquare className="mr-1 h-4 w-4" />
                   Chat
                 </TabsTrigger>
 
                 {isProfissional && (
-                  <TabsTrigger value="prontuario" className="flex-1 text-gray-300 data-[state=active]:bg-gray-700 data-[state=active]:text-white">
+                  <TabsTrigger value="prontuario" className="flex-1 text-muted-foreground data-[state=active]:bg-background data-[state=active]:text-foreground dark:text-gray-300 dark:data-[state=active]:bg-gray-700 dark:data-[state=active]:text-white">
                     <FileText className="mr-1 h-4 w-4" />
                     Prontuario
                   </TabsTrigger>
@@ -635,12 +635,12 @@ function TeleconsultaInner({ consultationId }) {
 
               {isProfissional && activeSidebarTab === 'prontuario' && (
                 <div className="flex min-h-0 flex-1 flex-col overflow-hidden">
-                  <div className="relative z-10 shrink-0 border-b border-gray-800 bg-gray-900 px-3 py-3">
+                  <div className="relative z-10 shrink-0 border-b border-border bg-card px-3 py-3 dark:border-gray-800 dark:bg-gray-900">
                     <div className="space-y-3">
                       <Button
                         variant="outline"
                         size="sm"
-                        className="border-gray-600 text-xs text-gray-300 hover:bg-gray-700"
+                        className="border-border text-xs text-muted-foreground hover:bg-muted dark:border-gray-600 dark:text-gray-300 dark:hover:bg-gray-700"
                         onClick={() => setShowProntuariosAnt(true)}
                       >
                         <History className="mr-1 h-3.5 w-3.5" />
@@ -648,9 +648,9 @@ function TeleconsultaInner({ consultationId }) {
                       </Button>
 
                       {consulta.symptoms && (
-                        <div className="rounded-lg border border-amber-500/20 bg-amber-500/10 p-3">
-                          <p className="mb-1 text-xs font-medium text-amber-400">Sintomas do paciente</p>
-                          <p className="text-xs text-gray-300">{consulta.symptoms}</p>
+                        <div className="rounded-lg border border-amber-500/30 bg-amber-50 p-3 dark:border-amber-500/20 dark:bg-amber-500/10">
+                          <p className="mb-1 text-xs font-medium text-amber-700 dark:text-amber-400">Sintomas do paciente</p>
+                          <p className="text-xs text-foreground dark:text-gray-300">{consulta.symptoms}</p>
                         </div>
                       )}
 

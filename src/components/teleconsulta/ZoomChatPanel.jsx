@@ -38,11 +38,11 @@ export default function ZoomChatPanel({ messages, onSend, disabled = false }) {
   };
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full flex-col bg-card text-foreground dark:bg-gray-900 dark:text-white">
       <ScrollArea className="flex-1 min-h-0 px-3">
         <div className="space-y-3 py-3">
           {messages.length === 0 && (
-            <p className="mt-4 text-center text-xs text-gray-400">
+            <p className="mt-4 text-center text-xs text-muted-foreground dark:text-gray-400">
               O chat da consulta aparece aqui em tempo real.
             </p>
           )}
@@ -53,14 +53,14 @@ export default function ZoomChatPanel({ messages, onSend, disabled = false }) {
                 className={`max-w-[85%] rounded-2xl px-3 py-2 ${
                   message.isSelf
                     ? 'bg-emerald-600 text-white'
-                    : 'bg-gray-100 text-gray-800'
+                    : 'bg-muted text-foreground dark:bg-gray-100 dark:text-gray-800'
                 }`}
               >
                 {!message.isSelf && (
                   <p className="mb-1 text-xs font-medium opacity-70">{message.sender}</p>
                 )}
                 <p className="whitespace-pre-wrap text-sm leading-relaxed">{message.text}</p>
-                <p className={`mt-1 text-xs ${message.isSelf ? 'text-emerald-100' : 'text-gray-400'}`}>
+                <p className={`mt-1 text-xs ${message.isSelf ? 'text-emerald-100' : 'text-muted-foreground dark:text-gray-400'}`}>
                   {format(message.timestamp, 'HH:mm')}
                 </p>
               </div>
@@ -70,14 +70,14 @@ export default function ZoomChatPanel({ messages, onSend, disabled = false }) {
         </div>
       </ScrollArea>
 
-      <div className="border-t border-gray-100 p-3">
+      <div className="border-t border-border p-3 dark:border-gray-800">
         <div className="flex gap-2">
           <Textarea
             value={text}
             onChange={(event) => setText(event.target.value)}
             onKeyDown={handleKeyDown}
             placeholder="Digite uma mensagem... (Enter para enviar)"
-            className="min-h-[40px] resize-none text-sm max-h-24"
+            className="min-h-[40px] resize-none text-sm max-h-24 bg-background dark:border-gray-700 dark:bg-gray-800 dark:text-gray-100 dark:placeholder:text-gray-500"
             rows={1}
             disabled={disabled || isSending}
           />
