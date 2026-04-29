@@ -6,6 +6,7 @@ import { Badge } from "@/components/ui/badge";
 import { Calendar, Clock, Video } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import NetAmountBadge from './NetAmountBadge';
 
 const STATUS_MAP = {
   pending:       { label: 'Pendente',     cls: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300' },
@@ -110,7 +111,8 @@ export default function UpcomingAppointments({ appointments, onStart }) {
                       </p>
                     )}
                   </div>
-                  <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <NetAmountBadge amount={a.professional_net_amount} />
                     <Badge className={`text-xs ${st.cls}`}>{st.label}</Badge>
                     {showStart && (
                       <Button

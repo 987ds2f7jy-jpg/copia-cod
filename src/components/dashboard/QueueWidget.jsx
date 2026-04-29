@@ -23,6 +23,7 @@ import {
   Video,
 } from 'lucide-react';
 import { getLaudoAttachmentUrls } from '@/lib/solicitacoesExames';
+import NetAmountBadge from './NetAmountBadge';
 
 function formatFieldValue(value, fallback = 'Nao informado') {
   if (value === null || value === undefined) {
@@ -105,7 +106,10 @@ export default function QueueWidget({ queuePatients, onAccept, accepting }) {
 
                         <div className="min-w-0 space-y-2">
                           <div className="space-y-1">
-                            <p className="truncate text-sm font-semibold text-foreground">{patient.patient_name}</p>
+                            <div className="flex min-w-0 flex-wrap items-center gap-2">
+                              <p className="truncate text-sm font-semibold text-foreground">{patient.patient_name}</p>
+                              <NetAmountBadge amount={patient.quoted_professional_net_amount} />
+                            </div>
                             <div className="flex flex-wrap items-center gap-2">
                               {laudo ? (
                                 <>
@@ -188,6 +192,7 @@ export default function QueueWidget({ queuePatients, onAccept, accepting }) {
                   <Badge variant="outline" className="border-sky-200 text-sky-700">
                     {selectedLaudoInfo?.tipo_laudo || 'Tipo nao informado'}
                   </Badge>
+                  <NetAmountBadge amount={selectedPatient.quoted_professional_net_amount} />
                 </div>
                 <SheetTitle className="mt-2 text-xl text-foreground">{selectedPatient.patient_name}</SheetTitle>
                 <SheetDescription className="text-sm text-muted-foreground">

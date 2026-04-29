@@ -8,6 +8,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Video, XCircle, Loader2, Clock, Play } from 'lucide-react';
+import NetAmountBadge from './NetAmountBadge';
 
 const STATUS_CONFIG = {
   CONFIRMADO: { label: 'Confirmado', className: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
@@ -119,6 +120,7 @@ export default function MinhasConsultasHoje({ appointments }) {
                     <div className="flex items-center gap-2 mb-1">
                       <span className="text-sm font-semibold text-foreground">{timeOf(appt)}</span>
                       <Badge className={`text-xs ${cfg.className}`}>{cfg.label}</Badge>
+                      <NetAmountBadge amount={appt.professional_net_amount} />
                       {appt.appointment_type && (
                         <Badge variant="outline" className="text-xs">
                           {TYPE_LABELS[appt.appointment_type] || appt.appointment_type}

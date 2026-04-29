@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import NetAmountBadge from './NetAmountBadge';
 
 export default function SolicitacoesAgendamento({ professional }) {
   const queryClient = useQueryClient();
@@ -158,24 +159,27 @@ export default function SolicitacoesAgendamento({ professional }) {
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-1">"{sol.symptoms}"</p>
               )}
             </div>
-            <Button
-              size="sm"
-              disabled={acceptingId === sol.id || acceptMutation.isPending}
-              onClick={() => {
-                setAcceptingId(sol.id);
-                acceptMutation.mutate(sol);
-              }}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 h-8 shrink-0"
-            >
-              {acceptingId === sol.id ? (
-                <Loader2 className="w-3.5 h-3.5 animate-spin" />
-              ) : (
-                <>
-                  <CheckCircle className="w-3.5 h-3.5 mr-1" />
-                  Aceitar
-                </>
-              )}
-            </Button>
+            <div className="flex shrink-0 flex-col items-end gap-2">
+              <NetAmountBadge amount={sol.professional_net_amount} />
+              <Button
+                size="sm"
+                disabled={acceptingId === sol.id || acceptMutation.isPending}
+                onClick={() => {
+                  setAcceptingId(sol.id);
+                  acceptMutation.mutate(sol);
+                }}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white text-xs px-3 h-8"
+              >
+                {acceptingId === sol.id ? (
+                  <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                ) : (
+                  <>
+                    <CheckCircle className="w-3.5 h-3.5 mr-1" />
+                    Aceitar
+                  </>
+                )}
+              </Button>
+            </div>
           </div>
         ))}
       </div>

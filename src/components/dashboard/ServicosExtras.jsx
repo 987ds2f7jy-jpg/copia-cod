@@ -6,6 +6,7 @@ import { getTeleconsultaContextRequest } from '@/client-api/teleconsulta';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { listDirectSolicitacoesForProfessional } from '@/lib/solicitacoesExames';
+import NetAmountBadge from './NetAmountBadge';
 
 function formatSexLabel(value) {
   if (!value) {
@@ -106,16 +107,19 @@ export default function ServicosExtras({ professional, onAtender }) {
                     <span className="truncate text-sm font-medium text-foreground">{patientName}</span>
                   </div>
 
-                  <Badge
-                    variant="outline"
-                    className={
-                      solicitacao.tipo === 'renovacao_receitas'
-                        ? 'border-violet-300 text-xs text-violet-700'
-                        : 'border-emerald-300 text-xs text-emerald-700'
-                    }
-                  >
-                    {solicitacao.tipo === 'renovacao_receitas' ? 'Renovacao de Receitas' : 'Check-Up'}
-                  </Badge>
+                  <div className="flex shrink-0 flex-wrap items-center justify-end gap-2">
+                    <NetAmountBadge amount={solicitacao.quoted_professional_net_amount} />
+                    <Badge
+                      variant="outline"
+                      className={
+                        solicitacao.tipo === 'renovacao_receitas'
+                          ? 'border-violet-300 text-xs text-violet-700'
+                          : 'border-emerald-300 text-xs text-emerald-700'
+                      }
+                    >
+                      {solicitacao.tipo === 'renovacao_receitas' ? 'Renovacao de Receitas' : 'Check-Up'}
+                    </Badge>
+                  </div>
                 </div>
 
                 <div className="space-y-1 text-xs text-muted-foreground">
