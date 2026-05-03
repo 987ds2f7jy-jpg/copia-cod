@@ -12,7 +12,7 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, Shield, Video, Sparkles
+  ArrowLeft, Shield, Video, Sparkles, FileText
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
@@ -234,6 +234,14 @@ function LayoutInner({ children, currentPageName }) {
                         Minhas Consultas
                       </Link>
                     </DropdownMenuItem>
+                    {user.role !== 'professional' && user.role !== 'admin' && (
+                      <DropdownMenuItem asChild>
+                        <Link to={createPageUrl('MeuProntuario')} className="flex items-center gap-2">
+                          <FileText className="w-4 h-4" />
+                          Meu Prontuário
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     {user.role === 'professional' && (
                       <DropdownMenuItem asChild>
                         <Link to={createPageUrl('DashboardProfissional')} className="flex items-center gap-2">
