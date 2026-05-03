@@ -234,7 +234,7 @@ function LayoutInner({ children, currentPageName }) {
                         Minhas Consultas
                       </Link>
                     </DropdownMenuItem>
-                    {user.role !== 'professional' && user.role !== 'admin' && (
+                    {user.role === 'patient' && (
                       <DropdownMenuItem asChild>
                         <Link to={createPageUrl('MeuProntuario')} className="flex items-center gap-2">
                           <FileText className="w-4 h-4" />

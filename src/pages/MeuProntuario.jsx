@@ -11,7 +11,7 @@ import {
 
 // ============================================================
 // MOCK DATA — TODO: substituir por chamada real ao backend
-// (futuramente: prontuarios.recomendacoes do paciente logado)
+// `plano` aqui e apenas o alias visual futuro de prontuarios.recomendacoes.
 // ============================================================
 const PRONTUARIOS_MOCK = [
   {
@@ -100,6 +100,48 @@ function formatarData(iso) {
   }
 }
 
+function isSafeHttpUrl(value) {
+  try {
+    const parsed = new URL(value);
+    return parsed.protocol === 'http:' || parsed.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function LinkifiedText({ text }) {
+  const value = String(text || '');
+  const urlRegex = /(https?:\/\/[^\s]+)/gi;
+  const parts = value.split(urlRegex);
+
+  return parts.map((part, index) => {
+    if (!/^https?:\/\//i.test(part)) {
+      return <React.Fragment key={index}>{part}</React.Fragment>;
+    }
+
+    const cleanUrl = part.replace(/[),.;!?]+$/, '');
+    const trailing = part.slice(cleanUrl.length);
+
+    if (!isSafeHttpUrl(cleanUrl)) {
+      return <React.Fragment key={index}>{part}</React.Fragment>;
+    }
+
+    return (
+      <React.Fragment key={index}>
+        <a
+          href={cleanUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="font-medium text-emerald-700 underline underline-offset-2 hover:text-emerald-800 dark:text-emerald-300 dark:hover:text-emerald-200"
+        >
+          {cleanUrl}
+        </a>
+        {trailing}
+      </React.Fragment>
+    );
+  });
+}
+
 function StatusBadge({ status }) {
   const map = {
     finalizado: { label: 'Finalizado', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300' },
@@ -143,7 +185,7 @@ function ProntuarioCard({ item, onOpen }) {
             </div>
           </div>
 
-          <div className="flex sm:flex-col sm:items-end gap-2">
+          <div className="flex flex-col sm:items-end gap-2">
             <Button
               onClick={() => onOpen(item)}
               disabled={!temPlano}
@@ -186,7 +228,7 @@ function PlanoModal({ item, open, onClose }) {
           <div className="rounded-lg border border-border bg-muted/30 p-4">
             <h4 className="text-sm font-semibold text-foreground mb-2">Plano terapêutico</h4>
             <p className="text-sm text-muted-foreground whitespace-pre-line leading-relaxed">
-              {item.plano}
+              <LinkifiedText text={item.plano} />
             </p>
           </div>
 
