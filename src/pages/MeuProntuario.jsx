@@ -1,86 +1,16 @@
 import React, { useMemo, useState } from 'react';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { useQuery } from '@tanstack/react-query';
+import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
   Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription,
 } from '@/components/ui/dialog';
 import {
-  FileText, Calendar, Clock, Stethoscope, User, ExternalLink, FileCheck, Inbox,
+  FileText, Calendar, Clock, Stethoscope, User, ExternalLink, FileCheck, Inbox, Loader2, AlertCircle,
 } from 'lucide-react';
-
-// ============================================================
-// MOCK DATA — TODO: substituir por chamada real ao backend
-// `plano` aqui e apenas o alias visual futuro de prontuarios.recomendacoes.
-// ============================================================
-const PRONTUARIOS_MOCK = [
-  {
-    id: '1',
-    data: '2026-04-29',
-    hora: '08:40',
-    tipo: 'Consulta por especialidade',
-    categoria: 'consulta',
-    status: 'finalizado',
-    profissional: 'Dr. João Silva',
-    especialidade: 'Clínico Geral',
-    plano: 'Orientações gerais. Manter hidratação adequada (2L/dia). Realizar caminhada leve 30 minutos por dia. Seguir receita médica disponível no link abaixo. Retorno em 30 dias.',
-    documentos: [
-      { label: 'Abrir receita', url: 'https://exemplo.com/receita' },
-    ],
-  },
-  {
-    id: '2',
-    data: '2026-04-22',
-    hora: '21:15',
-    tipo: 'Plantão / Consulta Agora',
-    categoria: 'consulta',
-    status: 'finalizado',
-    profissional: 'Dra. Ana Costa',
-    especialidade: 'Clínico Geral',
-    plano: 'Quadro de virose viral autolimitada. Repouso por 48h. Hidratação reforçada. Paracetamol 750mg de 6/6h se febre ou dor. Retornar se sintomas persistirem por mais de 5 dias.',
-    documentos: [],
-  },
-  {
-    id: '3',
-    data: '2026-04-15',
-    hora: '14:00',
-    tipo: 'Renovação de receita',
-    categoria: 'extra',
-    status: 'documento_disponivel',
-    profissional: 'Dr. Pedro Almeida',
-    especialidade: 'Clínico Geral',
-    plano: 'Renovação aprovada para uso contínuo. Manter posologia atual. Reavaliar em consulta presencial em 6 meses.',
-    documentos: [
-      { label: 'Abrir documento', url: 'https://exemplo.com/receita-renovada' },
-    ],
-  },
-  {
-    id: '4',
-    data: '2026-04-10',
-    hora: '10:30',
-    tipo: 'Check-up',
-    categoria: 'extra',
-    status: 'aguardando',
-    profissional: 'Dra. Mariana Rocha',
-    especialidade: 'Clínico Geral',
-    plano: null,
-    documentos: [],
-  },
-  {
-    id: '5',
-    data: '2026-04-02',
-    hora: '16:20',
-    tipo: 'Laudo médico',
-    categoria: 'extra',
-    status: 'documento_disponivel',
-    profissional: 'Dr. Carlos Mendes',
-    especialidade: 'Neurologia',
-    plano: 'Laudo emitido conforme exames apresentados. Documento disponível para download abaixo.',
-    documentos: [
-      { label: 'Abrir laudo', url: 'https://exemplo.com/laudo' },
-    ],
-  },
-];
+import { useAuth } from '@/components/AuthContext';
+import { getPatientProntuariosRequest } from '@/client-api/patientProntuarios';
 
 const FILTROS = [
   { id: 'todos', label: 'Todos' },
@@ -274,12 +204,63 @@ function EmptyState() {
   );
 }
 
+function LoadingState() {
+  return (
+    <Card className="border-border">
+      <CardContent className="flex flex-col items-center justify-center text-center py-16 px-6">
+        <Loader2 className="w-7 h-7 text-emerald-600 animate-spin mb-4" />
+        <h3 className="text-base font-semibold text-foreground">Carregando prontuários...</h3>
+        <p className="text-sm text-muted-foreground mt-1">
+          Buscando seus planos salvos com segurança.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ErrorState({ message }) {
+  return (
+    <Card className="border-red-200 bg-red-50/60 dark:border-red-500/30 dark:bg-red-500/10">
+      <CardContent className="flex flex-col items-center justify-center text-center py-12 px-6">
+        <AlertCircle className="w-7 h-7 text-red-600 dark:text-red-300 mb-4" />
+        <h3 className="text-base font-semibold text-red-900 dark:text-red-100">Não foi possível carregar seus prontuários.</h3>
+        <p className="text-sm text-red-700 dark:text-red-200 mt-1 max-w-sm">
+          {message || 'Tente novamente em instantes.'}
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function AccessDeniedState() {
+  return (
+    <Card className="border-border">
+      <CardContent className="flex flex-col items-center justify-center text-center py-16 px-6">
+        <FileText className="w-8 h-8 text-muted-foreground mb-4" />
+        <h3 className="text-base font-semibold text-foreground">Área exclusiva do paciente.</h3>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          Entre com uma conta de paciente para acessar seus planos e prontuários.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
 export default function MeuProntuario() {
   const [filtro, setFiltro] = useState('todos');
   const [selected, setSelected] = useState(null);
+  const { user, loading: authLoading } = useAuth();
+  const canLoadProntuarios = Boolean(user?.role === 'patient');
 
-  // TODO: substituir PRONTUARIOS_MOCK por dados reais do backend
-  const items = PRONTUARIOS_MOCK;
+  const prontuariosQuery = useQuery({
+    queryKey: ['patient-prontuarios'],
+    queryFn: () => getPatientProntuariosRequest({ limit: 100 }),
+    enabled: canLoadProntuarios,
+    staleTime: 60_000,
+    meta: { handledError: true, severity: 'warn' },
+  });
+
+  const items = prontuariosQuery.data?.items || [];
 
   const filtrados = useMemo(() => {
     if (filtro === 'todos') return items;
@@ -300,32 +281,44 @@ export default function MeuProntuario() {
           </p>
         </header>
 
-        {/* Filtros */}
-        <div className="flex gap-2 overflow-x-auto pb-3 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
-          {FILTROS.map((f) => (
-            <button
-              key={f.id}
-              onClick={() => setFiltro(f.id)}
-              className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
-                filtro === f.id
-                  ? 'bg-emerald-600 text-white'
-                  : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
-              }`}
-            >
-              {f.label}
-            </button>
-          ))}
-        </div>
-
-        {/* Lista */}
-        {filtrados.length === 0 ? (
-          <EmptyState />
+        {authLoading ? (
+          <LoadingState />
+        ) : !canLoadProntuarios ? (
+          <AccessDeniedState />
+        ) : prontuariosQuery.isLoading ? (
+          <LoadingState />
+        ) : prontuariosQuery.isError ? (
+          <ErrorState message={prontuariosQuery.error?.message} />
         ) : (
-          <div className="space-y-4">
-            {filtrados.map((item) => (
-              <ProntuarioCard key={item.id} item={item} onOpen={setSelected} />
-            ))}
-          </div>
+          <>
+            {/* Filtros */}
+            <div className="flex gap-2 overflow-x-auto pb-3 mb-6 -mx-4 px-4 sm:mx-0 sm:px-0">
+              {FILTROS.map((f) => (
+                <button
+                  key={f.id}
+                  onClick={() => setFiltro(f.id)}
+                  className={`px-4 py-2 rounded-full text-sm font-medium whitespace-nowrap transition-colors ${
+                    filtro === f.id
+                      ? 'bg-emerald-600 text-white'
+                      : 'bg-muted text-muted-foreground hover:bg-accent hover:text-accent-foreground'
+                  }`}
+                >
+                  {f.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Lista */}
+            {filtrados.length === 0 ? (
+              <EmptyState />
+            ) : (
+              <div className="space-y-4">
+                {filtrados.map((item) => (
+                  <ProntuarioCard key={item.id} item={item} onOpen={setSelected} />
+                ))}
+              </div>
+            )}
+          </>
         )}
       </div>
 
