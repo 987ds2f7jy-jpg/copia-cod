@@ -34,6 +34,7 @@ import ProfessionalStatusGate from '@/components/dashboard/ProfessionalStatusGat
 import ServicosExtras from '@/components/dashboard/ServicosExtras';
 import { answerQuestionRequest } from '@/client-api/questions';
 import { acceptQueueEntryRequest } from '@/client-api/queues';
+import { acceptSolicitacaoExameRequest } from '@/client-api/solicitacoesExames';
 import { buildQuestionAnswerPayload, normalizeQuestions } from '@/lib/questions';
 import { attachLaudoContextToQueue } from '@/lib/solicitacoesExames';
 import {
@@ -323,6 +324,50 @@ function DashboardProfissionalInner() {
     },
   });
 
+  const acceptSolicitacaoExame = useMutation({
+    mutationFn: async (solicitacao) => {
+      if (!solicitacao?.id) {
+        throw new Error('Solicitacao invalida.');
+      }
+
+      return acceptSolicitacaoExameRequest({ solicitacaoId: solicitacao.id });
+    },
+    onSuccess: (solicitacao) => {
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes-exames'] });
+
+      toast({
+        title: 'Solicitacao aceita',
+        description: solicitacao?.paciente_nome
+          ? `Paciente: ${solicitacao.paciente_nome}. Abrindo atendimento.`
+          : 'Abrindo atendimento.',
+      });
+
+      if (solicitacao?.id) {
+        navigate(createPageUrl(`AtenderServicoExtra?solicitacao=${solicitacao.id}`));
+      }
+    },
+    onError: (error) => {
+      const code = error?.code || '';
+      const description = code === 'SOLICITACAO_EXAME_ALREADY_ACCEPTED'
+        ? 'Solicitacao ja foi aceita por outro profissional.'
+        : code === 'SOLICITACAO_EXAME_ACCEPT_CONFLICT'
+          ? 'Solicitacao mudou durante o aceite. Atualize a lista e tente novamente.'
+        : code === 'SOLICITACAO_EXAME_PAYMENT_REQUIRED'
+          ? 'Pagamento ainda nao confirmado.'
+          : code === 'PROFESSIONAL_ROLE_REQUIRED' || code === 'ROLE_FORBIDDEN'
+            ? 'Apenas profissionais podem aceitar esta solicitacao.'
+          : code === 'SOLICITACAO_EXAME_DIRECT_FLOW_UNSUPPORTED'
+            ? 'Este tipo de solicitacao nao pode ser atendido diretamente pelo dashboard.'
+          : error?.message || 'Nao foi possivel aceitar esta solicitacao.';
+
+      toast({
+        title: 'Nao foi possivel aceitar a solicitacao',
+        description,
+        variant: 'destructive',
+      });
+    },
+  });
+
   // ── KPI calculations — memoized to avoid recalculation on every render ─────
   const { filtered, completed, cancelled, revenue, prevRev, cancelRate, avgTicket, avgRating, pendingQ } = useMemo(() => {
   const filtered = filterByPeriod(appointments, period);
@@ -557,12 +602,8 @@ function DashboardProfissionalInner() {
           <MinhasConsultasHoje appointments={appointments} />
           <ServicosExtras
             professional={professional}
-            onAtender={(s) => {
-              toast({
-                title: `Solicitação de ${s.tipo === 'checkup' ? 'Check-Up' : 'Exames Específicos'}`,
-                description: `Paciente: ${s.paciente_nome}. Exame: ${s.exame_solicitado}`,
-              });
-            }}
+            acceptingSolicitacaoId={acceptSolicitacaoExame.variables?.id || ''}
+            onAtender={(s) => acceptSolicitacaoExame.mutate(s)}
           />
         </div>
 

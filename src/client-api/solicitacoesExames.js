@@ -26,6 +26,40 @@ export async function updateSolicitacaoExameRequest(payload) {
   return result?.solicitacaoExame ?? null;
 }
 
+export async function acceptSolicitacaoExameRequest({ solicitacaoId }) {
+  const result = await invokeEdgeFunction('accept-solicitacao-exame', {
+    body: {
+      solicitacaoId,
+    },
+    fallbackMessage: 'Nao foi possivel aceitar a solicitacao.',
+  });
+
+  return result?.solicitacaoExame ?? null;
+}
+
+export async function getSolicitacaoExameAtendimentoRequest({ solicitacaoId }) {
+  const result = await invokeEdgeFunction('get-solicitacao-exame-atendimento', {
+    body: {
+      solicitacaoId,
+    },
+    fallbackMessage: 'Nao foi possivel carregar o atendimento do servico.',
+  });
+
+  return result ?? null;
+}
+
+export async function finishSolicitacaoExameAtendimentoRequest({ solicitacaoId, recomendacoes }) {
+  const result = await invokeEdgeFunction('finish-solicitacao-exame-atendimento', {
+    body: {
+      solicitacaoId,
+      recomendacoes,
+    },
+    fallbackMessage: 'Nao foi possivel finalizar o atendimento do servico.',
+  });
+
+  return result ?? null;
+}
+
 export async function deleteSolicitacaoExameRequest({ solicitacaoId }) {
   return invokeEdgeFunction('delete-solicitacao-exame', {
     body: {

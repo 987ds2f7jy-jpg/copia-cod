@@ -48,6 +48,8 @@ export const ROUTES = {
   planos:                  '/Planos',
   teleconsulta:            '/Teleconsulta',
   consultaRoom:            (id: string) => `/consulta/${id}`,
+  meuProntuario:           '/MeuProntuario',
+  atenderServicoExtra:     (id: string) => `/AtenderServicoExtra?solicitacao=${id}`,
   pagamentoStatus:         (status: 'sucesso' | 'falha' | 'pendente' | string) => `/pagamento/${status}`,
   financeiroProf:          '/FinanceiroProfissional',
   adminAprovacao:          '/AdminAprovacao',

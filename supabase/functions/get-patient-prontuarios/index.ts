@@ -56,6 +56,7 @@ type AppointmentRow = {
 type ProntuarioRow = {
   id: string;
   consulta_id: string | null;
+  solicitacao_exame_id: string | null;
   paciente_id: string | null;
   profissional_id: string | null;
   recomendacoes: string | null;
@@ -272,6 +273,7 @@ async function listProntuariosByConsultaIds(client: SupabaseClient, consultaIds:
     .select(`
       id,
       consulta_id,
+      solicitacao_exame_id,
       paciente_id,
       profissional_id,
       recomendacoes,
@@ -298,6 +300,7 @@ async function listProntuariosByPatientId(client: SupabaseClient, patientId: str
     .select(`
       id,
       consulta_id,
+      solicitacao_exame_id,
       paciente_id,
       profissional_id,
       recomendacoes,
@@ -448,7 +451,7 @@ async function getPatientProntuarios({
         id: prontuario.id,
         consulta_id: consultaId || null,
         appointment_id: appointment?.id || null,
-        solicitacao_exame_id: null,
+        solicitacao_exame_id: normalizeString(prontuario.solicitacao_exame_id) || null,
         data: dateTime.data,
         horario: dateTime.horario,
         tipo_atendimento: tipoAtendimento,

@@ -40,7 +40,7 @@ function formatAge(value) {
   return age >= 0 ? `${age} anos` : 'Nao informado';
 }
 
-export default function ServicosExtras({ professional, onAtender }) {
+export default function ServicosExtras({ professional, onAtender, acceptingSolicitacaoId = '' }) {
   const { data: solicitacoes = [], isLoading } = useQuery({
     queryKey: ['solicitacoes-exames', professional?.id, professional?.specialty],
     queryFn: () => listDirectSolicitacoesForProfessional(professional),
@@ -91,6 +91,7 @@ export default function ServicosExtras({ professional, onAtender }) {
           visibleSolicitacoes.map((solicitacao) => {
             const patient = patientLookup[solicitacao.paciente_id] || null;
             const patientName = solicitacao.paciente_nome || patient?.fullName || 'Paciente';
+            const isAccepting = acceptingSolicitacaoId === solicitacao.id;
             const mergedSolicitacao = {
               ...solicitacao,
               paciente_nome: patientName,
@@ -161,9 +162,17 @@ export default function ServicosExtras({ professional, onAtender }) {
                   <Button
                     size="sm"
                     className="h-7 bg-emerald-600 px-3 text-xs text-white hover:bg-emerald-700"
+                    disabled={isAccepting}
                     onClick={() => onAtender?.(mergedSolicitacao)}
                   >
-                    Atender Solicitacao
+                    {isAccepting ? (
+                      <>
+                        <Loader2 className="mr-1 h-3 w-3 animate-spin" />
+                        Aceitando...
+                      </>
+                    ) : (
+                      'Atender Solicitacao'
+                    )}
                   </Button>
                 </div>
               </div>
