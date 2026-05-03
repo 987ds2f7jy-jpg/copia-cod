@@ -82,7 +82,7 @@ async function clearAuthState(page: Page) {
 async function loginViaUI(page: Page, email: string, password: string) {
   await goto(page, ROUTES.entrar);
   await page.getByLabel('Email').fill(email);
-  await page.getByLabel('Senha').fill(password);
+  await page.getByLabel('Senha', { exact: true }).fill(password);
   await page.getByRole('button', { name: 'Entrar' }).click();
 }
 

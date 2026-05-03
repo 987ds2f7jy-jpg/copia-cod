@@ -46,7 +46,7 @@ test.describe('login — formulário', () => {
   test('exibe os elementos corretos na tela de login @smoke', async ({ page }) => {
     await expect(page.getByRole('heading', { name: 'Entrar na sua conta' })).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Senha')).toBeVisible();
+    await expect(page.getByLabel('Senha', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
     await expect(page.getByRole('link', { name: /criar conta de paciente/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /cadastrar-se como profissional/i })).toBeVisible();
@@ -64,7 +64,7 @@ test.describe('login — formulário', () => {
 
   test('credenciais inválidas exibem mensagem de erro @critical', async ({ page }) => {
     await page.getByLabel('Email').fill('naoexiste-e2e@example.com');
-    await page.getByLabel('Senha').fill('senha-invalida-e2e');
+    await page.getByLabel('Senha', { exact: true }).fill('senha-invalida-e2e');
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // Mensagem de erro vinda do authService.login() via getUserFacingErrorMessage()
@@ -76,18 +76,16 @@ test.describe('login — formulário', () => {
   });
 
   test('toggle de visibilidade da senha funciona', async ({ page }) => {
-    await page.getByLabel('Senha').fill('minha-senha');
+    await page.getByLabel('Senha', { exact: true }).fill('minha-senha');
 
     // Campo começa como type="password"
-    await expect(page.getByLabel('Senha')).toHaveAttribute('type', 'password');
+    await expect(page.getByLabel('Senha', { exact: true })).toHaveAttribute('type', 'password');
 
-    // Clicar no ícone de olho alterna para type="text"
-    await page.getByRole('button', { name: /mostrar|ocultar|eye/i }).click().catch(async () => {
-      // O botão do olho não tem name acessível — usar posição relativa ao campo
-      await page.locator('input#password ~ button').click();
-    });
+    // Clicar no botão acessível de visibilidade alterna para type="text"
+    await page.getByRole('button', { name: 'Mostrar senha' }).click();
 
-    await expect(page.getByLabel('Senha')).toHaveAttribute('type', 'text');
+    await expect(page.getByLabel('Senha', { exact: true })).toHaveAttribute('type', 'text');
+    await expect(page.getByRole('button', { name: 'Ocultar senha' })).toBeVisible();
   });
 
   test('não existe link de recuperação de senha (gap documentado)', async ({ page }) => {
@@ -113,7 +111,7 @@ test.describe('login — caminho feliz paciente', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.patient.email);
-    await page.getByLabel('Senha').fill(USERS.patient.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.patient.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     await expect(page).toHaveURL(/DashboardPaciente/, { timeout: 20_000 });
@@ -127,7 +125,7 @@ test.describe('login — caminho feliz paciente', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.patient.email);
-    await page.getByLabel('Senha').fill(USERS.patient.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.patient.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardPaciente/, { timeout: 20_000 });
 
@@ -150,7 +148,7 @@ test.describe('login — caminho feliz paciente', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.patient.email);
-    await page.getByLabel('Senha').fill(USERS.patient.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.patient.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardPaciente/, { timeout: 20_000 });
 
@@ -178,7 +176,7 @@ test.describe('login — caminho feliz paciente', () => {
     // Faz login
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.patient.email);
-    await page.getByLabel('Senha').fill(USERS.patient.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.patient.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardPaciente/, { timeout: 20_000 });
 
@@ -205,7 +203,7 @@ test.describe('login — caminho feliz profissional', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.professional.email);
-    await page.getByLabel('Senha').fill(USERS.professional.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.professional.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // resolveRedirectPath() → role=professional → DashboardProfissional
@@ -217,7 +215,7 @@ test.describe('login — caminho feliz profissional', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(USERS.professional.email);
-    await page.getByLabel('Senha').fill(USERS.professional.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.professional.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardProfissional/, { timeout: 20_000 });
 
@@ -256,7 +254,7 @@ test.describe('login — redirecionamento pós-login (rd_login_next)', () => {
 
     // 3. Faz login
     await page.getByLabel('Email').fill(USERS.patient.email);
-    await page.getByLabel('Senha').fill(USERS.patient.password);
+    await page.getByLabel('Senha', { exact: true }).fill(USERS.patient.password);
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // 4. Deve ir para /Perfil, não para /DashboardPaciente
@@ -278,7 +276,7 @@ test.describe('login — redirecionamento pós-login (rd_login_next)', () => {
     );
 
     await page.getByLabel('Email').fill('invalido@example.com');
-    await page.getByLabel('Senha').fill('errada');
+    await page.getByLabel('Senha', { exact: true }).fill('errada');
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // Aguarda resposta de erro
@@ -308,7 +306,7 @@ test.describe('login — conta inativa', () => {
     await clearAuthState();
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_INACTIVE_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_INACTIVE_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_INACTIVE_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // authService: AppError code ACCOUNT_INACTIVE → "Sua conta está inativa"

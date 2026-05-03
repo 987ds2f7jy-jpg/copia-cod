@@ -267,7 +267,7 @@ rdTest.describe('perfil — desativação de conta (requer conta descartável)',
     await clearAuthState();
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_DISPOSABLE_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_DISPOSABLE_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_DISPOSABLE_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/Dashboard/, { timeout: 20_000 });
 
@@ -300,7 +300,7 @@ rdTest.describe('perfil — desativação de conta (requer conta descartável)',
     await clearAuthState();
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_DEACTIVATED_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_DEACTIVATED_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_DEACTIVATED_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
 
     // authService: AppError ACCOUNT_INACTIVE → "Sua conta esta inativa"

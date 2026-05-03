@@ -89,6 +89,8 @@ export default function DisponibilidadeEditor({ professional }) {
             return (
               <button
                 key={wd}
+                type="button"
+                aria-pressed={activeDay === wd}
                 onClick={() => setActiveDay(wd)}
                 className={`px-3 py-2 rounded-lg text-sm font-medium transition-all flex items-center gap-1.5 ${
                   activeDay === wd
@@ -116,6 +118,8 @@ export default function DisponibilidadeEditor({ professional }) {
           {ALL_TIME_SLOTS.map(time => (
             <button
               key={time}
+              type="button"
+              aria-pressed={isSelected(activeDay, time)}
               onClick={() => toggle(activeDay, time)}
               className={`py-2 px-3 rounded-xl text-sm font-medium transition-all ${
                 isSelected(activeDay, time)

@@ -78,5 +78,11 @@ export default async function globalSetup(config: FullConfig) {
 
   await saveAuthState(config, 'patient');
   await saveAuthState(config, 'professional');
-  await saveAuthState(config, 'admin');
+
+  if (process.env.E2E_ADMIN_EMAIL && process.env.E2E_ADMIN_PASSWORD) {
+    await saveAuthState(config, 'admin');
+  } else {
+    fs.writeFileSync(path.join(AUTH_DIR, 'admin.json'), '{"cookies":[],"origins":[]}');
+    console.log('[global-setup] Admin auth skipped: E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD not configured.');
+  }
 }

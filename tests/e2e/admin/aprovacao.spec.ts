@@ -6,9 +6,9 @@
  * FLUXO: /AdminAprovacao — aprovação e gestão de profissionais
  *
  * SELETORES BASEADOS NO HTML REAL (AdminAprovacao.jsx)
- *   Bloqueio (role ≠ admin):
+ *   Bloqueio (role ≠ admin via ProtectedRoute em App.tsx):
  *     h2 "Acesso Restrito"
- *     p  "Esta pagina e exclusiva para administradores." (sem acento)
+ *     p  "Você não tem permissão para acessar esta página."
  *
  *   Página real (role = admin):
  *     h1 "Aprovacao de Profissionais" (sem acento)
@@ -61,7 +61,7 @@ rdTest.describe('admin-aprovacao — controle de acesso', () => {
       ).toBeVisible({ timeout: 10_000 });
 
       await expect(
-        page.getByText(/exclusiva para administradores/i)
+        page.getByText(/não tem permissão|nao tem permissao/i)
       ).toBeVisible();
     });
   });

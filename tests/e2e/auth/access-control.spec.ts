@@ -36,6 +36,7 @@ import {
   ROUTES,
   PUBLIC_ROUTES,
   AUTH_REQUIRED_ROUTES,
+  PATIENT_ROUTES,
 } from '../support/constants';
 
 // ---------------------------------------------------------------------------
@@ -87,6 +88,7 @@ test.describe('acesso autenticado — sem sessão redireciona para /Entrar', () 
         window.sessionStorage.getItem('rd_login_next'),
       );
       expect(loginNext).toBeTruthy();
+      expect(loginNext).toContain(route);
     });
   }
 
@@ -177,6 +179,30 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
     await expect(page).toHaveURL(ROUTES.home, { timeout: 8_000 });
   });
 
+  for (const { route, expected } of [
+    { route: ROUTES.dashboardPaciente, expected: /olá|ola/i },
+    { route: ROUTES.perfil, expected: /Meu perfil/i },
+    { route: ROUTES.consultaAgora, expected: /Consulta Agora/i },
+    { route: ROUTES.laudosMedicos, expected: /Laudos Medicos/i },
+    { route: ROUTES.solicitacaoExames, expected: /Solicitacao de Exames/i },
+    { route: ROUTES.renovacaoReceitas, expected: /Renovacao de Receitas/i },
+    { route: ROUTES.agendamentoEspecialidade, expected: /Agendamento por Especialidade/i },
+    { route: ROUTES.agendamentoPerfil, expected: /Profissional não encontrado|Profissional nao encontrado/i },
+    { route: ROUTES.pagamentoStatus('sucesso'), expected: /Pagamento recebido pelo provedor/i },
+  ]) {
+    test(`paciente autenticado acessa ${route} sem cair no login`, async ({
+      page, goto,
+    }) => {
+      expect(PATIENT_ROUTES).toContain(route as typeof PATIENT_ROUTES[number]);
+      await goto(route);
+
+      await expect(page).not.toHaveURL(/\/Entrar/);
+      await expect(page.getByRole('heading', { name: expected }).first())
+        .toBeVisible({ timeout: 15_000 });
+      await expect(page.getByRole('heading', { name: 'Acesso Restrito' })).not.toBeVisible();
+    });
+  }
+
 });
 
 // ---------------------------------------------------------------------------
@@ -236,6 +262,27 @@ test.describe('controle de acesso — profissional em rotas de agendamento', () 
       .not.toBeVisible();
     await expect(page.getByRole('heading', { name: 'Conta suspensa' }))
       .not.toBeVisible();
+  });
+
+  test('profissional aprovado acessa /FinanceiroProfissional sem bloqueio @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.financeiroProf);
+
+    await expect(page).not.toHaveURL(/\/Entrar/);
+    await expect(page.getByRole('heading', { name: 'Acesso Restrito' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Relatorio Financeiro' }))
+      .toBeVisible({ timeout: 15_000 });
+  });
+
+  test('profissional em /AdminAprovacao vê tela de acesso restrito @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.adminAprovacao);
+
+    await expect(page.getByRole('heading', { name: 'Acesso Restrito' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/não tem permissão|nao tem permissao/i)).toBeVisible();
   });
 
   test('menu do Layout mostra "Área Profissional" para profissional', async ({

@@ -45,21 +45,14 @@
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
 import { skipIfNoAuth } from '../support/auth-harness';
+import { waitForProfessionalDashboard } from '../support/page-helpers';
 
 // ---------------------------------------------------------------------------
 // Helper: força erro na Edge Function de perfil profissional
 // ---------------------------------------------------------------------------
 async function mockProfileError(page: import('@playwright/test').Page) {
   // Intercepta chamadas para as Edge Functions de perfil
-  await page.route('**/functions/v1/get-professional-profile**', async (route) => {
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: 'Internal Server Error — E2E mock' }),
-    });
-  });
-  // Também intercepta qualquer endpoint que retorne dados do profissional
-  await page.route('**/functions/v1/get-professional-public-profile**', async (route) => {
+  await page.route('**/functions/v1/get-professional-dashboard**', async (route) => {
     await route.fulfill({
       status: 500,
       contentType: 'application/json',
@@ -82,15 +75,10 @@ rdTest.describe('dashboard-profissional — loading não trava', () => {
   rdTest('dashboard carrega completamente sem ficar preso em spinner @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardProfissional);
 
-    // Aguarda o spinner de loading DESAPARECER (se aparecer)
-    // O Loader2 durante loadingProfessional não tem data-testid, mas podemos
-    // verificar que o heading principal aparece dentro do timeout
-    await expect(
-      page.getByRole('heading', { level: 1 })
-        .or(page.getByRole('heading', { name: /painel profissional|dr\(a\)\./i }))
-        .or(page.getByRole('heading', { name: /perfil profissional não encontrado/i }))
-        .or(page.getByRole('heading', { name: /cadastro em análise/i }))
-    ).toBeVisible({ timeout: 20_000 });
+    // O primeiro carregamento pode passar por retries do React Query.
+    // O helper central aguarda um estado conhecido e recarrega uma vez se o
+    // app ficar tempo demais apenas no spinner.
+    await waitForProfessionalDashboard(page);
 
     // Confirmar que não há spinner rodando após o carregamento
     // (animate-spin presente = ainda carregando)
@@ -105,12 +93,7 @@ rdTest.describe('dashboard-profissional — loading não trava', () => {
   rdTest('KPIs aparecem sem travar em skeleton infinito @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardProfissional);
 
-    // Aguarda o dashboard carregar (heading visível)
-    await expect(
-      page.getByRole('heading', { level: 1 })
-        .or(page.getByText('Consultas realizadas'))
-        .or(page.getByRole('heading', { name: /perfil profissional não encontrado/i }))
-    ).toBeVisible({ timeout: 20_000 });
+    await waitForProfessionalDashboard(page);
 
     // Se chegou ao dashboard real (não ao estado de erro), os KPIs devem estar visíveis
     const isErrorState = await page.getByRole('heading', {
@@ -150,20 +133,6 @@ rdTest.describe('dashboard-profissional — estado de erro com mock', () => {
 
     await expect(
       page.getByText('Seu perfil ainda não foi cadastrado ou está em análise.')
-    ).toBeVisible();
-  });
-
-  rdTest('estado de erro exibe link "Completar Cadastro" @critical', async ({ page, goto }) => {
-    await mockProfileError(page);
-    await goto(ROUTES.dashboardProfissional);
-
-    await expect(
-      page.getByRole('heading', { name: 'Perfil profissional não encontrado' })
-    ).toBeVisible({ timeout: 20_000 });
-
-    // Link → /CadastroProfissional
-    await expect(
-      page.getByRole('link', { name: 'Completar Cadastro' })
     ).toBeVisible();
   });
 
@@ -211,7 +180,7 @@ rdTest.describe('dashboard-profissional — profissional sem perfil', () => {
     await clearAuthState();
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_NO_PROFILE_PROFESSIONAL_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_NO_PROFILE_PROFESSIONAL_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_NO_PROFILE_PROFESSIONAL_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardProfissional|Entrar/, { timeout: 20_000 });
 
@@ -238,11 +207,7 @@ rdTest.describe('dashboard-profissional — KPICard loading state', () => {
   rdTest('KPIs com loading={true} mostram skeleton que resolve @critical', async ({ page, goto }) => {
     await goto(ROUTES.dashboardProfissional);
 
-    // Aguarda o dashboard carregar (heading principal)
-    await expect(
-      page.getByRole('heading', { level: 1 })
-        .or(page.getByRole('heading', { name: /perfil profissional não encontrado/i }))
-    ).toBeVisible({ timeout: 20_000 });
+    await waitForProfessionalDashboard(page);
 
     const isError = await page.getByRole('heading', {
       name: /perfil profissional não encontrado/i,

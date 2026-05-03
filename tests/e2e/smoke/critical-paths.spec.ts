@@ -45,7 +45,7 @@ test.describe('smoke — app de pé', () => {
     // Entrar.jsx: h1 "Entrar na sua conta" + campos + botão
     await expect(page.getByRole('heading', { name: 'Entrar na sua conta' })).toBeVisible();
     await expect(page.getByLabel('Email')).toBeVisible();
-    await expect(page.getByLabel('Senha')).toBeVisible();
+    await expect(page.getByLabel('Senha', { exact: true })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Entrar' })).toBeVisible();
   });
 

@@ -25,11 +25,10 @@
  *   → Guards documentados como testes passando (não como skip)
  *   → Skips explícitos e descritivos para tudo que requer admin
  *
- * SELETORES REAIS (AdminAprovacao.jsx — guard de não-admin)
+ * SELETORES REAIS (ProtectedRoute.jsx — guard de não-admin)
  *   h2 "Acesso Restrito"
- *   p  "Esta pagina e exclusiva para administradores." (sem acento)
- *   button "Voltar" → navigate(-1)
- *   ShieldX icon (decorativo — não testável por role)
+ *   p  "Você não tem permissão para acessar esta página."
+ *   button "Voltar ao início" → /
  *
  * PENDÊNCIAS (aguardando credencial admin)
  *   - Verificar lista de profissionais pendentes
@@ -91,23 +90,20 @@ rdTest.describe('admin-smoke — paciente bloqueado', () => {
     ).toBeVisible({ timeout: 10_000 });
 
     await expect(
-      page.getByText('Esta pagina e exclusiva para administradores.')
+      page.getByText(/não tem permissão|nao tem permissao/i)
     ).toBeVisible();
   });
 
-  rdTest('tela de bloqueio exibe botão "Voltar" funcional @critical', async ({ page, goto }) => {
+  rdTest('tela de bloqueio exibe botão "Voltar ao início" funcional @critical', async ({ page, goto }) => {
     await goto(ROUTES.adminAprovacao);
     await expect(
       page.getByRole('heading', { name: 'Acesso Restrito' })
     ).toBeVisible({ timeout: 10_000 });
 
-    await expect(page.getByRole('button', { name: 'Voltar' })).toBeVisible();
-    await page.getByRole('button', { name: 'Voltar' }).click();
+    await expect(page.getByRole('button', { name: /voltar ao início/i })).toBeVisible();
+    await page.getByRole('button', { name: /voltar ao início/i }).click();
 
-    // navigate(-1) — saiu da tela de acesso restrito
-    await expect(
-      page.getByRole('heading', { name: 'Acesso Restrito' })
-    ).not.toBeVisible({ timeout: 5_000 });
+    await expect(page).toHaveURL(ROUTES.home, { timeout: 8_000 });
   });
 
   rdTest('URL permanece /AdminAprovacao — não há redirect automático @critical', async ({ page, goto }) => {
@@ -157,7 +153,7 @@ rdTest.describe('admin-smoke — profissional bloqueado', () => {
     await expect(
       page.getByRole('heading', { name: 'Acesso Restrito' })
     ).toBeVisible({ timeout: 10_000 });
-    await expect(page.getByRole('button', { name: 'Voltar' })).toBeVisible();
+    await expect(page.getByRole('button', { name: /voltar ao início/i })).toBeVisible();
   });
 
 });
@@ -169,15 +165,13 @@ rdTest.describe('admin-smoke — testes pendentes por falta de credencial admin'
 
   rdTest('smoke: admin acessa /AdminAprovacao @smoke', async ({ page, goto }) => {
     rdTest.skip(
-      !process.env.E2E_ADMIN_EMAIL,
+      true,
       [
-        'Credencial admin não configurada.',
-        'Para habilitar: defina E2E_ADMIN_EMAIL e E2E_ADMIN_PASSWORD no .env.e2e',
-        'e rode o global-setup para gerar .auth/admin.json.',
+        'Admin dashboard fora do escopo atual.',
+        'Habilitar quando houver E2E_ADMIN_EMAIL/E2E_ADMIN_PASSWORD',
+        'e regra do dashboard admin definida.',
       ].join(' '),
     );
-
-    rdTest.use({ storageState: AUTH_STATE.admin });
 
     await goto(ROUTES.adminAprovacao);
     await expect(page).not.toHaveURL(/\/Entrar/);

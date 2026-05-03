@@ -72,7 +72,7 @@ rdTest.describe('financeiro - profissional aprovado', () => {
     await expect(page).not.toHaveURL(/\/Entrar/);
     await expect(page.getByRole('heading', { name: 'Relatorio Financeiro' })).toBeVisible({ timeout: 15_000 });
 
-    const hasTable = await page.getByText('Historico de Consultas').isVisible().catch(() => false);
+    const hasTable = await page.getByRole('heading', { name: 'Historico de Consultas' }).isVisible().catch(() => false);
     const hasEmpty = await page.getByText('Nenhuma consulta encontrada').isVisible().catch(() => false);
     expect(hasTable || hasEmpty).toBe(true);
   });

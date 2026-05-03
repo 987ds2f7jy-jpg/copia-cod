@@ -241,6 +241,8 @@ function AgendamentoEspecialidadeInner() {
                       {availableSlots.map((slot) => (
                         <button
                           key={slot}
+                          type="button"
+                          aria-pressed={selectedTime === slot}
                           onClick={() => setSelectedTime(slot)}
                           className={`p-2.5 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
                             selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-muted hover:bg-accent text-foreground'

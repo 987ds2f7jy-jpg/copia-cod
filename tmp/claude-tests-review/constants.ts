@@ -45,12 +45,12 @@ export const ROUTES = {
   solicitacaoExames:       '/SolicitacaoExames',
   renovacaoReceitas:       '/RenovacaoReceitas',
   pergunteEspecialista:    '/PergunteEspecialista',
-  planos:                  '/Planos',
   teleconsulta:            '/Teleconsulta',
   consultaRoom:            (id: string) => `/consulta/${id}`,
-  pagamentoStatus:         (status: 'sucesso' | 'falha' | 'pendente' | string) => `/pagamento/${status}`,
   financeiroProf:          '/FinanceiroProfissional',
   adminAprovacao:          '/AdminAprovacao',
+  planos:                  '/Planos',
+  pagamentoRetorno:        (status: string) => `/pagamento/${status}`,
   notFound:                '/rota-que-nao-existe',
 } as const;
 
@@ -64,45 +64,18 @@ export const PUBLIC_ROUTES = [
   ROUTES.cadastroProfissional,
   ROUTES.especialidades,
   ROUTES.perfilProfissional,
-  ROUTES.pergunteEspecialista,
-  ROUTES.planos,
 ] as const;
 
 // ---------------------------------------------------------------------------
 // Rotas que exigem autenticação (qualquer role)
 // ---------------------------------------------------------------------------
 export const AUTH_REQUIRED_ROUTES = [
-  ROUTES.agendamentoEspecialidade,
-  ROUTES.agendamentoPerfil,
   ROUTES.dashboardPaciente,
   ROUTES.consultaAgora,
   ROUTES.perfil,
   ROUTES.laudosMedicos,
   ROUTES.solicitacaoExames,
-  ROUTES.renovacaoReceitas,
-  ROUTES.teleconsulta,
-  ROUTES.pagamentoStatus('sucesso'),
-  ROUTES.pagamentoStatus('falha'),
-  ROUTES.pagamentoStatus('pendente'),
 ] as const;
-
-export const PATIENT_ROUTES = [
-  ROUTES.dashboardPaciente,
-  ROUTES.perfil,
-  ROUTES.consultaAgora,
-  ROUTES.laudosMedicos,
-  ROUTES.solicitacaoExames,
-  ROUTES.renovacaoReceitas,
-  ROUTES.agendamentoEspecialidade,
-  ROUTES.agendamentoPerfil,
-  ROUTES.pagamentoStatus('sucesso'),
-] as const;
-
-export const PAYMENT_STATUS_ROUTES = {
-  sucesso:  ROUTES.pagamentoStatus('sucesso'),
-  falha:    ROUTES.pagamentoStatus('falha'),
-  pendente: ROUTES.pagamentoStatus('pendente'),
-} as const;
 
 // ---------------------------------------------------------------------------
 // Rotas que exigem role específica

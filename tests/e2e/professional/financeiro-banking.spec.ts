@@ -44,8 +44,15 @@ async function openBankingModal(page: import('@playwright/test').Page) {
     page.getByRole('heading', { name: 'Relatorio Financeiro' })
   ).toBeVisible({ timeout: 15_000 });
   await page.getByRole('button', { name: /dados bancarios/i }).click();
-  await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
-  await expect(page.getByText('Dados Bancários')).toBeVisible();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible({ timeout: 5_000 });
+  await expect(dialog.getByRole('heading', { name: 'Dados Bancários' })).toBeVisible();
+}
+
+async function selectTransferenciaBancaria(page: import('@playwright/test').Page) {
+  const dialog = page.getByRole('dialog');
+  await dialog.getByRole('combobox').filter({ hasText: /^PIX$/ }).click();
+  await page.getByRole('option', { name: 'Transferência Bancária (TED)' }).click();
 }
 
 rdTest.describe('financeiro-banking — estrutura do modal', () => {
@@ -125,8 +132,7 @@ rdTest.describe('financeiro-banking — estrutura do modal', () => {
     await openBankingModal(page);
 
     // Mudar forma de recebimento para TED
-    await page.getByText('PIX').click();
-    await page.getByRole('option', { name: 'Transferência Bancária (TED)' }).click();
+    await selectTransferenciaBancaria(page);
 
     await expect(page.getByText('Banco')).toBeVisible();
     await expect(page.getByPlaceholder('Ex: Itaú, Bradesco, 001 - Banco do Brasil')).toBeVisible();
@@ -156,8 +162,7 @@ rdTest.describe('financeiro-banking — estrutura do modal', () => {
     await openBankingModal(page);
 
     // Mudar para TED
-    await page.getByText('PIX').click();
-    await page.getByRole('option', { name: 'Transferência Bancária (TED)' }).click();
+    await selectTransferenciaBancaria(page);
 
     // Preencher nome e CPF mas não o banco/agência/conta
     await page.getByPlaceholder('Seu nome completo').fill('Dr. Teste E2E TED');
@@ -174,21 +179,27 @@ rdTest.describe('financeiro-banking — estrutura do modal', () => {
     await openBankingModal(page);
 
     // Mudar para TED
-    await page.getByText('PIX').click();
-    await page.getByRole('option', { name: 'Transferência Bancária (TED)' }).click();
+    await selectTransferenciaBancaria(page);
 
     await page.getByPlaceholder('Seu nome completo').fill('Dr. Teste E2E TED');
     await page.getByPlaceholder('000.000.000-00').fill('123.456.789-09');
     await page.getByPlaceholder('Ex: Itaú, Bradesco, 001 - Banco do Brasil').fill('Itaú');
-    await page.getByPlaceholder('1234').fill('1234');
-    await page.getByPlaceholder('12345').fill('54321');
+    await page.getByPlaceholder('1234', { exact: true }).fill('1234');
+    await page.getByPlaceholder('12345', { exact: true }).fill('54321');
 
     await expect(
       page.getByRole('button', { name: 'Salvar Dados Bancários' })
     ).toBeEnabled();
   });
 
-  rdTest('fechar modal com Escape antes de salvar não persiste dados', async ({ page, goto }) => {
+  rdTest('fechar modal com Escape antes de salvar não chama endpoint de persistência', async ({ page, goto }) => {
+    let saveRequests = 0;
+    page.on('request', request => {
+      if (request.url().includes('/functions/v1/upsert-professional-banking-data')) {
+        saveRequests += 1;
+      }
+    });
+
     await goto(ROUTES.financeiroProf);
     await openBankingModal(page);
 
@@ -196,16 +207,9 @@ rdTest.describe('financeiro-banking — estrutura do modal', () => {
     await page.keyboard.press('Escape');
 
     await expect(page.getByRole('dialog')).not.toBeVisible({ timeout: 5_000 });
-
-    // Reabrir o modal — campo deve estar vazio (ou com dados do banco, não os digitados)
-    await page.getByRole('button', { name: /dados bancarios/i }).click();
-    await expect(page.getByRole('dialog')).toBeVisible({ timeout: 5_000 });
-
-    const nomeField = page.getByPlaceholder('Seu nome completo');
-    const value = await nomeField.inputValue();
-    // Se não há dados salvos no banco, deve estar vazio
-    // Se há dados, deve ter o valor do banco (não o que digitamos antes de fechar)
-    expect(value).not.toBe('Dr. Dados Temporários E2E');
+    await page.waitForTimeout(300);
+    expect(saveRequests).toBe(0);
+    await expect(page.getByText('Dados bancários salvos com sucesso!')).not.toBeVisible();
   });
 
 });

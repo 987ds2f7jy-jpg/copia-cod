@@ -469,6 +469,8 @@ function DashboardProfissionalInner() {
                   {PERIODS.map(p => (
                     <button
                       key={p.key}
+                      type="button"
+                      aria-pressed={period === p.key}
                       onClick={() => setPeriod(p.key)}
                       className={`px-3 py-1.5 text-xs font-medium rounded-lg transition-colors ${
                         period === p.key ? 'bg-card text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground'

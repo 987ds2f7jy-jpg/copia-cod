@@ -633,28 +633,29 @@ function LaudosMedicosInner() {
                 </h2>
                 <div className="space-y-3">
                   <div>
-                    <Label>Nome completo *</Label>
-                    <Input value={nome} onChange={(event) => setNome(event.target.value)} />
+                    <Label htmlFor="laudo-nome">Nome completo *</Label>
+                    <Input id="laudo-nome" value={nome} onChange={(event) => setNome(event.target.value)} />
                   </div>
                   <div>
-                    <Label>Data de nascimento *</Label>
+                    <Label htmlFor="laudo-nascimento">Data de nascimento *</Label>
                     <Input
+                      id="laudo-nascimento"
                       value={nascimento}
                       onChange={(event) => setNascimento(event.target.value)}
                       placeholder="DD/MM/AAAA"
                     />
                   </div>
                   <div>
-                    <Label>CPF *</Label>
-                    <Input value={cpf} onChange={(event) => setCpf(event.target.value)} />
+                    <Label htmlFor="laudo-cpf">CPF *</Label>
+                    <Input id="laudo-cpf" value={cpf} onChange={(event) => setCpf(event.target.value)} />
                   </div>
                   <div>
-                    <Label>Telefone *</Label>
-                    <Input value={telefone} onChange={(event) => setTelefone(event.target.value)} />
+                    <Label htmlFor="laudo-telefone">Telefone *</Label>
+                    <Input id="laudo-telefone" value={telefone} onChange={(event) => setTelefone(event.target.value)} />
                   </div>
                   <div>
-                    <Label>E-mail *</Label>
-                    <Input value={email} onChange={(event) => setEmail(event.target.value)} type="email" />
+                    <Label htmlFor="laudo-email">E-mail *</Label>
+                    <Input id="laudo-email" value={email} onChange={(event) => setEmail(event.target.value)} type="email" />
                   </div>
                 </div>
               </>
@@ -668,28 +669,29 @@ function LaudosMedicosInner() {
                 </h2>
                 <div className="space-y-3">
                   <div>
-                    <Label>Diagnostico atual ou motivo do laudo *</Label>
-                    <Textarea value={diagnostico} onChange={(event) => setDiagnostico(event.target.value)} rows={3} />
+                    <Label htmlFor="laudo-diagnostico">Diagnostico atual ou motivo do laudo *</Label>
+                    <Textarea id="laudo-diagnostico" value={diagnostico} onChange={(event) => setDiagnostico(event.target.value)} rows={3} />
                   </div>
                   <div>
-                    <Label>Historico clinico relevante</Label>
-                    <Textarea value={historico} onChange={(event) => setHistorico(event.target.value)} rows={2} />
+                    <Label htmlFor="laudo-historico">Historico clinico relevante</Label>
+                    <Textarea id="laudo-historico" value={historico} onChange={(event) => setHistorico(event.target.value)} rows={2} />
                   </div>
                   <div>
-                    <Label>Doencas cronicas</Label>
+                    <Label htmlFor="laudo-doencas-cronicas">Doencas cronicas</Label>
                     <Textarea
+                      id="laudo-doencas-cronicas"
                       value={doencasCronicas}
                       onChange={(event) => setDoencasCronicas(event.target.value)}
                       rows={2}
                     />
                   </div>
                   <div>
-                    <Label>Alergias</Label>
-                    <Textarea value={alergias} onChange={(event) => setAlergias(event.target.value)} rows={2} />
+                    <Label htmlFor="laudo-alergias">Alergias</Label>
+                    <Textarea id="laudo-alergias" value={alergias} onChange={(event) => setAlergias(event.target.value)} rows={2} />
                   </div>
                   <div>
-                    <Label>Medicamentos em uso</Label>
-                    <Textarea value={medicamentos} onChange={(event) => setMedicamentos(event.target.value)} rows={2} />
+                    <Label htmlFor="laudo-medicamentos">Medicamentos em uso</Label>
+                    <Textarea id="laudo-medicamentos" value={medicamentos} onChange={(event) => setMedicamentos(event.target.value)} rows={2} />
                   </div>
                 </div>
               </>
@@ -703,9 +705,9 @@ function LaudosMedicosInner() {
                 </h2>
                 <div className="space-y-3">
                   <div>
-                    <Label>Tipo de laudo solicitado *</Label>
+                    <Label htmlFor="laudo-tipo">Tipo de laudo solicitado *</Label>
                     <Select value={tipoLaudo} onValueChange={setTipoLaudo}>
-                      <SelectTrigger>
+                      <SelectTrigger id="laudo-tipo">
                         <SelectValue placeholder="Selecione o tipo" />
                       </SelectTrigger>
                       <SelectContent>
@@ -718,8 +720,9 @@ function LaudosMedicosInner() {
                     </Select>
                   </div>
                   <div>
-                    <Label>Finalidade do laudo *</Label>
+                    <Label htmlFor="laudo-finalidade">Finalidade do laudo *</Label>
                     <Textarea
+                      id="laudo-finalidade"
                       value={finalidade}
                       onChange={(event) => setFinalidade(event.target.value)}
                       rows={3}
@@ -738,8 +741,9 @@ function LaudosMedicosInner() {
                 </h2>
                 <div className="space-y-4">
                   <div>
-                    <Label>Documento de identidade * (PDF, JPG ou PNG - max. 10MB)</Label>
+                    <Label htmlFor="laudo-doc-identidade">Documento de identidade * (PDF, JPG ou PNG - max. 10MB)</Label>
                     <Input
+                      id="laudo-doc-identidade"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       onChange={(event) => handleSingleFileChange(event.target.files?.[0] || null, setDocIdentidade)}
@@ -753,8 +757,9 @@ function LaudosMedicosInner() {
                   </div>
 
                   <div>
-                    <Label>Exames recentes (opcional - ate 5 arquivos)</Label>
+                    <Label htmlFor="laudo-exames-recentes">Exames recentes (opcional - ate 5 arquivos)</Label>
                     <Input
+                      id="laudo-exames-recentes"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       multiple
@@ -775,8 +780,9 @@ function LaudosMedicosInner() {
                   </div>
 
                   <div>
-                    <Label>Relatorios medicos (opcional - ate 5 arquivos)</Label>
+                    <Label htmlFor="laudo-relatorios-medicos">Relatorios medicos (opcional - ate 5 arquivos)</Label>
                     <Input
+                      id="laudo-relatorios-medicos"
                       type="file"
                       accept=".pdf,.jpg,.jpeg,.png"
                       multiple

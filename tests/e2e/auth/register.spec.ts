@@ -71,7 +71,7 @@ rdTest.describe('register — paciente (estrutura)', () => {
   rdTest('CPF inválido (sequência repetida) exibe erro @critical', async ({ page }) => {
     await page.getByLabel('Nome completo').fill('Teste E2E');
     await page.getByLabel('Email').fill('teste-e2e-cpf@example.com');
-    await page.getByLabel('Senha').fill('senha123');
+    await page.getByLabel('Senha', { exact: true }).fill('senha123');
     await page.getByPlaceholder('000.000.000-00').fill('111.111.111-11');
 
     await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
@@ -83,7 +83,7 @@ rdTest.describe('register — paciente (estrutura)', () => {
   rdTest('senha com menos de 6 caracteres exibe erro de validação @critical', async ({
     page,
   }) => {
-    await page.getByLabel('Senha').fill('abc');
+    await page.getByLabel('Senha', { exact: true }).fill('abc');
     await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 
     await expect(page.getByText(/6 caracteres/i)).toBeVisible({ timeout: 5_000 });
@@ -118,7 +118,7 @@ rdTest.describe('register — paciente (caminho feliz)', () => {
 
     await page.getByLabel('Nome completo').fill('Paciente Teste E2E');
     await page.getByLabel('Email').fill(uniqueEmail);
-    await page.getByLabel('Senha').fill('senha-e2e-123');
+    await page.getByLabel('Senha', { exact: true }).fill('senha-e2e-123');
     await page.getByPlaceholder('000.000.000-00').fill('123.456.789-09'); // CPF matematicamente válido
     await page.getByPlaceholder('(11) 99999-9999').fill('(11) 99999-9999');
     await page.getByLabel(/data de nascimento/i).fill('1990-01-15');
@@ -197,7 +197,7 @@ rdTest.describe('register — profissional (estrutura)', () => {
     // Login com profissional pending
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_PENDING_PROFESSIONAL_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_PENDING_PROFESSIONAL_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_PENDING_PROFESSIONAL_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardProfissional/, { timeout: 20_000 });
 

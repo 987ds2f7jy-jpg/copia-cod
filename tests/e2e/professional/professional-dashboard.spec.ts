@@ -70,13 +70,50 @@ rdTest.describe('professional-dashboard - profissional aprovado', () => {
     await expect(page.getByText('Ativo').or(page.getByText('Inativo'))).toBeVisible();
   });
 
+  rdTest('widget de fila em tempo real renderiza contador e estado seguro @critical', async ({
+    page,
+    goto,
+  }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+
+    await expect(page.getByRole('heading', { name: /fila em tempo real/i })).toBeVisible({
+      timeout: 10_000,
+    });
+    await expect(page.getByText(/\d+ aguardando/i).first()).toBeVisible();
+    await expect(
+      page.getByText('Fila vazia').or(page.getByRole('button', { name: /atender|analise/i }).first()),
+    ).toBeVisible();
+  });
+
+  rdTest('widget de fila fica apenas na aba Dashboard', async ({ page, goto }, testInfo) => {
+    ensureProfessionalAuth(testInfo);
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+
+    await expect(page.getByRole('heading', { name: /fila em tempo real/i })).toBeVisible({
+      timeout: 10_000,
+    });
+
+    await clickProfessionalTab(page, 'perfil');
+
+    await expect(page.getByRole('heading', { name: /fila em tempo real/i })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Foto de Perfil' })).toBeVisible({
+      timeout: 10_000,
+    });
+  });
+
   rdTest('clicar em "Semana" altera o periodo selecionado', async ({ page, goto }, testInfo) => {
     ensureProfessionalAuth(testInfo);
     await goto(ROUTES.dashboardProfissional);
     await waitForProfessionalDashboard(page);
 
-    await page.getByRole('button', { name: 'Semana', exact: true }).click();
-    await expect(page.getByText('Consultas realizadas')).toBeVisible();
+    const semana = page.getByRole('button', { name: 'Semana', exact: true });
+    await expect(semana).toHaveAttribute('aria-pressed', 'false');
+    await semana.click();
+    await expect(semana).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByRole('button', { name: /^m[eê]s$/i })).toHaveAttribute('aria-pressed', 'false');
   });
 
   rdTest('clicar em "Meu Perfil" exibe o componente MeuPerfil @critical', async ({ page, goto }, testInfo) => {
@@ -154,7 +191,7 @@ rdTest.describe('professional-dashboard - status gate (R7)', () => {
 
     await goto(ROUTES.entrar);
     await page.getByLabel('Email').fill(process.env.E2E_PENDING_PROFESSIONAL_EMAIL!);
-    await page.getByLabel('Senha').fill(process.env.E2E_PENDING_PROFESSIONAL_PASSWORD ?? '');
+    await page.getByLabel('Senha', { exact: true }).fill(process.env.E2E_PENDING_PROFESSIONAL_PASSWORD ?? '');
     await page.getByRole('button', { name: 'Entrar' }).click();
     await page.waitForURL(/DashboardProfissional/, { timeout: 20_000 });
 
