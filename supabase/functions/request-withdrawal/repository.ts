@@ -8,6 +8,8 @@ import {
 } from '../_shared/supabase.ts';
 import type { RequestWithdrawalRepository } from './types.ts';
 
+const DIRECT_FINANCIAL_SERVICE_TYPES = ['checkup', 'renovacao_receitas'];
+
 async function findProfessionalByAppUserId(client: SupabaseClient, appUserId: string) {
   const { data, error } = await client
     .from('professional_profiles')
@@ -37,7 +39,7 @@ async function listCompletedAppointmentsForMonth(
 ) {
   const { data, error } = await client
     .from('appointments')
-    .select('status, date, price, preco')
+    .select('status, date, price, preco, professional_net_amount, consulta_id')
     .eq('professional_id', professionalId)
     .gte('date', monthStart)
     .lte('date', monthEnd)
@@ -52,7 +54,36 @@ async function listCompletedAppointmentsForMonth(
     });
   }
 
-  return (data as Array<{ price: number | null; preco: number | null; status: string | null; date: string | null }> | null) || [];
+  return (data as Array<{ price: number | null; preco: number | null; professional_net_amount?: number | null; status: string | null; date: string | null; consulta_id?: string | null }> | null) || [];
+}
+
+async function listCompletedServiceRequestsForMonth(
+  client: SupabaseClient,
+  professionalId: string,
+  monthStart: string,
+  monthEndExclusive: string,
+) {
+  const { data, error } = await client
+    .from('solicitacoes_exames')
+    .select('status, completed_at, quoted_professional_net_amount, consulta_id')
+    .eq('medico_id', professionalId)
+    .in('tipo', DIRECT_FINANCIAL_SERVICE_TYPES)
+    .eq('status', 'completed')
+    .eq('payment_status', 'paid')
+    .gt('quoted_professional_net_amount', 0)
+    .gte('completed_at', monthStart)
+    .lt('completed_at', monthEndExclusive);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'SERVICE_REQUESTS_LOOKUP_FAILED',
+      message: 'Unable to load completed service requests for withdrawal calculation.',
+      details: error.message,
+    });
+  }
+
+  return (data as Array<{ quoted_professional_net_amount: number | null; status: string | null; completed_at: string | null; consulta_id?: string | null }> | null) || [];
 }
 
 async function listPaidSaques(client: SupabaseClient, professionalId: string) {
@@ -129,6 +160,8 @@ function createRequestWithdrawalRepository(client: SupabaseClient): RequestWithd
     findProfessionalByAppUserId: (appUserId) => findProfessionalByAppUserId(client, appUserId),
     listCompletedAppointmentsForMonth: ({ professionalId, monthStart, monthEnd }) =>
       listCompletedAppointmentsForMonth(client, professionalId, monthStart, monthEnd),
+    listCompletedServiceRequestsForMonth: ({ professionalId, monthStart, monthEndExclusive }) =>
+      listCompletedServiceRequestsForMonth(client, professionalId, monthStart, monthEndExclusive),
     listPaidSaques: (professionalId) => listPaidSaques(client, professionalId),
     getBankingData: (professionalId) => getBankingData(client, professionalId),
     createSaque: ({ professionalId, valor, metodo, observacao }) => createSaque(client, { professionalId, valor, metodo, observacao }),

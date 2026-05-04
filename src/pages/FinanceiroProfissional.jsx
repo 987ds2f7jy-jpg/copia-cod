@@ -22,7 +22,7 @@ import { buildSaquePayload, buildWithdrawalMethodSummary, getSaqueDescriptor, SA
 import { getFinanceDashboardRequest, requestWithdrawalRequest } from '@/client-api/finance';
 
 const fmt = (value) => `R$ ${Number(value || 0).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}`;
-const PLATFORM_FEE = 0.15;
+const LEGACY_PLATFORM_FEE = 0.15;
 
 const TIPO_LABELS = {
   padrao: 'Por Especialidade',
@@ -36,6 +36,71 @@ const TIPO_LABELS = {
   ESPECIALIDADE: 'Por Especialidade',
   IMEDIATO: 'Plantao',
 };
+
+const SERVICE_REQUEST_LABELS = {
+  checkup: 'Check-up',
+  renovacao_receitas: 'Renovacao de receita',
+};
+
+function toPositiveNumber(value) {
+  const amount = Number(value);
+  return Number.isFinite(amount) && amount > 0 ? amount : 0;
+}
+
+function isCompletedStatus(status) {
+  return ['completed', 'CONCLUIDO'].includes(String(status || ''));
+}
+
+function isPendingStatus(status) {
+  return ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'].includes(String(status || ''));
+}
+
+function getItemDate(item) {
+  return String(item?.date || item?.completed_at || item?.created_at || item?.created_date || '').slice(0, 10);
+}
+
+function getGrossAmount(item) {
+  return toPositiveNumber(item?.gross_price) || toPositiveNumber(item?.price) || toPositiveNumber(item?.preco);
+}
+
+function getNetAmount(item) {
+  const snapshotNet = toPositiveNumber(item?.professional_net_amount);
+  if (snapshotNet > 0) {
+    return snapshotNet;
+  }
+
+  const gross = getGrossAmount(item);
+  const fee = toPositiveNumber(item?.platform_fee_amount);
+  if (gross > 0 && fee > 0) {
+    return Math.max(0, gross - fee);
+  }
+
+  return gross > 0 ? gross * (1 - LEGACY_PLATFORM_FEE) : 0;
+}
+
+function getFeeAmount(item) {
+  const snapshotFee = toPositiveNumber(item?.platform_fee_amount);
+  if (snapshotFee > 0) {
+    return snapshotFee;
+  }
+
+  const gross = getGrossAmount(item);
+  const net = toPositiveNumber(item?.professional_net_amount);
+  if (gross > 0 && net > 0) {
+    return Math.max(0, gross - net);
+  }
+
+  return gross > 0 ? gross * LEGACY_PLATFORM_FEE : 0;
+}
+
+function getFinanceItemLabel(item) {
+  if (item?.type === 'service_request') {
+    return SERVICE_REQUEST_LABELS[item.service_type] || 'Servico extra';
+  }
+
+  const tipo = item?.appointment_type || item?.tipo_consulta;
+  return TIPO_LABELS[tipo] || tipo || 'Consulta';
+}
 
 const STATUS_PAYMENT = {
   completed: { label: 'Pago', cls: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300' },
@@ -74,6 +139,15 @@ function FinanceiroProfissionalInner() {
     enabled: !!professional?.id,
   });
 
+  const { data: serviceRequests = [] } = useQuery({
+    queryKey: ['finance-service-requests', professional?.id],
+    queryFn: async () => {
+      const result = await getFinanceDashboardRequest({ appointmentsLimit: 500, saquesLimit: 1 });
+      return result?.serviceRequests || [];
+    },
+    enabled: !!professional?.id,
+  });
+
   const { data: saques = [] } = useQuery({
     queryKey: ['saques', professional?.id],
     queryFn: async () => {
@@ -97,20 +171,30 @@ function FinanceiroProfissionalInner() {
   const monthStart = format(startOfMonth(today), 'yyyy-MM-dd');
   const monthEnd = format(endOfMonth(today), 'yyyy-MM-dd');
 
-  const thisMonth = useMemo(
-    () => appointments.filter((appointment) => (appointment.date || '') >= monthStart && (appointment.date || '') <= monthEnd),
-    [appointments, monthStart, monthEnd]
-  );
-  const completed = thisMonth.filter((appointment) => ['completed', 'CONCLUIDO'].includes(appointment.status));
-  const pending = thisMonth.filter((appointment) => ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'].includes(appointment.status));
+  const financeItems = useMemo(() => {
+    return [
+      ...appointments.map((appointment) => ({ ...appointment, type: appointment.type || 'appointment' })),
+      ...serviceRequests.map((request) => ({ ...request, type: 'service_request' })),
+    ].sort((a, b) => getItemDate(b).localeCompare(getItemDate(a)));
+  }, [appointments, serviceRequests]);
 
-  const revenueMonth = completed.reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);
-  const revenuePending = pending.reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);
-  const platformFeeMonth = revenueMonth * PLATFORM_FEE;
-  const netMonth = revenueMonth - platformFeeMonth;
-  const allTimeRevenue = appointments
-    .filter((appointment) => ['completed', 'CONCLUIDO'].includes(appointment.status))
-    .reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);
+  const thisMonth = useMemo(
+    () => financeItems.filter((item) => {
+      const date = getItemDate(item);
+      return date >= monthStart && date <= monthEnd;
+    }),
+    [financeItems, monthStart, monthEnd]
+  );
+  const completed = thisMonth.filter((item) => isCompletedStatus(item.status));
+  const pending = thisMonth.filter((item) => isPendingStatus(item.status));
+
+  const revenueMonth = completed.reduce((sum, item) => sum + getGrossAmount(item), 0);
+  const revenuePending = pending.reduce((sum, item) => sum + getGrossAmount(item), 0);
+  const platformFeeMonth = completed.reduce((sum, item) => sum + getFeeAmount(item), 0);
+  const netMonth = completed.reduce((sum, item) => sum + getNetAmount(item), 0);
+  const allTimeRevenue = financeItems
+    .filter((item) => isCompletedStatus(item.status))
+    .reduce((sum, item) => sum + getGrossAmount(item), 0);
   const avgPerConsult = completed.length > 0 ? revenueMonth / completed.length : 0;
 
   const saquesPagos = saques
@@ -123,23 +207,24 @@ function FinanceiroProfissionalInner() {
       const month = subMonths(today, 5 - index);
       const start = format(startOfMonth(month), 'yyyy-MM-dd');
       const end = format(endOfMonth(month), 'yyyy-MM-dd');
-      const monthAppointments = appointments.filter((appointment) =>
-        ['completed', 'CONCLUIDO'].includes(appointment.status) &&
-        (appointment.date || '') >= start &&
-        (appointment.date || '') <= end
+      const monthItems = financeItems.filter((item) =>
+        isCompletedStatus(item.status) &&
+        getItemDate(item) >= start &&
+        getItemDate(item) <= end
       );
-      const gross = monthAppointments.reduce((sum, appointment) => sum + (appointment.price || appointment.preco || 0), 0);
+      const gross = monthItems.reduce((sum, item) => sum + getGrossAmount(item), 0);
+      const net = monthItems.reduce((sum, item) => sum + getNetAmount(item), 0);
 
       return {
         mes: format(month, 'MMM', { locale: ptBR }),
         bruto: gross,
-        liquido: gross * (1 - PLATFORM_FEE),
+        liquido: net,
       };
     });
-  }, [appointments, today]);
+  }, [financeItems, today]);
 
-  const historyAppts = [...appointments]
-    .sort((a, b) => (b.date || '').localeCompare(a.date || ''))
+  const historyItems = [...financeItems]
+    .sort((a, b) => getItemDate(b).localeCompare(getItemDate(a)))
     .slice(0, 100);
 
   const solicitarSaque = useMutation({
@@ -174,6 +259,7 @@ function FinanceiroProfissionalInner() {
       setChavePix('');
       queryClient.invalidateQueries({ queryKey: ['saques', professional?.id] });
       queryClient.invalidateQueries({ queryKey: ['finance-dashboard'] });
+      queryClient.invalidateQueries({ queryKey: ['finance-service-requests', professional?.id] });
     },
     onError: (error) => toast.error(error.message || 'Erro ao solicitar saque.'),
   });
@@ -181,7 +267,7 @@ function FinanceiroProfissionalInner() {
   const kpis = [
     { label: 'Receita disponivel', value: fmt(netMonth), icon: CheckCircle, cls: 'bg-emerald-50 text-emerald-600 dark:bg-emerald-950/40 dark:text-emerald-300' },
     { label: 'Receita pendente', value: fmt(revenuePending), icon: Clock, cls: 'bg-amber-50 text-amber-600 dark:bg-amber-950/40 dark:text-amber-300' },
-    { label: 'Taxa plataforma (15%)', value: fmt(platformFeeMonth), icon: DollarSign, cls: 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-300' },
+    { label: 'Taxa plataforma', value: fmt(platformFeeMonth), icon: DollarSign, cls: 'bg-red-50 text-red-500 dark:bg-red-950/40 dark:text-red-300' },
     { label: 'Receita acumulada', value: fmt(allTimeRevenue), icon: TrendingUp, cls: 'bg-indigo-50 text-indigo-600 dark:bg-indigo-950/40 dark:text-indigo-300' },
     { label: 'Total recebido (mes)', value: fmt(revenueMonth), icon: BarChart2, cls: 'bg-purple-50 text-purple-600 dark:bg-purple-950/40 dark:text-purple-300' },
     { label: 'Media por consulta', value: fmt(avgPerConsult), icon: DollarSign, cls: 'bg-sky-50 text-sky-600 dark:bg-sky-950/40 dark:text-sky-300' },
@@ -251,7 +337,7 @@ function FinanceiroProfissionalInner() {
           <CardHeader>
             <CardTitle className="text-base font-semibold text-foreground flex items-center gap-2">
               <CheckCircle className="w-4 h-4 text-indigo-500" />
-              Historico de Consultas
+              Historico financeiro
             </CardTitle>
           </CardHeader>
           <CardContent className="p-0">
@@ -263,31 +349,31 @@ function FinanceiroProfissionalInner() {
                     <th className="px-5 py-3 text-left font-medium">Paciente</th>
                     <th className="px-5 py-3 text-left font-medium">Tipo</th>
                     <th className="px-5 py-3 text-right font-medium">Valor bruto</th>
-                    <th className="px-5 py-3 text-right font-medium">Taxa (15%)</th>
+                    <th className="px-5 py-3 text-right font-medium">Taxa</th>
                     <th className="px-5 py-3 text-right font-medium">Valor liquido</th>
                     <th className="px-5 py-3 text-center font-medium">Status</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border">
-                  {historyAppts.length === 0 ? (
-                    <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhuma consulta encontrada</td></tr>
-                  ) : historyAppts.map((appointment) => {
-                    const bruto = appointment.price || appointment.preco || 0;
-                    const taxa = bruto * PLATFORM_FEE;
-                    const liquido = bruto - taxa;
-                    const tipo = appointment.appointment_type || appointment.tipo_consulta;
-                    const payStatus = STATUS_PAYMENT[appointment.status] || { label: appointment.status, cls: 'bg-muted text-muted-foreground' };
+                  {historyItems.length === 0 ? (
+                    <tr><td colSpan={7} className="px-5 py-8 text-center text-muted-foreground">Nenhum item financeiro encontrado</td></tr>
+                  ) : historyItems.map((item) => {
+                    const bruto = getGrossAmount(item);
+                    const taxa = getFeeAmount(item);
+                    const liquido = getNetAmount(item);
+                    const payStatus = STATUS_PAYMENT[item.status] || { label: item.status, cls: 'bg-muted text-muted-foreground' };
+                    const date = getItemDate(item);
 
                     return (
-                      <tr key={appointment.id} className="hover:bg-muted/50 transition-colors">
+                      <tr key={`${item.type}-${item.id}`} className="hover:bg-muted/50 transition-colors">
                         <td className="px-5 py-3 text-muted-foreground whitespace-nowrap">
-                          {appointment.date ? format(new Date(`${appointment.date}T00:00`), 'dd/MM/yyyy') : '—'}
+                          {date ? format(new Date(`${date}T00:00`), 'dd/MM/yyyy') : '—'}
                         </td>
                         <td className="px-5 py-3 text-foreground font-medium truncate max-w-[150px]">
-                          {appointment.patient_name || appointment.paciente_nome || '—'}
+                          {item.patient_name || item.paciente_nome || '—'}
                         </td>
                         <td className="px-5 py-3 text-muted-foreground">
-                          {TIPO_LABELS[tipo] || tipo || '—'}
+                          {getFinanceItemLabel(item)}
                         </td>
                         <td className="px-5 py-3 text-right text-foreground">{fmt(bruto)}</td>
                         <td className="px-5 py-3 text-right text-red-500">-{fmt(taxa)}</td>

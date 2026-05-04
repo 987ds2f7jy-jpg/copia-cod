@@ -39,15 +39,27 @@ export async function getFinanceDashboard({
   const professionalId = String(professional.id);
   const professionalIds = await repository.listProfessionalIdsByAppUserId(appUserId);
   const visibleProfessionalIds = professionalIds.length > 0 ? professionalIds : [professionalId];
-  const [appointments, saques, bankingData] = await Promise.all([
+  const [appointments, serviceRequests, saques, bankingData] = await Promise.all([
     repository.listAppointments(visibleProfessionalIds, appointmentsLimit),
+    repository.listCompletedServiceRequests(visibleProfessionalIds, appointmentsLimit),
     repository.listSaques(professionalId, saquesLimit),
     repository.getBankingData(professionalId),
   ]);
 
+  const appointmentConsultaIds = new Set(
+    appointments
+      .map((appointment) => String(appointment?.consulta_id || '').trim())
+      .filter(Boolean),
+  );
+  const visibleServiceRequests = serviceRequests.filter((request) => {
+    const consultaId = String(request?.consulta_id || '').trim();
+    return !consultaId || !appointmentConsultaIds.has(consultaId);
+  });
+
   return {
     professional,
     appointments,
+    serviceRequests: visibleServiceRequests,
     saques,
     bankingData,
   };

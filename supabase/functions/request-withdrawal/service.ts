@@ -12,8 +12,9 @@ function formatMonthBounds(now = new Date()) {
   const year = now.getFullYear();
   const start = new Date(year, month, 1);
   const end = new Date(year, month + 1, 0);
+  const endExclusive = new Date(year, month + 1, 1);
   const toYmd = (d: Date) => d.toISOString().slice(0, 10);
-  return { monthStart: toYmd(start), monthEnd: toYmd(end) };
+  return { monthStart: toYmd(start), monthEnd: toYmd(end), monthEndExclusive: toYmd(endExclusive) };
 }
 
 function buildWithdrawalSummary(bankingData: Record<string, unknown> | null, pixKey: string | null) {
@@ -50,7 +51,7 @@ export async function requestWithdrawal({
   appUserId: string;
   repository: RequestWithdrawalRepository;
 } & RequestWithdrawalCommand): Promise<RequestWithdrawalResult> {
-  const { monthStart, monthEnd } = formatMonthBounds();
+  const { monthStart, monthEnd, monthEndExclusive } = formatMonthBounds();
 
   console.info('[request-withdrawal] request:start', {
     requestId,
@@ -71,14 +72,36 @@ export async function requestWithdrawal({
   }
 
   const professionalId = professional.id;
-  const [appointments, paidSaques, bankingData] = await Promise.all([
+  const [appointments, serviceRequests, paidSaques, bankingData] = await Promise.all([
     repository.listCompletedAppointmentsForMonth({ professionalId, monthStart, monthEnd }),
+    repository.listCompletedServiceRequestsForMonth({ professionalId, monthStart, monthEndExclusive }),
     repository.listPaidSaques(professionalId),
     repository.getBankingData(professionalId),
   ]);
 
-  const grossMonth = appointments.reduce((sum, a) => sum + Number(a.price ?? a.preco ?? 0), 0);
-  const netMonth = grossMonth * (1 - PLATFORM_FEE);
+  const netAppointmentsMonth = appointments.reduce((sum, a) => {
+    const snapshotNet = Number(a.professional_net_amount ?? 0);
+    if (Number.isFinite(snapshotNet) && snapshotNet > 0) {
+      return sum + snapshotNet;
+    }
+
+    const legacyGross = Number(a.price ?? a.preco ?? 0);
+    return sum + (legacyGross > 0 ? legacyGross * (1 - PLATFORM_FEE) : 0);
+  }, 0);
+  const appointmentConsultaIds = new Set(
+    appointments
+      .map((appointment) => String(appointment.consulta_id || '').trim())
+      .filter(Boolean),
+  );
+  const visibleServiceRequests = serviceRequests.filter((item) => {
+    const consultaId = String(item.consulta_id || '').trim();
+    return !consultaId || !appointmentConsultaIds.has(consultaId);
+  });
+  const netServiceRequestsMonth = visibleServiceRequests.reduce(
+    (sum, item) => sum + Number(item.quoted_professional_net_amount ?? 0),
+    0,
+  );
+  const netMonth = netAppointmentsMonth + netServiceRequestsMonth;
   const saquesPagos = paidSaques.reduce((sum, s) => sum + Number(s.valor ?? 0), 0);
   const saldoDisponivel = Math.max(0, netMonth - saquesPagos);
 
