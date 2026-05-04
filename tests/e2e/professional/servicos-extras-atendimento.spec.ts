@@ -17,7 +17,7 @@ import {
   mockAuthForRole,
 } from '../support/edge-mocks';
 
-const SOLICITACAO_ID = 'solicitacao-extra-e2e-1';
+const SOLICITACAO_ID = '6f2f7f4f-3e07-4d8b-8a43-3d937d0a8a01';
 
 const directSolicitacao = {
   id: SOLICITACAO_ID,
@@ -165,7 +165,7 @@ rdTest.describe('Servicos Extras - Dashboard Profissional', () => {
     await page.getByRole('button', { name: /Atender Solicitacao/i }).click();
 
     await expect(page.getByText('Solicitacao aceita', { exact: true })).toBeVisible({ timeout: 8_000 });
-    await expect(page).toHaveURL(/\/AtenderServicoExtra\?solicitacao=solicitacao-extra-e2e-1/, {
+    await expect(page).toHaveURL(/\/AtenderServicoExtra\?solicitacao=6f2f7f4f-3e07-4d8b-8a43-3d937d0a8a01/, {
       timeout: 10_000,
     });
     await expect(page.getByRole('heading', { name: 'Atendimento de Servico Extra' })).toBeVisible();
@@ -304,6 +304,6 @@ rdTest.describe('AtenderServicoExtra - atendimento assincrono', () => {
       timeout: 8_000,
     });
     await expect(page.getByText('Pagamento ainda nao confirmado.', { exact: true })).toBeVisible();
-    await expect(page).toHaveURL(/\/AtenderServicoExtra\?solicitacao=solicitacao-extra-e2e-1/);
+    await expect(page).toHaveURL(/\/AtenderServicoExtra\?solicitacao=6f2f7f4f-3e07-4d8b-8a43-3d937d0a8a01/);
   });
 });
