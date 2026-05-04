@@ -46,6 +46,10 @@ function mapFinishTransactionError(error: { message?: string; details?: string }
       status: 422,
       message: 'Exam/service request payment must be confirmed before finishing.',
     },
+    SOLICITACAO_EXAME_PAYMENT_CHARGE_REQUIRED: {
+      status: 409,
+      message: 'Exam/service request is missing the active payment charge required for finishing.',
+    },
     SOLICITACAO_EXAME_NOT_ASSIGNED_TO_PROFESSIONAL: {
       status: 404,
       message: 'Exam/service request not found.',
