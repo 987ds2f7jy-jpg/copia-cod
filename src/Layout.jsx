@@ -12,7 +12,7 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, Shield, Video, Sparkles, FileText
+  ArrowLeft, Shield, Video, Sparkles, FileText, CreditCard
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
@@ -235,12 +235,20 @@ function LayoutInner({ children, currentPageName }) {
                       </Link>
                     </DropdownMenuItem>
                     {user.role === 'patient' && (
-                      <DropdownMenuItem asChild>
-                        <Link to={createPageUrl('MeuProntuario')} className="flex items-center gap-2">
-                          <FileText className="w-4 h-4" />
-                          Meu Prontuário
-                        </Link>
-                      </DropdownMenuItem>
+                      <>
+                        <DropdownMenuItem asChild>
+                          <Link to={createPageUrl('MeuProntuario')} className="flex items-center gap-2">
+                            <FileText className="w-4 h-4" />
+                            Meu Prontuário
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
+                          <Link to={createPageUrl('MeusPagamentos')} className="flex items-center gap-2">
+                            <CreditCard className="w-4 h-4" />
+                            Meus Pagamentos
+                          </Link>
+                        </DropdownMenuItem>
+                      </>
                     )}
                     {user.role === 'professional' && (
                       <DropdownMenuItem asChild>

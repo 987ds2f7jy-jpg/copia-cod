@@ -49,6 +49,7 @@ export const ROUTES = {
   teleconsulta:            '/Teleconsulta',
   consultaRoom:            (id: string) => `/consulta/${id}`,
   meuProntuario:           '/MeuProntuario',
+  meusPagamentos:          '/MeusPagamentos',
   atenderServicoExtra:     (id: string) => `/AtenderServicoExtra?solicitacao=${id}`,
   pagamentoStatus:         (status: 'sucesso' | 'falha' | 'pendente' | string) => `/pagamento/${status}`,
   financeiroProf:          '/FinanceiroProfissional',
@@ -83,6 +84,7 @@ export const AUTH_REQUIRED_ROUTES = [
   ROUTES.solicitacaoExames,
   ROUTES.renovacaoReceitas,
   ROUTES.teleconsulta,
+  ROUTES.meusPagamentos,
   ROUTES.pagamentoStatus('sucesso'),
   ROUTES.pagamentoStatus('falha'),
   ROUTES.pagamentoStatus('pendente'),
@@ -97,6 +99,7 @@ export const PATIENT_ROUTES = [
   ROUTES.renovacaoReceitas,
   ROUTES.agendamentoEspecialidade,
   ROUTES.agendamentoPerfil,
+  ROUTES.meusPagamentos,
   ROUTES.pagamentoStatus('sucesso'),
 ] as const;
 
