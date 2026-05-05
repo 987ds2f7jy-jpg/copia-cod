@@ -4,7 +4,7 @@ import { invokeEdgeFunction } from './edgeFunctions';
 const PAYMENT_STATUS_LABELS = {
   payment_pending: {
     label: 'Aguardando pagamento',
-    description: 'Conclua o pagamento para liberar a proxima etapa.',
+    description: 'Conclua o checkout seguro para liberar a proxima etapa.',
     tone: 'amber',
   },
   payment_processing: {
@@ -37,6 +37,12 @@ const PAYMENT_STATUS_LABELS = {
     description: 'Este pagamento foi contestado.',
     tone: 'red',
   },
+};
+
+const PAYMENT_PROVIDER_LABELS = {
+  mock: 'Ambiente interno',
+  mercadopago: 'Mercado Pago',
+  stripe: 'Stripe',
 };
 
 function pickFirstDefined(...values) {
@@ -100,6 +106,31 @@ export function normalizePayment(payment = null, owner = null) {
 
 export function getPaymentStatusInfo(status) {
   return PAYMENT_STATUS_LABELS[status] || PAYMENT_STATUS_LABELS.payment_pending;
+}
+
+export function formatPaymentProviderName(provider) {
+  const normalized = String(provider || '').trim().toLowerCase();
+
+  if (!normalized) {
+    return 'Plataforma';
+  }
+
+  return PAYMENT_PROVIDER_LABELS[normalized] || provider;
+}
+
+export async function ensurePaymentChargeRequest({
+  ownerType = '',
+  ownerId = '',
+}) {
+  const result = await invokeEdgeFunction('ensure-payment-charge', {
+    body: {
+      ownerType,
+      ownerId,
+    },
+    fallbackMessage: 'Nao foi possivel preparar o checkout do pagamento.',
+  });
+
+  return normalizePayment(result?.payment || result);
 }
 
 export function canUsePaymentSimulation() {

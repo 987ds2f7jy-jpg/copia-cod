@@ -1,11 +1,13 @@
-import React, { useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
   canUsePaymentSimulation,
+  ensurePaymentChargeRequest,
   formatMoney,
+  formatPaymentProviderName,
   getPaymentStatusInfo,
   normalizePayment,
   simulatePaymentPaidRequest,
@@ -34,7 +36,9 @@ export default function PaymentStep({
   className = '',
 }) {
   const [localPayment, setLocalPayment] = useState(() => normalizePayment(payment));
+  const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [simulationLoading, setSimulationLoading] = useState(false);
+  const [syncError, setSyncError] = useState('');
   const currentPayment = useMemo(
     () => normalizePayment(localPayment || payment),
     [localPayment, payment],
@@ -42,13 +46,116 @@ export default function PaymentStep({
   const statusInfo = getPaymentStatusInfo(currentPayment?.status);
   const isPaid = currentPayment?.status === 'paid';
   const canSimulate = !isPaid && canUsePaymentSimulation();
+  const shouldRefreshCheckout = Boolean(
+    ownerType &&
+    ownerId &&
+    !isPaid &&
+    (
+      !currentPayment?.checkoutUrl ||
+      currentPayment?.status === 'payment_failed' ||
+      currentPayment?.status === 'payment_expired'
+    ),
+  );
+  const providerLabel = formatPaymentProviderName(currentPayment?.provider);
+  const checkoutButtonLabel = currentPayment?.status === 'payment_failed' || currentPayment?.status === 'payment_expired'
+    ? 'Gerar novo checkout'
+    : 'Abrir checkout seguro';
 
-  function handleCheckout() {
-    if (!currentPayment?.checkoutUrl) {
+  useEffect(() => {
+    if (!shouldRefreshCheckout || checkoutLoading || syncError) {
       return;
     }
 
-    window.location.assign(currentPayment.checkoutUrl);
+    let active = true;
+
+    const syncCheckout = async () => {
+      setCheckoutLoading(true);
+      setSyncError('');
+
+      try {
+        const nextPayment = await ensurePaymentChargeRequest({ ownerType, ownerId });
+
+        if (!active || !nextPayment) {
+          return;
+        }
+
+        setLocalPayment(nextPayment);
+
+        if (nextPayment.status === 'paid') {
+          onPaid?.(nextPayment, { status: 'paid', paidAt: nextPayment.paidAt || null });
+        }
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+
+        setSyncError(error instanceof Error ? error.message : 'Nao foi possivel atualizar a cobranca.');
+      } finally {
+        if (active) {
+          setCheckoutLoading(false);
+        }
+      }
+    };
+
+    void syncCheckout();
+
+    return () => {
+      active = false;
+    };
+  }, [
+    checkoutLoading,
+    onPaid,
+    ownerId,
+    ownerType,
+    syncError,
+    shouldRefreshCheckout,
+  ]);
+
+  async function handleCheckout() {
+    setCheckoutLoading(true);
+    setSyncError('');
+
+    try {
+      let nextPayment = currentPayment;
+
+      if (
+        ownerType &&
+        ownerId &&
+        (
+          !currentPayment?.checkoutUrl ||
+          currentPayment?.status === 'payment_failed' ||
+          currentPayment?.status === 'payment_expired'
+        )
+      ) {
+        nextPayment = await ensurePaymentChargeRequest({ ownerType, ownerId });
+        setLocalPayment(nextPayment);
+      }
+
+      if (!nextPayment) {
+        throw new Error('O backend nao retornou uma cobranca valida para este pagamento.');
+      }
+
+      if (nextPayment.status === 'paid') {
+        onPaid?.(nextPayment, { status: 'paid', paidAt: nextPayment.paidAt || null });
+        return;
+      }
+
+      if (!nextPayment.checkoutUrl) {
+        throw new Error('Ainda nao foi possivel gerar um checkout valido para este pagamento.');
+      }
+
+      window.location.assign(nextPayment.checkoutUrl);
+    } catch (error) {
+      const message = error instanceof Error ? error.message : 'Nao foi possivel abrir o checkout.';
+      setSyncError(message);
+      toast({
+        title: 'Erro ao abrir pagamento',
+        description: message,
+        variant: 'destructive',
+      });
+    } finally {
+      setCheckoutLoading(false);
+    }
   }
 
   async function handleSimulatePayment() {
@@ -131,15 +238,34 @@ export default function PaymentStep({
             <span className="text-muted-foreground">Status</span>
             <span className="font-medium text-foreground">{statusInfo.description}</span>
           </div>
+          <div className="mt-2 flex items-center justify-between">
+            <span className="text-muted-foreground">Checkout</span>
+            <span className="font-medium text-foreground">{providerLabel}</span>
+          </div>
         </div>
 
         {!isPaid && (
           <div className="space-y-3">
-            {currentPayment.checkoutUrl && (
-              <Button onClick={handleCheckout} className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700">
-                Ir para pagamento
-                <ExternalLink className="ml-2 h-4 w-4" />
-              </Button>
+            <Button
+              onClick={handleCheckout}
+              disabled={checkoutLoading}
+              className="h-12 w-full bg-emerald-600 text-white hover:bg-emerald-700"
+            >
+              {checkoutLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {checkoutButtonLabel}
+              <ExternalLink className="ml-2 h-4 w-4" />
+            </Button>
+
+            {syncError && (
+              <div className="rounded-xl border border-red-200 bg-red-50 p-3 text-sm text-red-700 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
+                {syncError}
+              </div>
+            )}
+
+            {!currentPayment.checkoutUrl && !checkoutLoading && (
+              <div className="rounded-xl border border-blue-200 bg-blue-50 p-3 text-sm text-blue-700 dark:border-blue-900/60 dark:bg-blue-950/40 dark:text-blue-300">
+                Estamos preparando a cobranca segura no backend. Se necessario, uma nova tentativa sera gerada automaticamente.
+              </div>
             )}
 
             {canSimulate && (
@@ -147,7 +273,7 @@ export default function PaymentStep({
                 type="button"
                 variant="outline"
                 onClick={handleSimulatePayment}
-                disabled={simulationLoading}
+                disabled={simulationLoading || checkoutLoading}
                 className="h-12 w-full border-amber-200 bg-amber-50 text-amber-700 hover:bg-amber-100 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300 dark:hover:bg-amber-900/40"
               >
                 {simulationLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
@@ -155,9 +281,9 @@ export default function PaymentStep({
               </Button>
             )}
 
-            {!currentPayment.checkoutUrl && !canSimulate && (
+            {!canSimulate && !checkoutLoading && !currentPayment.checkoutUrl && !syncError && (
               <div className="rounded-xl border border-amber-200 bg-amber-50 p-3 text-sm text-amber-700 dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-                A cobranca foi criada, mas ainda nao ha checkout disponivel para este ambiente.
+                Se a cobranca anterior tiver expirado ou falhado, o backend gera um checkout novo quando voce prosseguir.
               </div>
             )}
           </div>

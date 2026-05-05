@@ -23,7 +23,11 @@ import {
 } from '@/components/ui/dialog';
 import { useAuth } from '@/components/AuthContext';
 import { getPatientPaymentsRequest } from '@/client-api/patientPayments';
-import { formatMoney, getPaymentStatusInfo } from '@/client-api/payments';
+import {
+  formatMoney,
+  formatPaymentProviderName,
+  getPaymentStatusInfo,
+} from '@/client-api/payments';
 
 const FILTROS = [
   { id: 'todos', label: 'Todos' },
@@ -127,7 +131,7 @@ function DetailRow({ label, value }) {
 
 function PaymentCard({ payment, onOpen }) {
   const dateTime = formatarDataHora(resolveEventDate(payment));
-  const provider = payment.provider || 'Plataforma';
+  const provider = formatPaymentProviderName(payment.provider);
 
   return (
     <Card className="border-border hover:shadow-md transition-shadow">
@@ -229,7 +233,7 @@ function PaymentDetailsModal({ payment, open, onClose }) {
           <div className="rounded-lg border border-border bg-muted/30 p-4">
             <DetailRow label="ID" value={payment.id ? `...${payment.id.slice(-8)}` : ''} />
             <DetailRow label="Tentativa" value={payment.attempt_number} />
-            <DetailRow label="Provedor" value={payment.provider || 'Plataforma'} />
+            <DetailRow label="Provedor" value={formatPaymentProviderName(payment.provider)} />
             <DetailRow label="Referência" value={payment.external_reference} />
             <DetailRow label="Criado em" value={`${created.data}${created.hora ? ` às ${created.hora}` : ''}`} />
             {payment.paid_at && (

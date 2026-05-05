@@ -6,7 +6,7 @@ import type {
 } from './types.ts';
 
 export type PaymentProvider = {
-  name: 'mock' | 'mercadopago';
+  name: 'mock' | 'mercadopago' | 'stripe';
   createCharge(input: ProviderCreateChargeInput): Promise<ProviderCreateChargeResult>;
   getChargeStatus(providerChargeId: string): Promise<ProviderChargeStatusResult>;
   verifyWebhook(input: {
