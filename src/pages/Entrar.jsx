@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { Loader2, Eye, EyeOff, Stethoscope } from 'lucide-react';
 import { createPageUrl } from '@/utils';
 import { useAuth } from '@/components/AuthContext';
@@ -19,11 +19,13 @@ function resolveRedirectPath(user) {
 export default function Entrar() {
   const { login, user, loading: authLoading } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
+  const resetSucceeded = searchParams.get('reset') === 'success';
 
   useEffect(() => {
     if (authLoading || !user) {
@@ -79,6 +81,12 @@ export default function Entrar() {
         <Card className="border border-border shadow-xl">
           <CardContent className="p-6">
             <form onSubmit={handleSubmit} className="space-y-5">
+              {resetSucceeded ? (
+                <div className="rounded-lg border border-emerald-200 bg-emerald-50 px-3 py-2 text-sm text-emerald-700 dark:border-emerald-900/60 dark:bg-emerald-950/30 dark:text-emerald-200">
+                  Sua senha foi atualizada. Entre novamente com a nova senha.
+                </div>
+              ) : null}
+
               <div>
                 <Label htmlFor="email">Email</Label>
                 <Input
@@ -112,6 +120,15 @@ export default function Entrar() {
                   >
                     {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                   </button>
+                </div>
+
+                <div className="mt-2 text-right">
+                  <Link
+                    to={email.trim() ? `${createPageUrl('RecuperarSenha')}?email=${encodeURIComponent(email.trim())}` : createPageUrl('RecuperarSenha')}
+                    className="text-sm font-medium text-emerald-600 hover:underline"
+                  >
+                    Esqueci minha senha
+                  </Link>
                 </div>
               </div>
 

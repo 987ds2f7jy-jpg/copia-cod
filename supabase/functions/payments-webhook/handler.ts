@@ -95,13 +95,16 @@ async function sha256Hex(value: string) {
 
 function buildPayload(req: Request, body: Record<string, unknown>) {
   const url = new URL(req.url);
+  const hasLegacySignature = Boolean(req.headers.get('x-signature'));
+  const hasStripeSignature = Boolean(req.headers.get('stripe-signature'));
 
   return {
     body,
     query: Object.fromEntries(url.searchParams.entries()),
     headers: {
       xRequestId: req.headers.get('x-request-id') || '',
-      xSignaturePresent: Boolean(req.headers.get('x-signature')),
+      xSignaturePresent: hasLegacySignature || hasStripeSignature,
+      stripeSignaturePresent: hasStripeSignature,
       userAgent: req.headers.get('user-agent') || '',
     },
   };
@@ -262,6 +265,9 @@ async function resolvePaymentCharge(
       : null,
     status.providerChargeId
       ? { field: 'provider_payment_reference', value: status.providerChargeId }
+      : null,
+    status.providerChargeId
+      ? { field: 'provider_charge_id', value: status.providerChargeId }
       : null,
     preferenceId
       ? { field: 'provider_charge_id', value: preferenceId }
@@ -555,7 +561,7 @@ function isNonRetryableProcessingError(error: unknown) {
 export async function handlePaymentsWebhookRequest(req: Request) {
   const preflightResponse = handlePreflight(req, {
     allowedMethods: ['POST'],
-    allowedHeaders: ['x-signature', 'x-request-id'],
+    allowedHeaders: ['x-signature', 'x-request-id', 'stripe-signature'],
   });
 
   if (preflightResponse) {
@@ -566,12 +572,12 @@ export async function handlePaymentsWebhookRequest(req: Request) {
   const methodErrorResponse = ensureMethod(req, {
     allowedMethods: ['POST'],
     functionName: FUNCTION_NAME,
-    requestId,
-    cors: {
-      allowedMethods: ['POST'],
-      allowedHeaders: ['x-signature', 'x-request-id'],
-    },
-  });
+      requestId,
+      cors: {
+        allowedMethods: ['POST'],
+        allowedHeaders: ['x-signature', 'x-request-id', 'stripe-signature'],
+      },
+    });
 
   if (methodErrorResponse) {
     return methodErrorResponse;
@@ -676,7 +682,7 @@ export async function handlePaymentsWebhookRequest(req: Request) {
       functionName: FUNCTION_NAME,
       cors: {
         allowedMethods: ['POST'],
-        allowedHeaders: ['x-signature', 'x-request-id'],
+        allowedHeaders: ['x-signature', 'x-request-id', 'stripe-signature'],
       },
     });
   }

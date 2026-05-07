@@ -1,6 +1,6 @@
 import type { PaymentChargeStatus, PaymentOwnerType } from '../types.ts';
 
-export type PaymentProviderName = 'mock' | 'mercadopago';
+export type PaymentProviderName = 'mock' | 'mercadopago' | 'stripe';
 
 export type ProviderCreateChargeInput = {
   internalChargeId: string;

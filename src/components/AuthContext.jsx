@@ -108,6 +108,22 @@ export function AuthProvider({ children }) {
     }
   }, []);
 
+  const requestPasswordReset = useCallback(async (email) => {
+    try {
+      await authService.requestPasswordReset(email);
+    } catch (error) {
+      throw new Error(getUserFacingErrorMessage(error, 'Nao foi possivel enviar o email de recuperacao.'));
+    }
+  }, []);
+
+  const resetPassword = useCallback(async (password) => {
+    try {
+      await authService.resetPassword(password);
+    } catch (error) {
+      throw new Error(getUserFacingErrorMessage(error, 'Nao foi possivel redefinir a senha.'));
+    }
+  }, []);
+
   const logout = useCallback(async () => {
     if (user?.role === 'professional' && user?.id) {
       try {
@@ -183,6 +199,8 @@ export function AuthProvider({ children }) {
         isAuthenticated: !!user,
         login,
         register,
+        requestPasswordReset,
+        resetPassword,
         logout,
         refreshUser,
         updateUser,

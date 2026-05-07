@@ -1,6 +1,7 @@
 import { AppError } from '../../errors.ts';
 import { createMercadoPagoProvider } from './real-provider.ts';
 import { createMockPaymentProvider } from './mock-provider.ts';
+import { createStripePaymentProvider } from './stripe-provider.ts';
 import type { PaymentProvider } from './provider-interface.ts';
 import type { PaymentProviderName } from './types.ts';
 
@@ -17,6 +18,10 @@ export function normalizePaymentProviderName(providerName: string): PaymentProvi
 
   if (configured === 'mercadopago' || configured === 'mercado_pago') {
     return 'mercadopago';
+  }
+
+  if (configured === 'stripe') {
+    return 'stripe';
   }
 
   throw new AppError({
@@ -38,6 +43,10 @@ export function createPaymentProvider(providerName?: string | PaymentProviderNam
 
   if (normalizedProviderName === 'mercadopago') {
     return createMercadoPagoProvider();
+  }
+
+  if (normalizedProviderName === 'stripe') {
+    return createStripePaymentProvider();
   }
 
   throw new AppError({

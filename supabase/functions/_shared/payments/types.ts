@@ -29,6 +29,7 @@ export type CreatedPaymentCharge = {
   attemptNumber: number;
   amount: number;
   currency: string;
+  paidAt?: string | null;
   reusedExisting: boolean;
 };
 

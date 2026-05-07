@@ -11,6 +11,8 @@ import { AppError } from '../_shared/errors.ts';
 import {
   assertActiveSessionAccount,
   createSessionAccountServiceClient,
+  linkSessionAccountAuthUserId,
+  loadSessionAccountByEmail,
   loadSessionAccountByAuthUserId,
   signInWithPassword,
 } from '../_shared/sessionAccount.ts';
@@ -80,9 +82,35 @@ async function handleLoginAppUserRequest(req: Request) {
     const input = parseInput(await readJsonBody<unknown>(req));
     const authResult = await signInWithPassword(input);
     const client = createSessionAccountServiceClient();
-    const appUser = assertActiveSessionAccount(
-      await loadSessionAccountByAuthUserId(client, authResult.authUserId),
-    );
+    let appUser = await loadSessionAccountByAuthUserId(client, authResult.authUserId);
+
+    if (!appUser?.id) {
+      const appUserByEmail = await loadSessionAccountByEmail(client, authResult.email);
+
+      if (appUserByEmail?.id) {
+        if (appUserByEmail.authUserId && appUserByEmail.authUserId !== authResult.authUserId) {
+          throw new AppError({
+            status: 409,
+            code: 'APP_USER_ALREADY_LINKED',
+            message: 'This application profile is already linked to another auth user.',
+          });
+        }
+
+        appUser = await linkSessionAccountAuthUserId(client, {
+          appUserId: appUserByEmail.id,
+          authUserId: authResult.authUserId,
+        });
+
+        console.info('[login-app-user] relinked-app-user-by-email', {
+          requestId,
+          appUserId: appUser.id,
+          authUserId: authResult.authUserId,
+          email: authResult.email,
+        });
+      }
+    }
+
+    appUser = assertActiveSessionAccount(appUser);
 
     console.info('[login-app-user] request:success', {
       requestId,

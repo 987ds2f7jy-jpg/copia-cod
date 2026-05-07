@@ -19,6 +19,7 @@ const Perfil = lazy(() => import('./pages/Perfil'));
 const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
 const PergunteEspecialista = lazy(() => import('./pages/PergunteEspecialista'));
 const Planos = lazy(() => import('./pages/Planos'));
+const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
 const SolicitacaoExames = lazy(() => import('./pages/SolicitacaoExames'));
 const RenovacaoReceitas = lazy(() => import('./pages/RenovacaoReceitas'));
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
@@ -44,6 +45,7 @@ export const PAGES = {
     "PerfilProfissional": PerfilProfissional,
     "PergunteEspecialista": PergunteEspecialista,
     "Planos": Planos,
+    "RecuperarSenha": RecuperarSenha,
     "SolicitacaoExames": SolicitacaoExames,
     "RenovacaoReceitas": RenovacaoReceitas,
     "Teleconsulta": Teleconsulta,

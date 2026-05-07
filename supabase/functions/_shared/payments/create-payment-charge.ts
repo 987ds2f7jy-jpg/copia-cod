@@ -217,6 +217,18 @@ function mapChargeRow(row: PaymentChargeRow, reusedExisting: boolean): CreatedPa
   };
 }
 
+function resolveProviderCreatedStatus(provider: string) {
+  if (provider === 'mock') {
+    return 'mock_created';
+  }
+
+  if (provider === 'stripe') {
+    return 'checkout_session_created';
+  }
+
+  return 'preference_created';
+}
+
 export async function createPaymentCharge(
   client: SupabaseClient,
   input: CreatePaymentChargeInput,
@@ -440,7 +452,7 @@ export async function createPaymentCharge(
       provider_charge_id: providerResult.providerChargeId,
       provider_checkout_url: providerResult.checkoutUrl,
       provider_payment_reference: providerResult.paymentReference,
-      last_provider_status: providerResult.provider === 'mock' ? 'mock_created' : 'preference_created',
+      last_provider_status: resolveProviderCreatedStatus(providerResult.provider),
       last_provider_payload: providerResult.raw,
       metadata: {
         provider: providerResult.provider,

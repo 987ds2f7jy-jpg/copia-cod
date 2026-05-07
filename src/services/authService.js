@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import accountApi from '@/client-api/account';
+import { recoverySupabase } from '@/integrations/supabase/recoveryClient';
 import {
   clearStoredSession,
   getStoredSession,
@@ -10,10 +11,19 @@ import { ensureFreshSession } from '@/client-api/edgeFunctions';
 import { isTransientApiError } from '@/lib/api-errors';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
+import { createPageUrl } from '@/utils';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Email invalido.'),
   password: z.string().min(1, 'Senha obrigatoria.'),
+});
+
+const recoveryEmailSchema = z.object({
+  email: z.string().trim().email('Email invalido.'),
+});
+
+const resetPasswordSchema = z.object({
+  password: z.string().min(6, 'Senha deve ter ao menos 6 caracteres.'),
 });
 
 const registerSchema = z.object({
@@ -25,6 +35,16 @@ const registerSchema = z.object({
 
 function normalizeEmail(email) {
   return email?.toLowerCase().trim() || '';
+}
+
+function buildPasswordRecoveryRedirectUrl() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  const url = new URL(createPageUrl('RecuperarSenha'), window.location.origin);
+  url.searchParams.set('mode', 'reset');
+  return url.toString();
 }
 
 function toUiUser(accountUser) {
@@ -257,6 +277,54 @@ export const authService = {
       return ensureActiveUser(toUiUser(result.appUser || null));
     } catch (error) {
       throw normalizeAccountError(error, 'Nao foi possivel concluir o cadastro.');
+    }
+  },
+
+  async requestPasswordReset(email) {
+    const payload = recoveryEmailSchema.parse({ email });
+
+    try {
+      const { error } = await recoverySupabase.auth.resetPasswordForEmail(
+        normalizeEmail(payload.email),
+        {
+          redirectTo: buildPasswordRecoveryRedirectUrl(),
+        },
+      );
+
+      if (error) {
+        throw error;
+      }
+
+      return true;
+    } catch (error) {
+      throw normalizeAccountError(error, 'Nao foi possivel enviar o email de recuperacao.');
+    }
+  },
+
+  async resetPassword(password) {
+    const payload = resetPasswordSchema.parse({ password });
+
+    try {
+      const { data, error } = await recoverySupabase.auth.updateUser({
+        password: payload.password,
+      });
+
+      if (error) {
+        throw error;
+      }
+
+      if (!data?.user?.id) {
+        throw new AppError({
+          message: 'Sessao de recuperacao nao confirmada.',
+          userMessage: 'Nao foi possivel confirmar a redefinicao da senha. Solicite um novo link e tente novamente.',
+          status: 409,
+          code: 'AUTH_RECOVERY_SESSION_MISSING',
+        });
+      }
+
+      return data.user;
+    } catch (error) {
+      throw normalizeAccountError(error, 'Nao foi possivel redefinir a senha.');
     }
   },
 
