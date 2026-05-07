@@ -180,6 +180,63 @@ export async function loadSessionAccountByAuthUserId(
   return data?.id ? mapAppUserRow(data as AppUserRow) : null;
 }
 
+export async function loadSessionAccountByEmail(
+  client: SupabaseClient,
+  email: string,
+): Promise<SessionAccountRecord | null> {
+  const normalizedEmail = normalizeEmail(email);
+
+  if (!normalizedEmail) {
+    return null;
+  }
+
+  const { data, error } = await client
+    .from('app_users')
+    .select('id, auth_user_id, full_name, email, role, is_active, phone, cpf, birth_date, sex, address, city, state, profile_complete')
+    .eq('email', normalizedEmail)
+    .limit(1);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'APP_USER_EMAIL_LOOKUP_FAILED',
+      message: 'Unable to load application user by email.',
+      details: error.message,
+    });
+  }
+
+  const row = ((data as AppUserRow[] | null) || [])[0] || null;
+  return row?.id ? mapAppUserRow(row) : null;
+}
+
+export async function linkSessionAccountAuthUserId(
+  client: SupabaseClient,
+  params: {
+    appUserId: string;
+    authUserId: string;
+  },
+): Promise<SessionAccountRecord> {
+  const { data, error } = await client
+    .from('app_users')
+    .update({
+      auth_user_id: params.authUserId,
+    })
+    .eq('id', params.appUserId)
+    .select('id, auth_user_id, full_name, email, role, is_active, phone, cpf, birth_date, sex, address, city, state, profile_complete')
+    .single();
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'APP_USER_LINK_FAILED',
+      message: 'Unable to link authenticated user to app_users.',
+      details: error.message,
+    });
+  }
+
+  return mapAppUserRow(data as AppUserRow);
+}
+
 export function assertActiveSessionAccount(appUser: SessionAccountRecord | null) {
   if (!appUser?.id) {
     throw new AppError({

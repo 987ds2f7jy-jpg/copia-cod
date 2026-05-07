@@ -112,7 +112,7 @@ function LayoutInner({ children, currentPageName }) {
     { name: 'Planos', page: 'Planos', icon: Sparkles },
   ];
 
-  const hideLayoutPages = ['Login', 'Cadastro', 'Entrar', 'Teleconsulta'];
+  const hideLayoutPages = ['Login', 'Cadastro', 'Entrar', 'RecuperarSenha', 'Teleconsulta'];
   if (hideLayoutPages.includes(currentPageName)) {
     return <>{children}</>;
   }
