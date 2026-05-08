@@ -30,6 +30,7 @@
 export const ROUTES = {
   home:                    '/',
   entrar:                  '/Entrar',
+  recuperarSenha:          '/RecuperarSenha',
   cadastroPaciente:        '/CadastroPaciente',
   cadastroProfissional:    '/CadastroProfissional',
   especialidades:          '/Especialidades',
@@ -63,6 +64,7 @@ export const ROUTES = {
 export const PUBLIC_ROUTES = [
   ROUTES.home,
   ROUTES.entrar,
+  ROUTES.recuperarSenha,
   ROUTES.cadastroPaciente,
   ROUTES.cadastroProfissional,
   ROUTES.especialidades,

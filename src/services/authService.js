@@ -37,6 +37,34 @@ function normalizeEmail(email) {
   return email?.toLowerCase().trim() || '';
 }
 
+function parseRecoveryEmail(email) {
+  try {
+    return recoveryEmailSchema.parse({ email });
+  } catch (error) {
+    throw new AppError({
+      message: 'Email invalido.',
+      userMessage: 'Informe um email valido.',
+      status: 400,
+      code: 'EMAIL_INVALID',
+      cause: error,
+    });
+  }
+}
+
+function parseResetPassword(password) {
+  try {
+    return resetPasswordSchema.parse({ password });
+  } catch (error) {
+    throw new AppError({
+      message: 'Senha invalida.',
+      userMessage: 'A nova senha deve ter ao menos 6 caracteres.',
+      status: 400,
+      code: 'PASSWORD_INVALID',
+      cause: error,
+    });
+  }
+}
+
 function buildPasswordRecoveryRedirectUrl() {
   if (typeof window === 'undefined') {
     return '';
@@ -281,7 +309,7 @@ export const authService = {
   },
 
   async requestPasswordReset(email) {
-    const payload = recoveryEmailSchema.parse({ email });
+    const payload = parseRecoveryEmail(email);
 
     try {
       const { error } = await recoverySupabase.auth.resetPasswordForEmail(
@@ -302,7 +330,7 @@ export const authService = {
   },
 
   async resetPassword(password) {
-    const payload = resetPasswordSchema.parse({ password });
+    const payload = parseResetPassword(password);
 
     try {
       const { data, error } = await recoverySupabase.auth.updateUser({

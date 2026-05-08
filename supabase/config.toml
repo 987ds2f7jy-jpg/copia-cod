@@ -24,6 +24,9 @@ verify_jwt = false
 [functions.create-solicitacao-exame]
 verify_jwt = false
 
+[functions.ensure-payment-charge]
+verify_jwt = false
+
 [functions.deactivate-account]
 verify_jwt = false
 

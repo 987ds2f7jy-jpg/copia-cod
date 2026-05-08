@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { AlertTriangle, CheckCircle, CreditCard, ExternalLink, Loader2 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -39,6 +39,7 @@ export default function PaymentStep({
   const [checkoutLoading, setCheckoutLoading] = useState(false);
   const [simulationLoading, setSimulationLoading] = useState(false);
   const [syncError, setSyncError] = useState('');
+  const autoSyncKeyRef = useRef('');
   const currentPayment = useMemo(
     () => normalizePayment(localPayment || payment),
     [localPayment, payment],
@@ -46,10 +47,13 @@ export default function PaymentStep({
   const statusInfo = getPaymentStatusInfo(currentPayment?.status);
   const isPaid = currentPayment?.status === 'paid';
   const canSimulate = !isPaid && canUsePaymentSimulation();
+  const isMockProvider = String(currentPayment?.provider || '').toLowerCase() === 'mock';
   const shouldRefreshCheckout = Boolean(
     ownerType &&
     ownerId &&
     !isPaid &&
+    !isMockProvider &&
+    !canSimulate &&
     (
       !currentPayment?.checkoutUrl ||
       currentPayment?.status === 'payment_failed' ||
@@ -65,6 +69,20 @@ export default function PaymentStep({
     if (!shouldRefreshCheckout || checkoutLoading || syncError) {
       return;
     }
+
+    const syncKey = [
+      ownerType,
+      ownerId,
+      currentPayment?.paymentChargeId || '',
+      currentPayment?.status || '',
+      currentPayment?.checkoutUrl || '',
+    ].join(':');
+
+    if (autoSyncKeyRef.current === syncKey) {
+      return;
+    }
+
+    autoSyncKeyRef.current = syncKey;
 
     let active = true;
 
@@ -109,6 +127,9 @@ export default function PaymentStep({
     ownerType,
     syncError,
     shouldRefreshCheckout,
+    currentPayment?.checkoutUrl,
+    currentPayment?.paymentChargeId,
+    currentPayment?.status,
   ]);
 
   async function handleCheckout() {

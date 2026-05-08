@@ -6,8 +6,7 @@
  * PROPÓSITO
  *   Cobrir completamente o fluxo de login: caminho feliz por role,
  *   erros de credenciais, validação frontend, mecanismo rd_login_next,
- *   persistência de sessão em localStorage e ausência de recuperação
- *   de senha (documentada como gap intencional).
+ *   persistência de sessão em localStorage e link de recuperação de senha.
  *
  * SELETORES
  *   Baseados no HTML real de Entrar.jsx:
@@ -88,11 +87,14 @@ test.describe('login — formulário', () => {
     await expect(page.getByRole('button', { name: 'Ocultar senha' })).toBeVisible();
   });
 
-  test('não existe link de recuperação de senha (gap documentado)', async ({ page }) => {
-    // Documenta ausência intencional. Quando implementado, este teste
-    // DEVE FALHAR e ser substituído por testes reais de reset.
+  test('link de recuperação de senha leva para /RecuperarSenha', async ({ page }) => {
     const forgotLink = page.getByRole('link', { name: /esqueci|recuperar|redefinir.*senha/i });
-    await expect(forgotLink).not.toBeVisible();
+    await expect(forgotLink).toBeVisible();
+
+    await forgotLink.click();
+
+    await expect(page).toHaveURL(/\/RecuperarSenha/, { timeout: 8_000 });
+    await expect(page.getByRole('heading', { name: 'Recuperar senha' })).toBeVisible();
   });
 
 });
