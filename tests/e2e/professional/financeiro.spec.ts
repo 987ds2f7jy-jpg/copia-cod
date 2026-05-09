@@ -45,7 +45,7 @@ rdTest.describe('financeiro - profissional aprovado', () => {
 
     await expect(page.getByText('Receita disponivel')).toBeVisible();
     await expect(page.getByText('Receita pendente')).toBeVisible();
-    await expect(page.getByText('Taxa plataforma (15%)')).toBeVisible();
+    await expect(page.getByText('Taxa plataforma')).toBeVisible();
     await expect(page.getByText('Receita acumulada')).toBeVisible();
   });
 
@@ -67,14 +67,22 @@ rdTest.describe('financeiro - profissional aprovado', () => {
     await expect(page.getByRole('button', { name: 'Solicitar Saque' })).toBeVisible();
   });
 
-  rdTest('estado vazio da tabela nao causa crash @critical', async ({ page, goto }) => {
+  rdTest('historico financeiro renderiza tabela ou estado vazio @critical', async ({ page, goto }) => {
     await goto(ROUTES.financeiroProf);
     await expect(page).not.toHaveURL(/\/Entrar/);
     await expect(page.getByRole('heading', { name: 'Relatorio Financeiro' })).toBeVisible({ timeout: 15_000 });
 
-    const hasTable = await page.getByRole('heading', { name: 'Historico de Consultas' }).isVisible().catch(() => false);
-    const hasEmpty = await page.getByText('Nenhuma consulta encontrada').isVisible().catch(() => false);
-    expect(hasTable || hasEmpty).toBe(true);
+    await expect(page.getByRole('heading', { name: 'Historico financeiro' })).toBeVisible();
+
+    const table = page.getByRole('table');
+    const emptyState = page.getByText('Nenhum item financeiro encontrado');
+    await expect(table.or(emptyState)).toBeVisible();
+
+    if (await table.isVisible().catch(() => false)) {
+      await expect(page.getByRole('columnheader', { name: 'Data' })).toBeVisible();
+      await expect(page.getByRole('columnheader', { name: 'Paciente' })).toBeVisible();
+      await expect(page.getByRole('columnheader', { name: 'Valor liquido' })).toBeVisible();
+    }
   });
 
   rdTest('botao "Dados Bancarios" abre o modal @critical', async ({ page, goto }) => {

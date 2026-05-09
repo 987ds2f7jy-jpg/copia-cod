@@ -148,10 +148,50 @@ rdTest.describe('consulta-agora — paciente (estrutura)', () => {
 
     // Com especialidade selecionada: ou o botão fica habilitado
     // (há profissionais disponíveis) ou aparece o aviso de indisponibilidade
-    const btnEnabled = await page.getByRole('button', { name: 'Criar pagamento e entrar na fila' }).isEnabled();
-    const hasWarning = await page.getByText(/nenhum profissional.*plantao ativo/i).isVisible().catch(() => false);
+    const restoredPayment = page.getByRole('heading', { name: 'Pagamento do plantao' });
+    const restoredQueue = page.getByRole('heading', { name: /voce esta na fila/i });
+    const unavailableWarning = page.getByText(/nenhum profissional.*plantao ativo/i);
+    const joinQueueButton = page.getByRole('button', { name: 'Criar pagamento e entrar na fila' });
 
-    expect(btnEnabled || hasWarning).toBe(true);
+    let selectedSpecialtyState: 'enabled' | 'unavailable' | 'restored' | 'pending' = 'pending';
+
+    for (let attempt = 0; attempt < 24; attempt += 1) {
+      if (
+        await restoredPayment.isVisible().catch(() => false) ||
+        await restoredQueue.isVisible().catch(() => false)
+      ) {
+        selectedSpecialtyState = 'restored';
+        break;
+      }
+
+      if (await unavailableWarning.isVisible().catch(() => false)) {
+        selectedSpecialtyState = 'unavailable';
+        break;
+      }
+
+      if (await joinQueueButton.isEnabled().catch(() => false)) {
+        selectedSpecialtyState = 'enabled';
+        break;
+      }
+
+      await page.waitForTimeout(500);
+    }
+
+    expect(selectedSpecialtyState).not.toBe('pending');
+
+    if (selectedSpecialtyState === 'restored') {
+      rdTest.skip(
+        true,
+        'Conta paciente possui entrada de fila/cobranca ativa; este teste valida apenas o formulario inicial.',
+      );
+    }
+
+    if (selectedSpecialtyState === 'unavailable') {
+      await expect(unavailableWarning).toBeVisible();
+      return;
+    }
+
+    await expect(joinQueueButton).toBeEnabled({ timeout: 10_000 });
   });
 
   rdTest('informações de garantia da plataforma visíveis', async ({ page, goto }) => {
