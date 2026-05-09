@@ -484,6 +484,7 @@ function AgendamentoPerfilInner() {
                 paidTitle="Pagamento confirmado"
                 paidDescription="Agora sua consulta esta liberada no sistema."
                 continueLabel="Ver minhas consultas"
+                successRedirectPath={createPageUrl('DashboardPaciente')}
                 onPaid={(paidPayment) => {
                   setAppointmentPayment(paidPayment);
                   queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });

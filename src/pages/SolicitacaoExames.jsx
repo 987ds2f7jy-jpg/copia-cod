@@ -213,6 +213,8 @@ function SolicitacaoExamesInner() {
                 paidTitle="Pagamento confirmado"
                 paidDescription="Seu Check-Up foi liberado para avaliacao."
                 continueLabel="Concluir"
+                successRedirectPath="/DashboardPaciente"
+                failureRedirectPath="/SolicitacaoExames"
                 onPaid={finishCheckupPayment}
                 onContinue={finishCheckupPayment}
               />
@@ -300,6 +302,13 @@ function SolicitacaoExamesInner() {
                 paidTitle="Pagamento confirmado"
                 paidDescription="Agora vamos levar voce para o plantao."
                 continueLabel="Seguir para o plantao"
+                successRedirectPath={`/ConsultaAgora?especialidade=${encodeURIComponent('clinico_geral')}&sintomas=${encodeURIComponent(pendingEspecificos.redirect?.sintomas || '')}`}
+                failureRedirectPath="/SolicitacaoExames"
+                onBeforeCheckout={() => {
+                  if (pendingEspecificos?.redirect) {
+                    persistSpecificExamRedirect(pendingEspecificos.redirect);
+                  }
+                }}
                 onPaid={finishEspecificosPayment}
                 onContinue={finishEspecificosPayment}
               />

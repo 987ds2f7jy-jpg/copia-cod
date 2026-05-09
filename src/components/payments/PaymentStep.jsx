@@ -22,6 +22,43 @@ const STATUS_BADGE_CLASSES = {
   gray: 'bg-muted text-foreground',
 };
 
+const PAYMENT_RETURN_CONTEXT_KEY = 'rd.payment.return_context.v1';
+
+function getCurrentPath() {
+  if (typeof window === 'undefined') {
+    return '';
+  }
+
+  return `${window.location.pathname}${window.location.search || ''}`;
+}
+
+function storePaymentReturnContext({
+  payment,
+  ownerType,
+  ownerId,
+  successRedirectPath,
+  failureRedirectPath,
+  pendingRedirectPath,
+}) {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  const context = {
+    ownerType,
+    ownerId,
+    paymentChargeId: payment?.paymentChargeId || null,
+    providerChargeId: payment?.providerChargeId || null,
+    successRedirectPath: successRedirectPath || '',
+    failureRedirectPath: failureRedirectPath || '',
+    pendingRedirectPath: pendingRedirectPath || '',
+    returnPath: getCurrentPath(),
+    createdAt: new Date().toISOString(),
+  };
+
+  sessionStorage.setItem(PAYMENT_RETURN_CONTEXT_KEY, JSON.stringify(context));
+}
+
 export default function PaymentStep({
   payment,
   ownerType,
@@ -33,6 +70,10 @@ export default function PaymentStep({
   continueLabel = 'Continuar',
   onPaid,
   onContinue,
+  onBeforeCheckout,
+  successRedirectPath = '',
+  failureRedirectPath = '',
+  pendingRedirectPath = '',
   className = '',
 }) {
   const [localPayment, setLocalPayment] = useState(() => normalizePayment(payment));
@@ -46,8 +87,8 @@ export default function PaymentStep({
   );
   const statusInfo = getPaymentStatusInfo(currentPayment?.status);
   const isPaid = currentPayment?.status === 'paid';
-  const canSimulate = !isPaid && canUsePaymentSimulation();
   const isMockProvider = String(currentPayment?.provider || '').toLowerCase() === 'mock';
+  const canSimulate = !isPaid && isMockProvider && canUsePaymentSimulation();
   const shouldRefreshCheckout = Boolean(
     ownerType &&
     ownerId &&
@@ -165,6 +206,15 @@ export default function PaymentStep({
         throw new Error('Ainda nao foi possivel gerar um checkout valido para este pagamento.');
       }
 
+      storePaymentReturnContext({
+        payment: nextPayment,
+        ownerType,
+        ownerId,
+        successRedirectPath,
+        failureRedirectPath,
+        pendingRedirectPath,
+      });
+      onBeforeCheckout?.(nextPayment);
       window.location.assign(nextPayment.checkoutUrl);
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Nao foi possivel abrir o checkout.';

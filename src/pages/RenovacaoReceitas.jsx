@@ -187,6 +187,8 @@ function RenovacaoReceitasInner() {
             paidTitle="Pagamento confirmado"
             paidDescription="A renovacao foi liberada para analise medica."
             continueLabel="Concluir"
+            successRedirectPath="/DashboardPaciente"
+            failureRedirectPath="/RenovacaoReceitas"
             onPaid={finishPayment}
             onContinue={finishPayment}
           />

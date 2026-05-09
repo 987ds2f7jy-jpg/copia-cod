@@ -580,6 +580,8 @@ function ConsultaAgoraInner() {
                 paidTitle="Pagamento confirmado"
                 paidDescription="Agora voce entrou na fila de atendimento."
                 continueLabel="Ver fila"
+                successRedirectPath="/ConsultaAgora"
+                failureRedirectPath="/ConsultaAgora"
                 onPaid={handleQueuePaymentPaid}
                 onContinue={() => setStep('queue')}
               />

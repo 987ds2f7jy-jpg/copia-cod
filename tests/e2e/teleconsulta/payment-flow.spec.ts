@@ -7,7 +7,7 @@
  *   Cobrir a camada real de pagamento do plantão:
  *   - /pagamento/:status é rota protegida por autenticação;
  *   - sucesso, falha e pendente exibem mensagens próprias;
- *   - CTAs "Ver painel" e "Voltar ao inicio" navegam corretamente;
+ *   - a tela de retorno nao exibe CTAs que possam quebrar o fluxo;
  *   - /ConsultaAgora usa a etapa atual de pagamento antes da fila.
  *
  * LIMITAÇÕES
@@ -24,20 +24,20 @@ const PAYMENT_EXPECTATIONS = [
   {
     status: 'sucesso',
     route: PAYMENT_STATUS_ROUTES.sucesso,
-    title: 'Pagamento recebido pelo provedor',
-    detail: /webhook seguro do backend/i,
+    title: 'Pagamento recebido',
+    detail: /redirecionado automaticamente/i,
   },
   {
     status: 'falha',
     route: PAYMENT_STATUS_ROUTES.falha,
-    title: 'Pagamento nao concluido',
-    detail: /volte ao fluxo e tente novamente/i,
+    title: /Pagamento n.o conclu.do/i,
+    detail: /tentar novamente/i,
   },
   {
     status: 'pendente',
     route: PAYMENT_STATUS_ROUTES.pendente,
     title: 'Pagamento pendente',
-    detail: /processamento/i,
+    detail: /acompanhar o status/i,
   },
 ] as const;
 
@@ -67,7 +67,7 @@ rdTest.describe('pagamento retorno — paciente autenticado', () => {
   });
 
   for (const { status, route, title, detail } of PAYMENT_EXPECTATIONS) {
-    rdTest(`/pagamento/${status} exibe mensagem e CTAs corretos @critical`, async ({
+    rdTest(`/pagamento/${status} exibe mensagem de retorno automatico @critical`, async ({
       page, goto,
     }) => {
       await goto(route);
@@ -76,36 +76,31 @@ rdTest.describe('pagamento retorno — paciente autenticado', () => {
       await expect(page.getByRole('heading', { name: title }))
         .toBeVisible({ timeout: 10_000 });
       await expect(page.getByText(detail)).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Ver painel' })).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Voltar ao inicio' })).toBeVisible();
+      await expect(page.getByText(/Voc. est. sendo redirecionado/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Ver painel' })).not.toBeVisible();
+      await expect(page.getByRole('button', { name: 'Voltar ao inicio' })).not.toBeVisible();
     });
   }
 
-  rdTest('CTA "Ver painel" navega para DashboardPaciente @critical', async ({
+  rdTest('pagamento com sucesso redireciona automaticamente para DashboardPaciente @critical', async ({
     page, goto,
   }) => {
     await goto(PAYMENT_STATUS_ROUTES.sucesso);
-    await expect(page.getByRole('heading', { name: 'Pagamento recebido pelo provedor' }))
+    await expect(page.getByRole('heading', { name: 'Pagamento recebido' }))
       .toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Ver painel' }).click();
-
-    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 10_000 });
+    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 8_000 });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 12_000 });
   });
 
-  rdTest('CTA "Voltar ao inicio" navega para Home @critical', async ({
+  rdTest('pagamento com falha redireciona automaticamente sem quebrar a UI @critical', async ({
     page, goto,
   }) => {
     await goto(PAYMENT_STATUS_ROUTES.falha);
-    await expect(page.getByRole('heading', { name: 'Pagamento nao concluido' }))
+    await expect(page.getByRole('heading', { name: /Pagamento n.o conclu.do/i }))
       .toBeVisible({ timeout: 10_000 });
 
-    await page.getByRole('button', { name: 'Voltar ao inicio' }).click();
-
-    await expect(page).toHaveURL(/\/(?:Home)?$/, { timeout: 10_000 });
-    await expect(page.getByRole('heading', { level: 1 }).first())
-      .toBeVisible({ timeout: 12_000 });
+    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 8_000 });
   });
 
   rdTest('status desconhecido usa estado pendente como fallback', async ({ page, goto }) => {

@@ -71,6 +71,12 @@ function getOptionalEnv(name: string) {
   return Deno.env.get(name)?.trim() || '';
 }
 
+function getPaymentMethodMode() {
+  const configured = getOptionalEnv('STRIPE_PAYMENT_METHOD_MODE').toLowerCase();
+
+  return configured === 'manual' ? 'manual' : 'dynamic';
+}
+
 function normalizeCurrency(currency: string) {
   return currency.trim().toLowerCase();
 }
@@ -226,6 +232,10 @@ function getEnabledPaymentMethodTypes({
   return methods;
 }
 
+function shouldUseManualPaymentMethods() {
+  return getPaymentMethodMode() === 'manual';
+}
+
 function buildCheckoutSessionBody(input: {
   internalChargeId: string;
   ownerType: string;
@@ -236,10 +246,13 @@ function buildCheckoutSessionBody(input: {
   externalReference: string;
 }) {
   const urls = getCheckoutUrls();
-  const paymentMethodTypes = getEnabledPaymentMethodTypes({
-    currency: input.currency,
-    amount: input.amount,
-  });
+  const useManualPaymentMethods = shouldUseManualPaymentMethods();
+  const paymentMethodTypes = useManualPaymentMethods
+    ? getEnabledPaymentMethodTypes({
+      currency: input.currency,
+      amount: input.amount,
+    })
+    : [];
   const params = new URLSearchParams();
 
   params.set('mode', 'payment');
@@ -265,13 +278,15 @@ function buildCheckoutSessionBody(input: {
   params.set('payment_intent_data[metadata][owner_id]', input.ownerId);
   params.set('payment_intent_data[metadata][attempt_number]', String(input.attemptNumber));
 
-  paymentMethodTypes.forEach((method) => {
-    params.append('payment_method_types[]', method);
-  });
+  if (useManualPaymentMethods) {
+    paymentMethodTypes.forEach((method) => {
+      params.append('payment_method_types[]', method);
+    });
+  }
 
   const pixExpiration = Number(getOptionalEnv('STRIPE_PIX_EXPIRES_AFTER_SECONDS'));
 
-  if (paymentMethodTypes.includes('pix') && Number.isFinite(pixExpiration) && pixExpiration > 0) {
+  if (useManualPaymentMethods && paymentMethodTypes.includes('pix') && Number.isFinite(pixExpiration) && pixExpiration > 0) {
     params.set('payment_method_options[pix][expires_after_seconds]', String(Math.trunc(pixExpiration)));
   }
 
@@ -516,7 +531,8 @@ export function createStripePaymentProvider(): PaymentProvider {
         paymentReference,
         raw: {
           ...session,
-          payment_method_types: paymentMethodTypes,
+          configured_payment_method_types: paymentMethodTypes,
+          payment_method_mode: getPaymentMethodMode(),
         } as Record<string, unknown>,
       };
     },

@@ -367,6 +367,8 @@ function AgendamentoEspecialidadeInner() {
                 paidTitle="Pagamento confirmado"
                 paidDescription="Sua solicitacao por especialidade esta liberada."
                 continueLabel="Ver minhas consultas"
+                successRedirectPath={createPageUrl('DashboardPaciente')}
+                failureRedirectPath={createPageUrl('AgendamentoEspecialidade')}
                 onPaid={(paidPayment) => {
                   setAppointmentPayment(paidPayment);
                   queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });

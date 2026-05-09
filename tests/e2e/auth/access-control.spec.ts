@@ -188,7 +188,7 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
     { route: ROUTES.renovacaoReceitas, expected: /Renovacao de Receitas/i },
     { route: ROUTES.agendamentoEspecialidade, expected: /Agendamento por Especialidade/i },
     { route: ROUTES.agendamentoPerfil, expected: /Profissional não encontrado|Profissional nao encontrado/i },
-    { route: ROUTES.pagamentoStatus('sucesso'), expected: /Pagamento recebido pelo provedor/i },
+    { route: ROUTES.pagamentoStatus('sucesso'), expected: /Pagamento recebido/i },
   ]) {
     test(`paciente autenticado acessa ${route} sem cair no login`, async ({
       page, goto,

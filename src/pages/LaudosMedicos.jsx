@@ -499,6 +499,8 @@ function LaudosMedicosInner() {
             paidTitle="Pagamento confirmado"
             paidDescription="Estamos liberando sua entrada na fila de Clinico Geral."
             continueLabel={finalizingPaidLaudo ? 'Liberando...' : 'Entrar na fila'}
+            successRedirectPath="/LaudosMedicos"
+            failureRedirectPath="/LaudosMedicos"
             onPaid={finalizePaidLaudo}
             onContinue={finalizePaidLaudo}
           />
