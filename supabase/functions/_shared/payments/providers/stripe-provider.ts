@@ -223,10 +223,15 @@ function getEnabledPaymentMethodTypes({
 }) {
   const methods = ['card'];
   const pixEnabled = getOptionalEnv('STRIPE_ENABLE_PIX').toLowerCase() === 'true';
+  const boletoEnabled = getOptionalEnv('STRIPE_ENABLE_BOLETO').toLowerCase() === 'true';
   const normalizedCurrency = currency.toUpperCase();
 
   if (pixEnabled && normalizedCurrency === 'BRL' && amount >= 0.5 && amount <= 3000) {
     methods.push('pix');
+  }
+
+  if (boletoEnabled && normalizedCurrency === 'BRL' && amount >= 5) {
+    methods.push('boleto');
   }
 
   return methods;
@@ -288,6 +293,17 @@ function buildCheckoutSessionBody(input: {
 
   if (useManualPaymentMethods && paymentMethodTypes.includes('pix') && Number.isFinite(pixExpiration) && pixExpiration > 0) {
     params.set('payment_method_options[pix][expires_after_seconds]', String(Math.trunc(pixExpiration)));
+  }
+
+  const boletoExpirationDays = Number(getOptionalEnv('STRIPE_BOLETO_EXPIRES_AFTER_DAYS'));
+
+  if (
+    useManualPaymentMethods &&
+    paymentMethodTypes.includes('boleto') &&
+    Number.isFinite(boletoExpirationDays) &&
+    boletoExpirationDays > 0
+  ) {
+    params.set('payment_method_options[boleto][expires_after_days]', String(Math.trunc(boletoExpirationDays)));
   }
 
   return {
