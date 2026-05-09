@@ -244,19 +244,12 @@ rdTest.describe('consulta-agora — entrada na fila (requer E2E_ALLOW_QUEUE)', (
 
     if (canSimulate) {
       await simulateButton.click();
-      const verFila = page.getByRole('button', { name: 'Ver fila' });
-      await expect(verFila).toBeVisible({ timeout: 15_000 });
-      await verFila.click();
+      await expect(page.getByRole('button', { name: 'Ver fila' })).toBeVisible({ timeout: 15_000 });
+      await page.getByRole('button', { name: 'Ver fila' }).click();
       await expect(
         page.getByRole('heading', { name: /voce esta na fila/i })
       ).toBeVisible({ timeout: 15_000 });
-      await expect(page.getByText(/posicao \d+ - tempo estimado/i)).toBeVisible();
-      await expect(page.getByText(/mantenha esta pagina aberta/i)).toBeVisible();
-
-      const sairDaFila = page.getByRole('button', { name: 'Sair da Fila' });
-      await expect(sairDaFila).toBeVisible();
-      await expect(sairDaFila).toBeEnabled();
-      await sairDaFila.click();
+      await page.getByRole('button', { name: 'Sair da Fila' }).click();
       await expect(
         page.getByText('Entrar na Fila de Atendimento')
       ).toBeVisible({ timeout: 10_000 });
@@ -304,6 +297,117 @@ rdTest.describe('consulta-agora — profissional bloqueado', () => {
     await expect(
       page.getByRole('heading', { name: 'Consulta Agora' })
     ).toBeVisible({ timeout: 12_000 });
+  });
+
+});
+
+// ---------------------------------------------------------------------------
+// Step 'queue' — detalhes de posição, tempo e aviso
+// ---------------------------------------------------------------------------
+rdTest.describe('consulta-agora — step queue: conteúdo e UX', () => {
+
+  rdTest.use({ storageState: AUTH_STATE.patient });
+
+  rdTest.beforeEach(async ({}, testInfo) => {
+    skipIfNoAuth(testInfo, 'patient');
+  });
+
+  rdTest('step queue exibe h2, posição, tempo estimado e aviso de manter página @critical', async ({
+    page, goto,
+  }) => {
+    rdTest.skip(!process.env.E2E_ALLOW_QUEUE, 'Define E2E_ALLOW_QUEUE=true.');
+
+    await goto(ROUTES.consultaAgora);
+    await expect(page).not.toHaveURL(/\/Entrar/);
+    await expect(page.getByText('Entrar na Fila de Atendimento')).toBeVisible({ timeout: 12_000 });
+
+    await page.getByText('Selecione a especialidade').click();
+    await page.getByRole('option', { name: /clinico geral/i }).click();
+    await expect(
+      page.getByRole('button', { name: 'Criar pagamento e entrar na fila' })
+    ).toBeEnabled({ timeout: 5_000 });
+    await page.getByPlaceholder(/dor de cabeca|sintomas/i).fill('Teste E2E step queue UX');
+    await page.getByRole('button', { name: 'Criar pagamento e entrar na fila' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Pagamento do plantao' })
+    ).toBeVisible({ timeout: 15_000 });
+
+    const simulateBtn = page.getByRole('button', { name: 'Simular pagamento aprovado' });
+    if (!await simulateBtn.isVisible().catch(() => false)) {
+      rdTest.skip(true, 'Sandbox indisponível — não é possível avançar para step=queue.');
+      return;
+    }
+
+    await simulateBtn.click();
+    await page.getByRole('button', { name: 'Ver fila' }).click();
+
+    // h2 "Voce esta na fila" (sem acento)
+    await expect(
+      page.getByRole('heading', { name: 'Voce esta na fila' })
+    ).toBeVisible({ timeout: 15_000 });
+
+    // Posição + tempo estimado: "Posicao N - Tempo estimado: ~10 min"
+    await expect(
+      page.getByText(/Posicao \d+ - Tempo estimado/)
+    ).toBeVisible();
+
+    // Aviso: "Mantenha esta pagina aberta. Voce sera redirecionado automaticamente."
+    await expect(
+      page.getByText('Mantenha esta pagina aberta. Voce sera redirecionado automaticamente.')
+    ).toBeVisible();
+
+    // Número da posição visível no círculo animado
+    await expect(page.getByText(/^\d+$/).first()).toBeVisible();
+
+    // Cleanup
+    await page.getByRole('button', { name: 'Sair da Fila' }).click();
+    await expect(page.getByText('Entrar na Fila de Atendimento')).toBeVisible({ timeout: 10_000 });
+  });
+
+  rdTest('step queue exibe botão "Sair da Fila" habilitado @critical', async ({
+    page, goto,
+  }) => {
+    rdTest.skip(!process.env.E2E_ALLOW_QUEUE, 'Define E2E_ALLOW_QUEUE=true.');
+
+    await goto(ROUTES.consultaAgora);
+    await expect(page).not.toHaveURL(/\/Entrar/);
+    await expect(page.getByText('Entrar na Fila de Atendimento')).toBeVisible({ timeout: 12_000 });
+
+    await page.getByText('Selecione a especialidade').click();
+    await page.getByRole('option', { name: /clinico geral/i }).click();
+    await expect(
+      page.getByRole('button', { name: 'Criar pagamento e entrar na fila' })
+    ).toBeEnabled({ timeout: 5_000 });
+    await page.getByPlaceholder(/dor de cabeca|sintomas/i).fill('Teste E2E sair da fila');
+    await page.getByRole('button', { name: 'Criar pagamento e entrar na fila' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Pagamento do plantao' })
+    ).toBeVisible({ timeout: 15_000 });
+
+    const simulateBtn = page.getByRole('button', { name: 'Simular pagamento aprovado' });
+    if (!await simulateBtn.isVisible().catch(() => false)) {
+      rdTest.skip(true, 'Sandbox indisponível.');
+      return;
+    }
+
+    await simulateBtn.click();
+    await page.getByRole('button', { name: 'Ver fila' }).click();
+
+    await expect(
+      page.getByRole('heading', { name: 'Voce esta na fila' })
+    ).toBeVisible({ timeout: 15_000 });
+
+    const saiFila = page.getByRole('button', { name: 'Sair da Fila' });
+    await expect(saiFila).toBeVisible();
+    await expect(saiFila).toBeEnabled();
+
+    // Clicar e verificar retorno ao formulário
+    await saiFila.click();
+    await expect(
+      page.getByText('Entrar na Fila de Atendimento')
+    ).toBeVisible({ timeout: 10_000 });
   });
 
 });

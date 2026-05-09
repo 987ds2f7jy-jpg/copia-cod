@@ -102,15 +102,51 @@ rdTest.describe('financeiro - profissional aprovado', () => {
     await expect(dialog.getByText('Tipo de Chave PIX')).toBeVisible();
   });
 
-  rdTest('"Solicitar Saque" esta desabilitado quando saldo e zero @critical', async ({ page, goto }) => {
+  rdTest('"Solicitar Saque" reflete disponibilidade de saldo @critical', async ({ page, goto }) => {
     await goto(ROUTES.financeiroProf);
     await expect(page).not.toHaveURL(/\/Entrar/);
     await expect(page.getByRole('heading', { name: 'Relatorio Financeiro' })).toBeVisible({ timeout: 15_000 });
 
     const saqueBtn = page.getByRole('button', { name: 'Solicitar Saque' });
+    await expect(saqueBtn).toBeVisible();
+
     const isDisabled = await saqueBtn.isDisabled();
-    const isEnabled = await saqueBtn.isEnabled();
-    expect(isDisabled || isEnabled).toBe(true);
+    if (isDisabled) {
+      await expect(saqueBtn).toBeDisabled();
+      await expect(page.getByText(/receita dispon.vel|saldo dispon.vel/i).first()).toBeVisible();
+      return;
+    }
+
+    await expect(saqueBtn).toBeEnabled();
+  });
+
+  rdTest('modal de saque exibe saldo, valor e confirmacao quando ha seed de saldo @critical', async ({ page, goto }) => {
+    rdTest.skip(
+      !process.env.E2E_HAS_SALDO,
+      'Define E2E_HAS_SALDO=true com profissional contendo receita disponivel para validar o modal de saque.',
+    );
+
+    await goto(ROUTES.financeiroProf);
+    await expect(page).not.toHaveURL(/\/Entrar/);
+    await expect(page.getByRole('heading', { name: 'Relatorio Financeiro' })).toBeVisible({ timeout: 15_000 });
+
+    const saqueBtn = page.getByRole('button', { name: 'Solicitar Saque' });
+    await expect(saqueBtn).toBeEnabled({ timeout: 5_000 });
+    await saqueBtn.click();
+
+    const dialog = page.getByRole('dialog');
+    await expect(dialog).toBeVisible({ timeout: 5_000 });
+    await expect(dialog.getByRole('heading', { name: 'Solicitar Saque' })).toBeVisible();
+    await expect(dialog.getByText(/saldo dispon.vel/i)).toBeVisible();
+
+    const valor = dialog.getByPlaceholder(/ex:\s*500\.00/i)
+      .or(dialog.getByRole('spinbutton'))
+      .first();
+    await expect(valor).toBeVisible();
+
+    const confirmar = dialog.getByRole('button', { name: 'Confirmar Saque' });
+    await expect(confirmar).toBeVisible();
+    await expect(confirmar).toBeDisabled();
   });
 
   rdTest('botao Voltar navega para pagina anterior', async ({ page, goto }) => {

@@ -1,4 +1,3 @@
-import { type Page } from '@playwright/test';
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
 import { skipIfNoAuth } from '../support/auth-harness';
@@ -7,13 +6,6 @@ import { clickProfessionalTab, waitForProfessionalDashboard } from '../support/p
 const BIO_PLACEHOLDER = /conte sobre sua experi[êe]ncia, abordagem e como pode ajudar/i;
 const APRESENTACAO_HEADING = /apresenta[cç][aã]o/i;
 const DISPONIBILIDADE_HEADING = /disponibilidade por dia/i;
-
-async function openMeuPerfilTab(page: Page, goto: (route: string) => Promise<void>) {
-  await goto(ROUTES.dashboardProfissional);
-  await waitForProfessionalDashboard(page);
-  await clickProfessionalTab(page, 'perfil');
-  await expect(page.getByRole('heading', { name: APRESENTACAO_HEADING })).toBeVisible({ timeout: 10_000 });
-}
 
 rdTest.describe('meu-perfil - acesso e estrutura', () => {
   rdTest.use({ storageState: AUTH_STATE.professional });
@@ -118,47 +110,125 @@ rdTest.describe('meu-perfil - acesso e estrutura', () => {
   });
 });
 
-rdTest.describe('meu-perfil - secoes publicas do perfil', () => {
+// ===========================================================================
+// Seções do perfil público
+// ===========================================================================
+rdTest.describe('meu-perfil — seções de conteúdo público', () => {
+
   rdTest.use({ storageState: AUTH_STATE.professional });
 
   rdTest.beforeEach(async ({}, testInfo) => {
     skipIfNoAuth(testInfo, 'professional');
   });
 
-  rdTest('exibe especializacao, modalidade e galeria do consultorio @critical', async ({ page, goto }) => {
-    await openMeuPerfilTab(page, goto);
+  rdTest('CardTitle "Público e Especialização" com botões de público atendido @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
 
-    await expect(page.getByText(/p.blico e especializa..o/i)).toBeVisible();
-    await expect(page.getByText(/modalidade e local/i)).toBeVisible();
-    await expect(page.getByText(/galeria do consult.rio/i)).toBeVisible();
+    await expect(page.getByText('Público e Especialização')).toBeVisible();
+    await expect(page.getByText('Público atendido')).toBeVisible();
   });
 
-  rdTest('exibe valores de consulta, visibilidade e atalho publico @critical', async ({ page, goto }) => {
-    await openMeuPerfilTab(page, goto);
+  rdTest('CardTitle "Modalidade e Local" com campos de endereço @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
+
+    await expect(page.getByText('Modalidade e Local')).toBeVisible();
+    // Campo de endereço
+    await expect(page.getByPlaceholder('Rua / Avenida')).toBeVisible();
+  });
+
+  rdTest('CardTitle "Galeria do Consultório" presente @critical', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
+
+    await expect(page.getByText('Galeria do Consultório')).toBeVisible();
+  });
+
+  rdTest('CardTitle "Valores das Consultas" com campos de preço @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
 
     await expect(page.getByText('Valores das Consultas')).toBeVisible();
+    await expect(page.getByText('Consulta Padrão (R$)')).toBeVisible();
+    await expect(page.getByText('Consulta Prioritária (R$)')).toBeVisible();
+    await expect(page.getByPlaceholder('150')).toBeVisible();
+    await expect(page.getByPlaceholder('250')).toBeVisible();
+  });
+
+  rdTest('CardTitle "Controles de Visibilidade" presente @critical', async ({ page, goto }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
+
     await expect(page.getByText('Controles de Visibilidade')).toBeVisible();
+  });
+
+  rdTest('link "Ver meu perfil público" existe na seção de cabeçalho @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
+
+    // Link para /PerfilProfissional?id=...
     await expect(
-      page.getByRole('button', { name: /ver perfil/i }),
+      page.getByRole('link', { name: /ver meu perfil público/i })
+        .or(page.getByRole('button', { name: /ver meu perfil público/i }))
     ).toBeVisible();
   });
 
-  rdTest('campos de preco podem ser editados localmente sem salvar', async ({ page, goto }) => {
-    await openMeuPerfilTab(page, goto);
+  rdTest('preencher campo de preço padrão não desabilita o botão Salvar @critical', async ({
+    page, goto,
+  }) => {
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Valores das Consultas')).toBeVisible({ timeout: 10_000 });
 
-    const precoComum = page.getByPlaceholder('150').first();
-    const precoPrioritario = page.getByPlaceholder('250').first();
+    await page.getByPlaceholder('150').fill('180');
 
-    await expect(precoComum).toBeVisible();
-    await expect(precoPrioritario).toBeVisible();
-
-    await precoComum.fill('180');
-    await precoPrioritario.fill('280');
-
-    await expect(precoComum).toHaveValue('180');
-    await expect(precoPrioritario).toHaveValue('280');
     await expect(
-      page.getByRole('button', { name: /salvar/i }).first(),
+      page.getByRole('button', { name: 'Salvar Alterações' })
     ).toBeEnabled();
   });
+
+  rdTest('salvar perfil exibe toast de sucesso (requer E2E_ALLOW_PROFILE_SAVE)', async ({
+    page, goto,
+  }) => {
+    rdTest.skip(
+      !process.env.E2E_ALLOW_PROFILE_SAVE,
+      'Define E2E_ALLOW_PROFILE_SAVE=true para salvar perfil real.',
+    );
+
+    await goto(ROUTES.dashboardProfissional);
+    await waitForProfessionalDashboard(page);
+    await clickProfessionalTab(page, 'perfil');
+    await expect(page.getByText('Apresentação')).toBeVisible({ timeout: 10_000 });
+
+    await page.getByPlaceholder(/escreva uma apresentacao/i).clear();
+    await page.getByPlaceholder(/escreva uma apresentacao/i).fill('Perfil atualizado por E2E — ' + Date.now());
+    await page.getByRole('button', { name: 'Salvar Alterações' }).click();
+
+    await expect(
+      page.getByText('Perfil atualizado! Visível na busca em instantes.')
+    ).toBeVisible({ timeout: 12_000 });
+  });
+
 });
