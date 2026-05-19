@@ -22,7 +22,9 @@ import {
 } from '@/lib/scheduling';
 import { createAppointmentRequest } from '@/client-api/appointments';
 import { quoteServicePricingRequest } from '@/client-api/pricing';
+import { checkPlanCoverage } from '@/client-api/plans';
 import { formatMoney } from '@/client-api/payments';
+import { env } from '@/config/env';
 import PaymentStep from '@/components/payments/PaymentStep';
 
 const PROFESSIONS = [
@@ -39,6 +41,53 @@ const PROFESSIONS = [
   { id: 'Nutrição', name: 'Nutrição', icon: Leaf, color: 'bg-lime-500', description: 'Nutricionistas clínicos', specialties: ['Nutrição Clínica'] },
   { id: 'Fonoaudiologia', name: 'Fonoaudiologia', icon: Mic, color: 'bg-fuchsia-500', description: 'Fonoaudiólogos', specialties: ['Fonoaudiologia Clínica'] },
 ];
+
+const PLAN_COVERAGE_DEBUG_REASONS = new Set([
+  'flow_not_plan_eligible',
+  'no_plan_credit_available',
+  'specialty_not_mapped',
+]);
+
+const PLAN_COVERAGE_OPERATIONAL_REASONS = new Set([
+  'plans_service_not_configured',
+  'plans_service_rejected_request',
+  'plans_service_unavailable',
+]);
+
+const PLAN_COVERAGE_STATUS_MESSAGES = {
+  flow_not_plan_eligible: 'Este fluxo nao e elegivel para planos. Pagamento avulso disponivel.',
+  no_plan_credit_available: 'Nenhum credito de plano disponivel para esta especialidade.',
+  plans_service_not_configured: 'Servico de planos ainda nao configurado. Pagamento avulso disponivel.',
+  plans_service_rejected_request: 'Nao foi possivel validar plano para esta especialidade. Pagamento avulso disponivel.',
+  plans_service_unavailable: 'Nao foi possivel verificar plano agora. Pagamento avulso disponivel.',
+  specialty_not_mapped: 'Esta especialidade ainda nao esta vinculada aos planos.',
+};
+
+function shouldShowDetailedPlanCoverageStatus() {
+  return env.isDev || ['development', 'staging', 'test'].includes(env.appEnv);
+}
+
+function getPlanCoverageStatusMessage(planCoverage, planCoverageError) {
+  if (planCoverageError) {
+    return 'Nao foi possivel verificar plano agora. Voce ainda pode seguir com pagamento avulso.';
+  }
+
+  if (!planCoverage || planCoverage.covered) {
+    return '';
+  }
+
+  const reason = planCoverage.reason || '';
+
+  if (PLAN_COVERAGE_OPERATIONAL_REASONS.has(reason)) {
+    return PLAN_COVERAGE_STATUS_MESSAGES[reason];
+  }
+
+  if (shouldShowDetailedPlanCoverageStatus() && PLAN_COVERAGE_DEBUG_REASONS.has(reason)) {
+    return PLAN_COVERAGE_STATUS_MESSAGES[reason];
+  }
+
+  return '';
+}
 
 function AgendamentoEspecialidadeInner() {
   const navigate = useNavigate();
@@ -76,6 +125,23 @@ function AgendamentoEspecialidadeInner() {
     retry: false,
     meta: { handledError: true, severity: 'warn' },
   });
+
+  const {
+    data: planCoverage,
+    isLoading: planCoverageLoading,
+    error: planCoverageError,
+  } = useQuery({
+    queryKey: ['plan-coverage', 'appointment-specialty', selectedSpecialty],
+    queryFn: () => checkPlanCoverage({
+      flow: 'specialty',
+      specialty_code: selectedSpecialty || '',
+    }),
+    enabled: canQuotePatientService && Boolean(selectedSpecialty),
+    retry: false,
+    meta: { handledError: true, severity: 'warn' },
+  });
+
+  const planCoverageStatusMessage = getPlanCoverageStatusMessage(planCoverage, planCoverageError);
 
   const createRequest = useMutation({
     mutationFn: async () => {
@@ -318,6 +384,32 @@ function AgendamentoEspecialidadeInner() {
                   <div className="mb-4 p-3 bg-red-50 border border-red-200 rounded-lg text-sm text-red-700 flex items-start gap-2 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-300">
                     <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
                     {quoteError.message || 'Nao foi possivel carregar o valor oficial.'}
+                  </div>
+                )}
+
+                {planCoverageLoading && (
+                  <div className="mb-4 p-3 bg-muted/50 border border-border rounded-lg text-sm text-muted-foreground flex items-center gap-2">
+                    <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                    Verificando cobertura do plano...
+                  </div>
+                )}
+
+                {!planCoverageLoading && planCoverage?.covered && (
+                  <div className="mb-4 p-4 bg-emerald-50 border border-emerald-200 rounded-xl text-sm dark:bg-emerald-950/30 dark:border-emerald-900/60">
+                    <p className="font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
+                      Plano disponivel para esta consulta
+                    </p>
+                    <p className="text-emerald-700 dark:text-emerald-300">
+                      Voce possui credito/passe disponivel para esta especialidade. Nesta etapa,
+                      o pagamento avulso ainda permanece ativo enquanto finalizamos a integracao.
+                    </p>
+                  </div>
+                )}
+
+                {!planCoverageLoading && !planCoverage?.covered && planCoverageStatusMessage && (
+                  <div className="mb-4 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-800 flex items-start gap-2 dark:bg-amber-950/35 dark:border-amber-900/60 dark:text-amber-200">
+                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                    {planCoverageStatusMessage}
                   </div>
                 )}
 

@@ -12,6 +12,9 @@ verify_jwt = false
 [functions.bootstrap-app-user]
 verify_jwt = false
 
+[functions.check-plan-coverage]
+verify_jwt = false
+
 [functions.cancel-appointment]
 verify_jwt = false
 
