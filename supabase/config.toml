@@ -99,6 +99,9 @@ verify_jwt = false
 [functions.register-professional]
 verify_jwt = false
 
+[functions.retry-plan-activation]
+verify_jwt = false
+
 [functions.replace-availability-slots]
 verify_jwt = false
 

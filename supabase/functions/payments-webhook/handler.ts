@@ -10,6 +10,7 @@ import {
   createPaymentProvider,
   getConfiguredPaymentProviderName,
 } from '../_shared/payments/providers/index.ts';
+import { activatePlanSubscriptionForPayment } from '../_shared/plans/activate-plan-subscription.ts';
 import type {
   ProviderChargeStatusResult,
   ProviderWebhookVerificationResult,
@@ -505,10 +506,12 @@ async function applyProviderStatus({
   client,
   charge,
   providerStatus,
+  requestId,
 }: {
   client: SupabaseClient;
   charge: PaymentChargeRow;
   providerStatus: ProviderChargeStatusResult;
+  requestId: string;
 }) {
   await assertAmountsAreConsistent(client, charge, providerStatus);
 
@@ -520,6 +523,7 @@ async function applyProviderStatus({
       currentStatus: charge.status,
       nextStatus,
       reason: 'ignored_out_of_order_transition',
+      activation: null,
     };
   }
 
@@ -549,6 +553,13 @@ async function applyProviderStatus({
 
   await updateOwnerPaymentStatus(client, charge, nextStatus, paidAt);
 
+  const activation = charge.owner_type === 'plan_subscription' && nextStatus === 'paid'
+    ? await activatePlanSubscriptionForPayment(client, {
+      paymentChargeId: charge.id,
+      requestId,
+    })
+    : null;
+
   console.info('[payments] webhook:status-applied', {
     paymentChargeId: charge.id,
     ownerType: charge.owner_type,
@@ -563,6 +574,7 @@ async function applyProviderStatus({
     currentStatus: charge.status,
     nextStatus,
     reason: '',
+    activation,
   };
 }
 
@@ -633,7 +645,7 @@ export async function handlePaymentsWebhookRequest(req: Request) {
     try {
       const providerStatus = await provider.getChargeStatus(verification.providerChargeId);
       const charge = await resolvePaymentCharge(client, provider.name, providerStatus);
-      const result = await applyProviderStatus({ client, charge, providerStatus });
+      const result = await applyProviderStatus({ client, charge, providerStatus, requestId });
 
       await updateWebhookEvent(client, event.row.id, {
         resolved_charge_id: charge.id,
@@ -651,6 +663,7 @@ export async function handlePaymentsWebhookRequest(req: Request) {
         webhookEventId: event.row.id,
         paymentChargeId: charge.id,
         status: result.nextStatus,
+        activation: result.activation,
       }, requestId);
     } catch (processingError) {
       if (isNonRetryableProcessingError(processingError)) {

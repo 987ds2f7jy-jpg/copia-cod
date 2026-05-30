@@ -18,4 +18,12 @@ test.describe('configuração de cobrança', () => {
     expect(config).toContain('[functions.create-plan-checkout]');
     expect(config).toMatch(/\[functions\.create-plan-checkout\]\s+verify_jwt\s*=\s*false/);
   });
+
+  test('retry-plan-activation esta registrada no config.toml', async () => {
+    const configPath = path.join(process.cwd(), 'supabase', 'config.toml');
+    const config = fs.readFileSync(configPath, 'utf8');
+
+    expect(config).toContain('[functions.retry-plan-activation]');
+    expect(config).toMatch(/\[functions\.retry-plan-activation\]\s+verify_jwt\s*=\s*false/);
+  });
 });

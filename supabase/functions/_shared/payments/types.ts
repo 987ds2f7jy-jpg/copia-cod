@@ -43,4 +43,5 @@ export type MarkPaymentAsPaidResult = {
   ownerId: string;
   status: 'paid';
   paidAt: string;
+  activation?: unknown;
 };

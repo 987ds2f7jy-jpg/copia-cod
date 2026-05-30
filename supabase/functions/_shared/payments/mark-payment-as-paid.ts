@@ -1,4 +1,5 @@
 import { AppError } from '../errors.ts';
+import { activatePlanSubscriptionForPayment } from '../plans/activate-plan-subscription.ts';
 import type { SupabaseClient } from '../supabase.ts';
 import type {
   MarkPaymentAsPaidInput,
@@ -21,6 +22,19 @@ const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   solicitacao_exame: 'solicitacoes_exames',
   plan_subscription: 'plan_subscription_orders',
 };
+
+async function activatePlanOwnerIfNeeded(
+  client: SupabaseClient,
+  charge: PaymentChargeRow,
+) {
+  if (charge.owner_type !== 'plan_subscription') {
+    return null;
+  }
+
+  return activatePlanSubscriptionForPayment(client, {
+    paymentChargeId: charge.id,
+  });
+}
 
 async function updateOwnerAsPaid(
   client: SupabaseClient,
@@ -88,6 +102,7 @@ export async function markPaymentAsPaid(
 
   if (charge.status === 'paid') {
     await updateOwnerAsPaid(client, charge.owner_type, charge.owner_id, charge.id, paidAt);
+    const activation = await activatePlanOwnerIfNeeded(client, charge);
 
     return {
       paymentChargeId: charge.id,
@@ -95,6 +110,7 @@ export async function markPaymentAsPaid(
       ownerId: charge.owner_id,
       status: 'paid',
       paidAt,
+      activation,
     };
   }
 
@@ -130,6 +146,7 @@ export async function markPaymentAsPaid(
   }
 
   await updateOwnerAsPaid(client, charge.owner_type, charge.owner_id, charge.id, paidAt);
+  const activation = await activatePlanOwnerIfNeeded(client, charge);
 
   return {
     paymentChargeId: charge.id,
@@ -137,5 +154,6 @@ export async function markPaymentAsPaid(
     ownerId: charge.owner_id,
     status: 'paid',
     paidAt,
+    activation,
   };
 }
