@@ -48,6 +48,10 @@ const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
     table: 'solicitacoes_exames',
     amountField: 'quoted_gross_price',
   },
+  plan_subscription: {
+    table: 'plan_subscription_orders',
+    amountField: 'amount',
+  },
 };
 
 const RETRYABLE_STATUSES = new Set<PaymentChargeStatus>([

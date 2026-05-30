@@ -61,6 +61,10 @@ const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
     table: 'solicitacoes_exames',
     amountField: 'quoted_gross_price',
   },
+  plan_subscription: {
+    table: 'plan_subscription_orders',
+    amountField: 'amount',
+  },
 };
 
 function roundMoney(value: number) {
@@ -472,6 +476,14 @@ async function updateOwnerPaymentStatus(
 
   if (status === 'paid') {
     updatePayload.paid_at = paidAt || new Date().toISOString();
+
+    if (charge.owner_type === 'plan_subscription') {
+      updatePayload.status = 'payment_confirmed';
+    }
+  }
+
+  if ((status === 'refunded' || status === 'chargeback') && charge.owner_type === 'plan_subscription') {
+    updatePayload.status = 'refunded';
   }
 
   const { error } = await client

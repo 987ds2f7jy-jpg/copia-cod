@@ -1,5 +1,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { createPlanCheckout } from '@/client-api/plans';
+import { useAuth } from '@/components/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,16 +10,19 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
-  Sparkles, Users, Brain, Check, Building2, Send, Star, ShieldCheck,
+  Sparkles, Users, Brain, Check, Building2, Send, Star, ShieldCheck, Loader2,
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 
+const PAYMENT_RETURN_CONTEXT_KEY = 'rd.payment.return_context.v1';
+
 // ============================================================
-// Mock data — substituir futuramente por dados reais (API/CMS)
+// Catalogo visual; preco real e plano externo sao resolvidos no backend.
 // ============================================================
-const PLANOS_MOCK = [
+const PLANOS_UI = [
   {
     id: 'emagrecimento',
+    planCode: 'weight_loss',
     nome: 'Emagrecimento',
     descricao:
       'Acompanhamento completo com nutricionista e endocrinologista para uma jornada de emagrecimento saudável e sustentável.',
@@ -35,6 +40,7 @@ const PLANOS_MOCK = [
   },
   {
     id: 'familiar',
+    planCode: 'family',
     nome: 'Familiar',
     descricao:
       'Cuidado integral para até 4 pessoas da mesma família, com acesso a clínico geral e principais especialidades.',
@@ -52,6 +58,7 @@ const PLANOS_MOCK = [
   },
   {
     id: 'psicologia',
+    planCode: 'psychology',
     nome: 'Psicologia',
     descricao:
       'Acompanhamento psicológico contínuo com sessões semanais e suporte emocional sempre que precisar.',
@@ -79,7 +86,7 @@ function formatPreco(valor) {
 // ============================================================
 // Card de Plano
 // ============================================================
-function PlanoCard({ plano, index }) {
+function PlanoCard({ plano, index, loading, disabled, onCheckout }) {
   const Icone = plano.icone;
   return (
     <motion.div
@@ -164,9 +171,12 @@ function PlanoCard({ plano, index }) {
                 ? 'bg-emerald-600 hover:bg-emerald-700 text-white'
                 : 'bg-slate-900 hover:bg-slate-800 text-white dark:bg-emerald-700 dark:hover:bg-emerald-600'
             }`}
-            onClick={(e) => e.preventDefault()}
+            type="button"
+            disabled={loading || disabled}
+            onClick={() => onCheckout(plano)}
           >
-            {plano.cta}
+            {loading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+            {loading ? 'Preparando checkout...' : plano.cta}
           </Button>
         </CardContent>
       </Card>
@@ -321,6 +331,78 @@ function FormularioEmpresas() {
 // Página
 // ============================================================
 export default function Planos() {
+  const { isAuthenticated, loading: authLoading, redirectToLogin, user } = useAuth();
+  const [loadingPlanCode, setLoadingPlanCode] = useState('');
+  const { toast } = useToast();
+
+  function storePaymentReturnContext(checkout) {
+    if (typeof window === 'undefined') {
+      return;
+    }
+
+    window.sessionStorage.setItem(PAYMENT_RETURN_CONTEXT_KEY, JSON.stringify({
+      ownerType: 'plan_subscription',
+      ownerId: checkout.order?.id || '',
+      paymentChargeId: checkout.payment?.paymentChargeId || checkout.order?.currentPaymentChargeId || null,
+      providerChargeId: checkout.payment?.providerChargeId || null,
+      successRedirectPath: '/Planos?pagamento=sucesso',
+      failureRedirectPath: '/Planos?pagamento=falha',
+      pendingRedirectPath: '/Planos?pagamento=pendente',
+      returnPath: '/Planos',
+      createdAt: new Date().toISOString(),
+    }));
+  }
+
+  async function handleCheckout(plano) {
+    if (authLoading) {
+      return;
+    }
+
+    if (!isAuthenticated) {
+      redirectToLogin('/Planos');
+      return;
+    }
+
+    if (user?.role && user.role !== 'patient') {
+      toast({
+        title: 'Acesso restrito',
+        description: 'A contratacao de planos esta disponivel para pacientes.',
+        variant: 'destructive',
+      });
+      return;
+    }
+
+    setLoadingPlanCode(plano.planCode);
+
+    try {
+      const checkout = await createPlanCheckout(plano.planCode);
+
+      if (!checkout?.checkoutUrl) {
+        toast({
+          title: 'Checkout criado',
+          description: 'A cobranca foi criada, mas o provedor atual nao retornou uma URL de checkout.',
+        });
+        return;
+      }
+
+      storePaymentReturnContext(checkout);
+      window.location.assign(checkout.checkoutUrl);
+    } catch (error) {
+      if (error?.status === 401 || error?.code === 'AUTH_SESSION_REQUIRED') {
+        redirectToLogin('/Planos');
+        return;
+      }
+
+      toast({
+        title: 'Erro ao iniciar pagamento',
+        description: error instanceof Error ? error.message : 'Nao foi possivel criar o checkout do plano.',
+        variant: 'destructive',
+      });
+    } finally {
+      setLoadingPlanCode('');
+    }
+  }
+
   return (
     <div className="min-h-screen bg-background">
       {/* Hero */}
@@ -356,8 +438,15 @@ export default function Planos() {
           {/* Aba Planos */}
           <TabsContent value="planos" className="mt-0">
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 pt-4">
-              {PLANOS_MOCK.map((plano, idx) => (
-                <PlanoCard key={plano.id} plano={plano} index={idx} />
+              {PLANOS_UI.map((plano, idx) => (
+                <PlanoCard
+                  key={plano.id}
+                  plano={plano}
+                  index={idx}
+                  loading={loadingPlanCode === plano.planCode}
+                  disabled={Boolean(loadingPlanCode) || authLoading}
+                  onCheckout={handleCheckout}
+                />
               ))}
             </div>
 

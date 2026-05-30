@@ -9,6 +9,11 @@
 
 import { test as rdTest, expect } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
+import {
+  edgeOk,
+  fulfillJson,
+  mockAuthForRole,
+} from '../support/edge-mocks';
 
 const PLANOS_HEADING = /Planos pensados para o seu cuidado/i;
 
@@ -57,21 +62,61 @@ rdTest.describe('planos - rota publica e planos individuais', () => {
     await expect(page.getByText('Plano de fidelidade')).toHaveCount(3);
   });
 
-  rdTest('CTAs dos cards sao visuais e nao navegam enquanto nao ha checkout real', async ({
+  rdTest('CTA de plano exige login antes de iniciar checkout', async ({
     page,
     goto,
   }) => {
     await openPlanos(goto, page);
-    const currentUrl = page.url();
-
     await page.getByRole('button', { name: 'Quero esse plano' }).click();
-    await expect(page).toHaveURL(currentUrl);
+    await expect(page).toHaveURL(/\/Entrar/);
+  });
+});
 
+rdTest.describe('planos - checkout autenticado', () => {
+  rdTest('envia somente plan_code ao backend e redireciona para checkout', async ({
+    page,
+    goto,
+  }) => {
+    let payload: Record<string, unknown> | null = null;
+    const checkoutUrl = 'https://checkout.rapidodoutor.test/plans/family';
+
+    await mockAuthForRole(page, 'patient');
+    await page.route('**/functions/v1/create-plan-checkout', async (route) => {
+      payload = route.request().postDataJSON();
+      await fulfillJson(route, 200, edgeOk({
+        checkoutUrl,
+        order: {
+          id: 'order-family-e2e',
+          planCode: 'family',
+          amount: 249.9,
+          currency: 'BRL',
+          status: 'pending_payment',
+          paymentStatus: 'payment_pending',
+          currentPaymentChargeId: 'charge-family-e2e',
+        },
+        payment: {
+          paymentChargeId: 'charge-family-e2e',
+          provider: 'stripe',
+          status: 'payment_pending',
+          amount: 249.9,
+          currency: 'BRL',
+          checkoutUrl,
+        },
+      }));
+    });
+    await page.route('https://checkout.rapidodoutor.test/**', async (route) => {
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/html',
+        body: '<html><body><h1>Checkout E2E</h1></body></html>',
+      });
+    });
+
+    await openPlanos(goto, page);
     await page.getByRole('button', { name: 'Escolher plano familiar' }).click();
-    await expect(page).toHaveURL(currentUrl);
 
-    await page.getByRole('button', { name: /come.ar agora/i }).click();
-    await expect(page).toHaveURL(currentUrl);
+    await expect.poll(() => payload?.plan_code).toBe('family');
+    await expect(page).toHaveURL(checkoutUrl);
   });
 });
 

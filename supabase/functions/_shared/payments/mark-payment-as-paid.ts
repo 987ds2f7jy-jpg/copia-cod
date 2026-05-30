@@ -19,6 +19,7 @@ const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   appointment: 'appointments',
   queue: 'queues',
   solicitacao_exame: 'solicitacoes_exames',
+  plan_subscription: 'plan_subscription_orders',
 };
 
 async function updateOwnerAsPaid(
@@ -28,13 +29,19 @@ async function updateOwnerAsPaid(
   paymentChargeId: string,
   paidAt: string,
 ) {
+  const updatePayload: Record<string, unknown> = {
+    payment_status: 'paid',
+    paid_at: paidAt,
+    current_payment_charge_id: paymentChargeId,
+  };
+
+  if (ownerType === 'plan_subscription') {
+    updatePayload.status = 'payment_confirmed';
+  }
+
   const { error } = await client
     .from(OWNER_TABLE[ownerType])
-    .update({
-      payment_status: 'paid',
-      paid_at: paidAt,
-      current_payment_charge_id: paymentChargeId,
-    })
+    .update(updatePayload)
     .eq('id', ownerId);
 
   if (error) {

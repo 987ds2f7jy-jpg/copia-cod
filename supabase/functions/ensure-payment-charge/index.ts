@@ -70,12 +70,22 @@ const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
     ownerField: 'paciente_id',
     amountField: 'quoted_gross_price',
   },
+  plan_subscription: {
+    table: 'plan_subscription_orders',
+    ownerField: 'app_user_id',
+    amountField: 'amount',
+  },
 };
 
 function normalizeOwnerType(value: unknown): PaymentOwnerType {
   const normalized = String(value || '').trim();
 
-  if (normalized === 'appointment' || normalized === 'queue' || normalized === 'solicitacao_exame') {
+  if (
+    normalized === 'appointment' ||
+    normalized === 'queue' ||
+    normalized === 'solicitacao_exame' ||
+    normalized === 'plan_subscription'
+  ) {
     return normalized;
   }
 

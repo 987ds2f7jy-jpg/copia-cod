@@ -31,6 +31,7 @@ const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   appointment: 'appointments',
   queue: 'queues',
   solicitacao_exame: 'solicitacoes_exames',
+  plan_subscription: 'plan_subscription_orders',
 };
 
 function normalizeString(value: unknown) {

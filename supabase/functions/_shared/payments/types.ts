@@ -1,4 +1,4 @@
-export type PaymentOwnerType = 'appointment' | 'queue' | 'solicitacao_exame';
+export type PaymentOwnerType = 'appointment' | 'queue' | 'solicitacao_exame' | 'plan_subscription';
 
 export type PaymentChargeStatus =
   | 'payment_pending'

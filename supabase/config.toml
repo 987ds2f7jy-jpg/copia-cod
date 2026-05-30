@@ -21,6 +21,9 @@ verify_jwt = false
 [functions.create-appointment]
 verify_jwt = false
 
+[functions.create-plan-checkout]
+verify_jwt = false
+
 [functions.create-question]
 verify_jwt = false
 
