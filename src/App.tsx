@@ -33,6 +33,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 const routeProtection = {
   AdminAprovacao: { requiredRole: 'admin' },
   MeusPagamentos: { requiredRole: 'patient' },
+  MeusPlanos: { requiredRole: 'patient' },
   Teleconsulta: {},
 };
 

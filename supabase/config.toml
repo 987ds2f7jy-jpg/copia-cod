@@ -60,6 +60,9 @@ verify_jwt = false
 [functions.get-my-active-consultation]
 verify_jwt = false
 
+[functions.get-my-plans]
+verify_jwt = false
+
 [functions.get-professional-dashboard]
 verify_jwt = false
 

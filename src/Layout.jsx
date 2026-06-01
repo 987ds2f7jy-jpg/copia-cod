@@ -172,6 +172,7 @@ function LayoutInner({ children, currentPageName }) {
                       : currentPageName === 'CadastroProfissional' ? 'Cadastro Profissional'
                       : currentPageName === 'CadastroPaciente' ? 'Criar Conta'
                       : currentPageName === 'Perfil' ? 'Meu Perfil'
+                      : currentPageName === 'MeusPlanos' ? 'Meus Planos'
                       : 'Voltar'}
                   </span>
                 </>

@@ -1,6 +1,7 @@
 import { AppError } from '../errors.ts';
 
 const ACTIVATE_EXTERNAL_PATH = '/plans/external/activate';
+const LIST_EXTERNAL_SCORES_PATH = '/plans/external/scores';
 const DEFAULT_TIMEOUT_MS = 8_000;
 
 export type ActivateExternalPlanPayload = {
@@ -30,6 +31,39 @@ export type ActivateExternalPlanResult = {
   raw: unknown;
 };
 
+export type ListExternalPlanScoresInput = {
+  externalKey: string;
+  subscriptionId?: number | string | null;
+};
+
+export type ExternalPlanScore = {
+  subscription_score_id?: number | string | null;
+  score_id?: number | string | null;
+  status?: number | string | null;
+  status_label?: string | null;
+  specialization_id?: number | string | null;
+  specialization_name?: string | null;
+  concil_type?: string | null;
+  created_at?: string | null;
+  used_at?: string | null;
+};
+
+export type ExternalPlanScoresSubscription = {
+  id?: number | string | null;
+  plan_id?: number | string | null;
+  plan_name?: string | null;
+  status?: number | string | null;
+  status_label?: string | null;
+  created_at?: string | null;
+  scores?: ExternalPlanScore[] | null;
+};
+
+export type ListExternalPlanScoresResult = {
+  externalKey: string;
+  subscriptions: ExternalPlanScoresSubscription[];
+  raw: unknown;
+};
+
 function normalizeString(value: unknown) {
   return String(value ?? '').trim();
 }
@@ -56,7 +90,7 @@ function getInternalApiKey() {
   return normalizeString(Deno.env.get('PLANS_SERVICE_INTERNAL_API_KEY'));
 }
 
-function buildActivationUrl() {
+function buildPlansServiceRequest(path: string, operation: string) {
   const baseUrl = getPlansServiceBaseUrl();
   const internalApiKey = getInternalApiKey();
 
@@ -64,7 +98,7 @@ function buildActivationUrl() {
     throw new AppError({
       status: 500,
       code: 'plans_service_not_configured',
-      message: 'Plans service activation is not configured.',
+      message: `Plans service ${operation} is not configured.`,
       details: {
         hasBaseUrl: Boolean(baseUrl),
         hasInternalApiKey: Boolean(internalApiKey),
@@ -73,9 +107,17 @@ function buildActivationUrl() {
   }
 
   return {
-    url: `${baseUrl}${ACTIVATE_EXTERNAL_PATH}`,
+    url: `${baseUrl}${path}`,
     internalApiKey,
   };
+}
+
+function buildActivationUrl() {
+  return buildPlansServiceRequest(ACTIVATE_EXTERNAL_PATH, 'activation');
+}
+
+function buildScoresUrl() {
+  return buildPlansServiceRequest(LIST_EXTERNAL_SCORES_PATH, 'scores lookup');
 }
 
 function unwrapResource(payload: unknown): Record<string, unknown> {
@@ -140,6 +182,20 @@ async function parseResponsePayload(response: Response) {
   }
 }
 
+function asArray(value: unknown) {
+  return Array.isArray(value) ? value : [];
+}
+
+function normalizeExternalScoresPayload(payload: unknown): ListExternalPlanScoresResult {
+  const resource = unwrapResource(payload);
+
+  return {
+    externalKey: normalizeString(resource.external_key || resource.externalKey),
+    subscriptions: asArray(resource.subscriptions) as ExternalPlanScoresSubscription[],
+    raw: payload,
+  };
+}
+
 export async function activateExternalPlanSubscription(
   payload: ActivateExternalPlanPayload,
 ): Promise<ActivateExternalPlanResult> {
@@ -194,6 +250,72 @@ export async function activateExternalPlanSubscription(
       status: 502,
       code: 'plans_service_unavailable',
       message: 'Plans service is unavailable for external plan activation.',
+      details: error instanceof Error ? error.message : 'Unexpected plans-service error.',
+    });
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
+
+export async function listExternalPlanScores({
+  externalKey,
+  subscriptionId = null,
+}: ListExternalPlanScoresInput): Promise<ListExternalPlanScoresResult> {
+  const { url, internalApiKey } = buildScoresUrl();
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), getTimeoutMs());
+  const body: Record<string, unknown> = {
+    external_key: externalKey,
+  };
+  const normalizedSubscriptionId = normalizeString(subscriptionId);
+
+  if (normalizedSubscriptionId) {
+    body.subscription_id = normalizedSubscriptionId;
+  }
+
+  try {
+    const response = await fetch(url, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Internal-Api-Key': internalApiKey,
+      },
+      body: JSON.stringify(body),
+      signal: controller.signal,
+    });
+    const responsePayload = await parseResponsePayload(response);
+
+    if (!response.ok) {
+      throw new AppError({
+        status: 502,
+        code: 'plans_service_scores_request_failed',
+        message: 'Plans service rejected external score listing.',
+        details: {
+          status: response.status,
+          payload: responsePayload,
+        },
+      });
+    }
+
+    return normalizeExternalScoresPayload(responsePayload);
+  } catch (error) {
+    if (error instanceof AppError) {
+      throw error;
+    }
+
+    if (error instanceof DOMException && error.name === 'AbortError') {
+      throw new AppError({
+        status: 504,
+        code: 'plans_service_scores_timeout',
+        message: 'Plans service score listing request timed out.',
+      });
+    }
+
+    throw new AppError({
+      status: 502,
+      code: 'plans_service_scores_unavailable',
+      message: 'Plans service is unavailable for external score listing.',
       details: error instanceof Error ? error.message : 'Unexpected plans-service error.',
     });
   } finally {

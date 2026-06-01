@@ -1,5 +1,6 @@
-import React, { useState } from 'react';
+import React from 'react';
 import { Link } from 'react-router-dom';
+import { useQuery } from '@tanstack/react-query';
 import { createPageUrl } from '@/utils';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -9,74 +10,66 @@ import {
   Sparkles, CheckCircle2, XCircle, Calendar, RefreshCw, CreditCard,
   Users, UserPlus, Clock, ShieldCheck, Stethoscope, Baby, Brain,
   Apple, Dumbbell, ClipboardList, AlertCircle, ChevronRight, Inbox,
+  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/components/AuthContext';
+import { getMyPlans } from '@/client-api/plans';
+import { formatMoney } from '@/client-api/payments';
 
-/* =========================================================================
- * MOCKS LOCAIS — substituir por API real depois (Codex)
- * Estrutura pensada para troca direta por respostas de backend.
- * ========================================================================= */
-
-// Estado visual padrão da página: 'ativo' | 'sem_plano' | 'pendente' | 'falha'
-const MOCK_PLAN_STATE = 'ativo';
-
-const mockPlan = {
-  name: 'Familiar',
-  status: 'Ativo',
-  price: 'R$ 249,90/mês',
-  contractedAt: '01/03/2026',
-  nextRenewal: '01/07/2026',
-  renewalDay: 1,
+const CREDIT_ICON_BY_CODE = {
+  clinico_geral: Stethoscope,
+  clinico: Stethoscope,
+  pediatria: Baby,
+  psicologia: Brain,
+  psiquiatria: Brain,
+  nutricao: Apple,
+  endocrinologia: Apple,
+  educacao_fisica: Dumbbell,
+  ginecologia: Stethoscope,
+  dermatologia: Stethoscope,
+  cardiologia: Stethoscope,
 };
 
-const mockCredits = [
-  { id: 'clinico', label: 'Clínico Geral', icon: Stethoscope, available: 1, used: 0, included: true },
-  { id: 'pediatria', label: 'Pediatria', icon: Baby, available: 1, used: 0, included: true },
-  { id: 'psicologia', label: 'Psicologia', icon: Brain, available: 0, used: 0, included: false },
-  { id: 'nutricao', label: 'Nutrição', icon: Apple, available: 0, used: 0, included: false },
-  { id: 'educacao_fisica', label: 'Educação Física', icon: Dumbbell, available: 0, used: 0, included: false },
-];
-
-const mockCoverage = {
-  included: [
-    'Consulta com clínico geral',
-    'Pediatria',
-    'Ginecologia',
-    'Pronto atendimento 24h',
-  ],
-  notIncluded: [
-    'Psicologia semanal',
-    'Nutrição',
-    'Educação física',
-    'Serviços extras',
-    'Consulta por perfil do profissional',
-  ],
+const PLAN_STATUS_LABELS = {
+  active: 'Ativo',
+  activating_plan: 'Pendente',
+  payment_confirmed: 'Pendente',
+  pending_payment: 'Pendente',
+  activation_failed: 'Falha',
+  canceled: 'Inativo',
+  refunded: 'Inativo',
 };
 
-const mockUsageHistory = [
-  { id: 1, date: '28/05/2026', type: 'Consulta', specialty: 'Clínico Geral', status: 'Usado' },
-  { id: 2, date: '01/05/2026', type: 'Renovação mensal', specialty: 'Créditos renovados', status: 'Concluído' },
-];
+function formatDate(value, fallback = 'A definir') {
+  if (!value) {
+    return fallback;
+  }
 
-const mockDependents = {
-  holder: 'wesley paciente teste',
-  current: 0,
-  max: 3,
-  list: [],
-};
+  const parsed = new Date(value);
 
-/* ========================================================================= */
+  if (Number.isNaN(parsed.getTime())) {
+    return fallback;
+  }
+
+  return parsed.toLocaleDateString('pt-BR');
+}
+
+function statusLabel(status) {
+  return PLAN_STATUS_LABELS[status] || status || 'Inativo';
+}
 
 function PlanStatusBadge({ status }) {
+  const label = statusLabel(status);
   const map = {
     Ativo: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-500/10 dark:text-emerald-300',
     Pendente: 'bg-amber-100 text-amber-700 dark:bg-amber-500/10 dark:text-amber-300',
+    Falha: 'bg-red-100 text-red-700 dark:bg-red-500/10 dark:text-red-300',
     Inativo: 'bg-muted text-muted-foreground',
   };
   return (
-    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${map[status] || map.Inativo}`}>
+    <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-xs font-medium ${map[label] || map.Inativo}`}>
       <span className="w-1.5 h-1.5 rounded-full bg-current" />
-      {status}
+      {label}
     </span>
   );
 }
@@ -97,9 +90,9 @@ function UsageStatusBadge({ status }) {
 /* ---------- Seção 1: Card do plano atual ---------- */
 function CurrentPlanCard({ plan }) {
   const rows = [
-    { icon: Calendar, label: 'Contratação', value: plan.contractedAt },
-    { icon: RefreshCw, label: 'Próxima renovação', value: plan.nextRenewal },
-    { icon: Clock, label: 'Dia de renovação', value: `Todo dia ${plan.renewalDay}` },
+    { icon: Calendar, label: 'Contratação', value: formatDate(plan.createdAt) },
+    { icon: RefreshCw, label: 'Próxima renovação', value: formatDate(plan.nextRenewalAt) },
+    { icon: Clock, label: 'Dia de renovação', value: plan.renewalDayLabel || 'A definir' },
   ];
   return (
     <Card className="overflow-hidden">
@@ -117,7 +110,7 @@ function CurrentPlanCard({ plan }) {
           <PlanStatusBadge status={plan.status} />
         </div>
 
-        <p className="mt-4 text-2xl font-bold text-foreground">{plan.price}</p>
+        <p className="mt-4 text-2xl font-bold text-foreground">{formatMoney(plan.amount, plan.currency)}/mês</p>
 
         <div className="mt-5 grid gap-3 sm:grid-cols-3">
           {rows.map((row) => (
@@ -132,7 +125,7 @@ function CurrentPlanCard({ plan }) {
         </div>
 
         <div className="mt-6 flex flex-col sm:flex-row gap-3">
-          <Button className="bg-emerald-600 hover:bg-emerald-700 text-white">
+          <Button variant="outline" disabled>
             Ver detalhes do plano
           </Button>
           <Button variant="outline" asChild>
@@ -145,20 +138,28 @@ function CurrentPlanCard({ plan }) {
 }
 
 /* ---------- Seção 2: Créditos / consultas disponíveis ---------- */
-function CreditsSection({ credits }) {
+function CreditsSection({ credits, source }) {
+  const sourceLabel = source === 'plans_service'
+    ? 'Créditos atualizados pelo plano'
+    : 'Créditos estimados até a próxima sincronização';
+
   return (
     <section>
-      <h3 className="text-base font-semibold text-foreground mb-4">Créditos disponíveis</h3>
+      <div className="mb-4 flex flex-col gap-1 sm:flex-row sm:items-end sm:justify-between">
+        <h3 className="text-base font-semibold text-foreground">Créditos disponíveis</h3>
+        <span className="text-xs text-muted-foreground">{sourceLabel}</span>
+      </div>
       <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
         {credits.map((credit) => {
-          const total = credit.available + credit.used;
+          const total = credit.total || credit.available + credit.used;
           const pct = total > 0 ? (credit.available / total) * 100 : 0;
+          const CreditIcon = CREDIT_ICON_BY_CODE[credit.code] || Stethoscope;
           return (
             <Card key={credit.id} className={!credit.included ? 'opacity-70' : ''}>
               <CardContent className="p-5">
                 <div className="flex items-center gap-2.5">
                   <div className="w-9 h-9 rounded-lg bg-emerald-50 dark:bg-emerald-500/10 flex items-center justify-center shrink-0">
-                    <credit.icon className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-300" />
+                    <CreditIcon className="w-4.5 h-4.5 text-emerald-600 dark:text-emerald-300" />
                   </div>
                   <p className="text-sm font-semibold text-foreground">{credit.label}</p>
                 </div>
@@ -223,6 +224,23 @@ function CoverageSection({ coverage }) {
 
 /* ---------- Seção 4: Histórico de uso ---------- */
 function UsageHistorySection({ history }) {
+  if (!history.length) {
+    return (
+      <section>
+        <h3 className="text-base font-semibold text-foreground mb-4">Histórico de uso</h3>
+        <Card className="border-dashed">
+          <CardContent className="flex flex-col items-center justify-center text-center py-10 px-6">
+            <ClipboardList className="w-6 h-6 text-muted-foreground mb-3" />
+            <p className="text-sm font-medium text-foreground">Nenhum uso registrado ainda.</p>
+            <p className="text-xs text-muted-foreground mt-1">
+              Quando houver consumo de créditos, ele aparecerá aqui.
+            </p>
+          </CardContent>
+        </Card>
+      </section>
+    );
+  }
+
   return (
     <section>
       <h3 className="text-base font-semibold text-foreground mb-4">Histórico de uso</h3>
@@ -274,6 +292,10 @@ function UsageHistorySection({ history }) {
 
 /* ---------- Seção 5: Plano familiar ---------- */
 function FamilySection({ dependents }) {
+  if (!dependents?.enabled) {
+    return null;
+  }
+
   return (
     <section>
       <h3 className="text-base font-semibold text-foreground mb-4">Plano familiar</h3>
@@ -286,11 +308,11 @@ function FamilySection({ dependents }) {
               </div>
               <div>
                 <p className="text-xs text-muted-foreground">Titular</p>
-                <p className="text-sm font-semibold text-foreground capitalize">{dependents.holder}</p>
+                <p className="text-sm font-semibold text-foreground capitalize">{dependents.holderName}</p>
               </div>
             </div>
             <Badge variant="outline">
-              {dependents.current} de {dependents.max} dependentes
+              {dependents.used} de {dependents.limit} dependentes
             </Badge>
           </div>
 
@@ -344,7 +366,39 @@ function PendingState() {
   );
 }
 
-function FailureState() {
+function LoadingState() {
+  return (
+    <Card className="border-border">
+      <CardContent className="flex flex-col items-center justify-center text-center py-16 px-6">
+        <Loader2 className="w-7 h-7 text-emerald-600 animate-spin mb-4" />
+        <h3 className="text-base font-semibold text-foreground">Carregando seus planos...</h3>
+        <p className="text-sm text-muted-foreground mt-1 max-w-sm">
+          Buscando dados reais do seu plano com segurança.
+        </p>
+      </CardContent>
+    </Card>
+  );
+}
+
+function ErrorState({ message, onRetry }) {
+  return (
+    <Card className="border-red-200 bg-red-50/60 dark:border-red-500/30 dark:bg-red-500/10">
+      <CardContent className="flex flex-col items-center justify-center text-center py-14 px-6">
+        <AlertCircle className="w-7 h-7 text-red-600 dark:text-red-300 mb-4" />
+        <h3 className="text-base font-semibold text-red-900 dark:text-red-100">Não foi possível carregar seus planos.</h3>
+        <p className="text-sm text-red-700 dark:text-red-200 mt-1 max-w-sm">
+          {message || 'Tente novamente em alguns instantes.'}
+        </p>
+        <Button variant="outline" className="mt-5" onClick={onRetry}>
+          <RefreshCw className="w-4 h-4" />
+          Tentar novamente
+        </Button>
+      </CardContent>
+    </Card>
+  );
+}
+
+function FailureState({ onRetry }) {
   return (
     <Card className="border-red-200 bg-red-50/60 dark:border-red-500/30 dark:bg-red-500/10">
       <CardContent className="flex flex-col items-center justify-center text-center py-14 px-6">
@@ -353,7 +407,7 @@ function FailureState() {
         <p className="text-sm text-red-700 dark:text-red-200 mt-1 max-w-sm">
           Tente novamente em alguns instantes. Se o problema persistir, entre em contato com o suporte.
         </p>
-        <Button variant="outline" className="mt-5">
+        <Button variant="outline" className="mt-5" onClick={onRetry}>
           <RefreshCw className="w-4 h-4" />
           Tentar novamente
         </Button>
@@ -381,8 +435,21 @@ export default function MeusPlanos() {
   const { user, loading: authLoading } = useAuth();
   const isPatient = Boolean(user?.role === 'patient');
 
-  // Estado visual mockado. Trocar por dado real depois (Codex).
-  const [planState] = useState(MOCK_PLAN_STATE);
+  const plansQuery = useQuery({
+    queryKey: ['my-plans'],
+    queryFn: getMyPlans,
+    enabled: isPatient,
+    staleTime: 60_000,
+    meta: { handledError: true, severity: 'warn' },
+  });
+
+  const plans = plansQuery.data;
+  const planState = plans?.state || 'no_plan';
+  const isPendingState = (
+    planState === 'pending_payment' ||
+    planState === 'payment_confirmed' ||
+    planState === 'activating_plan'
+  );
 
   return (
     <div className="min-h-screen bg-background">
@@ -396,22 +463,29 @@ export default function MeusPlanos() {
         </header>
 
         {authLoading ? (
-          <Card><CardContent className="py-16" /></Card>
+          <LoadingState />
         ) : !isPatient ? (
           <AccessDeniedState />
-        ) : planState === 'sem_plano' ? (
+        ) : plansQuery.isLoading ? (
+          <LoadingState />
+        ) : plansQuery.isError ? (
+          <ErrorState
+            message={plansQuery.error?.message}
+            onRetry={() => plansQuery.refetch()}
+          />
+        ) : planState === 'no_plan' ? (
           <NoPlanState />
-        ) : planState === 'pendente' ? (
+        ) : isPendingState ? (
           <PendingState />
-        ) : planState === 'falha' ? (
-          <FailureState />
+        ) : planState === 'activation_failed' ? (
+          <FailureState onRetry={() => plansQuery.refetch()} />
         ) : (
           <div className="space-y-10">
-            <CurrentPlanCard plan={mockPlan} />
-            <CreditsSection credits={mockCredits} />
-            <CoverageSection coverage={mockCoverage} />
-            <UsageHistorySection history={mockUsageHistory} />
-            <FamilySection dependents={mockDependents} />
+            <CurrentPlanCard plan={plans.currentPlan} />
+            <CreditsSection credits={plans.credits} source={plans.creditsSource} />
+            <CoverageSection coverage={plans.coverage} />
+            <UsageHistorySection history={plans.usageHistory} />
+            <FamilySection dependents={plans.dependents} />
 
             {/* CTAs finais */}
             <section className="flex flex-col sm:flex-row gap-3">
