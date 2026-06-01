@@ -14,6 +14,7 @@ const Especialidades = lazy(() => import('./pages/Especialidades'));
 const Home = lazy(() => import('./pages/Home'));
 const LaudosMedicos = lazy(() => import('./pages/LaudosMedicos'));
 const MeusPagamentos = lazy(() => import('./pages/MeusPagamentos'));
+const MeusPlanos = lazy(() => import('./pages/MeusPlanos'));
 const MeuProntuario = lazy(() => import('./pages/MeuProntuario'));
 const Perfil = lazy(() => import('./pages/Perfil'));
 const PerfilProfissional = lazy(() => import('./pages/PerfilProfissional'));
@@ -40,6 +41,7 @@ export const PAGES = {
     "Home": Home,
     "LaudosMedicos": LaudosMedicos,
     "MeusPagamentos": MeusPagamentos,
+    "MeusPlanos": MeusPlanos,
     "MeuProntuario": MeuProntuario,
     "Perfil": Perfil,
     "PerfilProfissional": PerfilProfissional,
