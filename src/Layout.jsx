@@ -243,6 +243,12 @@ function LayoutInner({ children, currentPageName }) {
                           </Link>
                         </DropdownMenuItem>
                         <DropdownMenuItem asChild>
+                          <Link to={createPageUrl('MeusPlanos')} className="flex items-center gap-2">
+                            <Sparkles className="w-4 h-4" />
+                            Meus Planos
+                          </Link>
+                        </DropdownMenuItem>
+                        <DropdownMenuItem asChild>
                           <Link to={createPageUrl('MeusPagamentos')} className="flex items-center gap-2">
                             <CreditCard className="w-4 h-4" />
                             Meus Pagamentos
