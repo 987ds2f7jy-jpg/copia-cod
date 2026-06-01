@@ -29,6 +29,7 @@ type PlanSubscriptionOrderRow = {
   status: string;
   payment_status: string | null;
   current_payment_charge_id: string | null;
+  plans_service_subscription_id: string | null;
   external_key: string | null;
   paid_at: string | null;
 };
@@ -177,6 +178,7 @@ async function loadOrder(client: SupabaseClient, orderId: string) {
       status,
       payment_status,
       current_payment_charge_id,
+      plans_service_subscription_id,
       external_key,
       paid_at
     `)
@@ -422,7 +424,7 @@ export async function activatePlanSubscriptionForPayment(
       paymentChargeId: charge.id,
       status: 'active',
       reason: 'already_active',
-      plansServiceSubscriptionId: null,
+      plansServiceSubscriptionId: order.plans_service_subscription_id,
     };
   }
 

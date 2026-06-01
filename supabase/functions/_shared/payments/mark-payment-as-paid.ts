@@ -16,6 +16,14 @@ type PaymentChargeRow = {
   paid_at: string | null;
 };
 
+type PlanSubscriptionPaymentState = {
+  id: string;
+  status: string;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
+  paid_at: string | null;
+};
+
 const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   appointment: 'appointments',
   queue: 'queues',
@@ -36,6 +44,103 @@ async function activatePlanOwnerIfNeeded(
   });
 }
 
+async function loadPlanSubscriptionPaymentState(
+  client: SupabaseClient,
+  ownerId: string,
+) {
+  const { data, error } = await client
+    .from('plan_subscription_orders')
+    .select('id, status, payment_status, current_payment_charge_id, paid_at')
+    .eq('id', ownerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_OWNER_LOOKUP_FAILED',
+      message: 'Unable to load plan subscription order.',
+      details: error.message,
+    });
+  }
+
+  const order = data as PlanSubscriptionPaymentState | null;
+
+  if (!order?.id) {
+    throw new AppError({
+      status: 404,
+      code: 'PAYMENT_OWNER_NOT_FOUND',
+      message: 'Payment owner was not found.',
+      details: { ownerType: 'plan_subscription', ownerId },
+    });
+  }
+
+  return order;
+}
+
+async function updatePlanSubscriptionAsPaid(
+  client: SupabaseClient,
+  ownerId: string,
+  paymentChargeId: string,
+  paidAt: string,
+) {
+  const order = await loadPlanSubscriptionPaymentState(client, ownerId);
+
+  if (order.status === 'active') {
+    const updatePayload: Record<string, unknown> = {};
+
+    if (order.payment_status !== 'paid') {
+      updatePayload.payment_status = 'paid';
+    }
+
+    if (!order.current_payment_charge_id) {
+      updatePayload.current_payment_charge_id = paymentChargeId;
+    }
+
+    if (!order.paid_at) {
+      updatePayload.paid_at = paidAt;
+    }
+
+    if (Object.keys(updatePayload).length === 0) {
+      return;
+    }
+
+    const { error } = await client
+      .from('plan_subscription_orders')
+      .update(updatePayload)
+      .eq('id', ownerId);
+
+    if (error) {
+      throw new AppError({
+        status: 500,
+        code: 'PAYMENT_OWNER_PAID_UPDATE_FAILED',
+        message: 'Unable to update active plan subscription payment fields.',
+        details: error.message,
+      });
+    }
+
+    return;
+  }
+
+  const { error } = await client
+    .from('plan_subscription_orders')
+    .update({
+      payment_status: 'paid',
+      paid_at: paidAt,
+      current_payment_charge_id: paymentChargeId,
+      status: 'payment_confirmed',
+    })
+    .eq('id', ownerId);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_OWNER_PAID_UPDATE_FAILED',
+      message: 'Unable to update payment owner as paid.',
+      details: error.message,
+    });
+  }
+}
+
 async function updateOwnerAsPaid(
   client: SupabaseClient,
   ownerType: PaymentOwnerType,
@@ -43,15 +148,16 @@ async function updateOwnerAsPaid(
   paymentChargeId: string,
   paidAt: string,
 ) {
+  if (ownerType === 'plan_subscription') {
+    await updatePlanSubscriptionAsPaid(client, ownerId, paymentChargeId, paidAt);
+    return;
+  }
+
   const updatePayload: Record<string, unknown> = {
     payment_status: 'paid',
     paid_at: paidAt,
     current_payment_charge_id: paymentChargeId,
   };
-
-  if (ownerType === 'plan_subscription') {
-    updatePayload.status = 'payment_confirmed';
-  }
 
   const { error } = await client
     .from(OWNER_TABLE[ownerType])

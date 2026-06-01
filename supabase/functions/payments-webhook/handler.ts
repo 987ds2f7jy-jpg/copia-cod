@@ -49,6 +49,14 @@ type WebhookEventRow = {
   resolved_charge_id: string | null;
 };
 
+type PlanSubscriptionPaymentState = {
+  id: string;
+  status: string;
+  payment_status: string | null;
+  current_payment_charge_id: string | null;
+  paid_at: string | null;
+};
+
 const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
   appointment: {
     table: 'appointments',
@@ -463,12 +471,106 @@ function buildTimestampUpdates(status: PaymentChargeStatus, paidAt: string) {
   }
 }
 
+async function loadPlanSubscriptionPaymentState(
+  client: SupabaseClient,
+  ownerId: string,
+) {
+  const { data, error } = await client
+    .from('plan_subscription_orders')
+    .select('id, status, payment_status, current_payment_charge_id, paid_at')
+    .eq('id', ownerId)
+    .maybeSingle();
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_OWNER_LOOKUP_FAILED',
+      message: 'Unable to load plan subscription order during webhook processing.',
+      details: error.message,
+    });
+  }
+
+  const order = data as PlanSubscriptionPaymentState | null;
+
+  if (!order?.id) {
+    throw new AppError({
+      status: 404,
+      code: 'PAYMENT_OWNER_NOT_FOUND',
+      message: 'Payment owner was not found during webhook processing.',
+      details: { ownerType: 'plan_subscription', ownerId },
+    });
+  }
+
+  return order;
+}
+
+async function updatePlanSubscriptionPaymentStatus(
+  client: SupabaseClient,
+  charge: PaymentChargeRow,
+  status: PaymentChargeStatus,
+  paidAt: string,
+) {
+  const order = await loadPlanSubscriptionPaymentState(client, charge.owner_id);
+  const updatePayload: Record<string, unknown> = {};
+
+  if (status === 'paid') {
+    if (order.status === 'active') {
+      if (order.payment_status !== 'paid') {
+        updatePayload.payment_status = 'paid';
+      }
+
+      if (!order.current_payment_charge_id) {
+        updatePayload.current_payment_charge_id = charge.id;
+      }
+
+      if (!order.paid_at) {
+        updatePayload.paid_at = paidAt || new Date().toISOString();
+      }
+    } else {
+      updatePayload.payment_status = status;
+      updatePayload.current_payment_charge_id = charge.id;
+      updatePayload.paid_at = paidAt || new Date().toISOString();
+      updatePayload.status = 'payment_confirmed';
+    }
+  } else {
+    updatePayload.payment_status = status;
+    updatePayload.current_payment_charge_id = charge.id;
+
+    if (status === 'refunded' || status === 'chargeback') {
+      updatePayload.status = 'refunded';
+    }
+  }
+
+  if (Object.keys(updatePayload).length === 0) {
+    return;
+  }
+
+  const { error } = await client
+    .from('plan_subscription_orders')
+    .update(updatePayload)
+    .eq('id', charge.owner_id);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_OWNER_STATUS_UPDATE_FAILED',
+      message: 'Unable to update payment owner status.',
+      details: error.message,
+    });
+  }
+}
+
 async function updateOwnerPaymentStatus(
   client: SupabaseClient,
   charge: PaymentChargeRow,
   status: PaymentChargeStatus,
   paidAt: string,
 ) {
+  if (charge.owner_type === 'plan_subscription') {
+    await updatePlanSubscriptionPaymentStatus(client, charge, status, paidAt);
+    return;
+  }
+
   const config = OWNER_CONFIG[charge.owner_type];
   const updatePayload: Record<string, unknown> = {
     payment_status: status,
@@ -477,14 +579,6 @@ async function updateOwnerPaymentStatus(
 
   if (status === 'paid') {
     updatePayload.paid_at = paidAt || new Date().toISOString();
-
-    if (charge.owner_type === 'plan_subscription') {
-      updatePayload.status = 'payment_confirmed';
-    }
-  }
-
-  if ((status === 'refunded' || status === 'chargeback') && charge.owner_type === 'plan_subscription') {
-    updatePayload.status = 'refunded';
   }
 
   const { error } = await client
