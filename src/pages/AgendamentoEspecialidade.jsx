@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useNavigate } from 'react-router-dom';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import { useAuth } from '@/components/AuthContext';
@@ -104,6 +104,7 @@ function AgendamentoEspecialidadeInner() {
   const [submitError, setSubmitError] = useState(null);
   const [createdAppointment, setCreatedAppointment] = useState(null);
   const [appointmentPayment, setAppointmentPayment] = useState(null);
+  const [fundingSource, setFundingSource] = useState('self_pay');
   const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const availableSlots = useMemo(() => {
@@ -142,6 +143,23 @@ function AgendamentoEspecialidadeInner() {
   });
 
   const planCoverageStatusMessage = getPlanCoverageStatusMessage(planCoverage, planCoverageError);
+  const canUsePlanFunding = Boolean(planCoverage?.covered);
+  const effectiveFundingSource = canUsePlanFunding && fundingSource === 'plan' ? 'plan' : 'self_pay';
+  const isPlanFundedAppointment = createdAppointment?.fundingSource === 'plan'
+    || createdAppointment?.funding_source === 'plan';
+
+  useEffect(() => {
+    setFundingSource('self_pay');
+  }, [selectedSpecialty]);
+
+  useEffect(() => {
+    if (canUsePlanFunding) {
+      setFundingSource((current) => (current === 'self_pay' ? 'plan' : current));
+      return;
+    }
+
+    setFundingSource('self_pay');
+  }, [canUsePlanFunding]);
 
   const createRequest = useMutation({
     mutationFn: async () => {
@@ -157,6 +175,7 @@ function AgendamentoEspecialidadeInner() {
         time: selectedTime,
         symptoms,
         priority: false,
+        fundingSource: effectiveFundingSource,
       });
     },
     onSuccess: (result) => {
@@ -167,7 +186,15 @@ function AgendamentoEspecialidadeInner() {
       setStep(5);
     },
     onError: (err) => {
-      setSubmitError(err.message || 'Erro ao criar solicitação. Tente novamente.');
+      if (effectiveFundingSource === 'plan') {
+        setFundingSource('self_pay');
+      }
+
+      setSubmitError(
+        err.message
+          ? `${err.message} Voce pode seguir com pagamento avulso.`
+          : 'Erro ao criar solicitação. Tente novamente.',
+      );
     },
   });
 
@@ -399,10 +426,39 @@ function AgendamentoEspecialidadeInner() {
                     <p className="font-semibold text-emerald-800 dark:text-emerald-200 mb-1">
                       Plano disponivel para esta consulta
                     </p>
-                    <p className="text-emerald-700 dark:text-emerald-300">
-                      Voce possui credito/passe disponivel para esta especialidade. Nesta etapa,
-                      o pagamento avulso ainda permanece ativo enquanto finalizamos a integracao.
+                    <p className="text-emerald-700 dark:text-emerald-300 mb-3">
+                      Seu plano possui credito disponivel para esta especialidade. O credito sera
+                      confirmado quando um profissional aceitar sua solicitacao. Nesta etapa, ele
+                      ficara pendente e nao sera consumido definitivamente.
                     </p>
+                    <div className="grid gap-2 sm:grid-cols-2">
+                      <button
+                        type="button"
+                        aria-pressed={fundingSource === 'plan'}
+                        onClick={() => setFundingSource('plan')}
+                        className={`rounded-lg border p-3 text-left transition-colors ${
+                          fundingSource === 'plan'
+                            ? 'border-emerald-500 bg-white text-emerald-800 shadow-sm dark:bg-emerald-950/45 dark:text-emerald-100'
+                            : 'border-emerald-200 bg-white/70 text-emerald-700 hover:bg-white dark:bg-emerald-950/20 dark:text-emerald-200'
+                        }`}
+                      >
+                        <span className="block font-semibold">Usar meu plano</span>
+                        <span className="block text-xs opacity-80">Sem pagamento avulso agora</span>
+                      </button>
+                      <button
+                        type="button"
+                        aria-pressed={fundingSource === 'self_pay'}
+                        onClick={() => setFundingSource('self_pay')}
+                        className={`rounded-lg border p-3 text-left transition-colors ${
+                          fundingSource === 'self_pay'
+                            ? 'border-emerald-500 bg-white text-emerald-800 shadow-sm dark:bg-emerald-950/45 dark:text-emerald-100'
+                            : 'border-emerald-200 bg-white/70 text-emerald-700 hover:bg-white dark:bg-emerald-950/20 dark:text-emerald-200'
+                        }`}
+                      >
+                        <span className="block font-semibold">Pagar avulso</span>
+                        <span className="block text-xs opacity-80">Gerar cobranca normalmente</span>
+                      </button>
+                    </div>
                   </div>
                 )}
 
@@ -440,7 +496,7 @@ function AgendamentoEspecialidadeInner() {
                     className="bg-emerald-600 hover:bg-emerald-700 text-white"
                   >
                     {createRequest.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                    Enviar Solicitação
+                    {effectiveFundingSource === 'plan' ? 'Enviar solicitacao usando plano' : 'Enviar Solicitação'}
                   </Button>
                 </div>
               </CardContent>
@@ -449,7 +505,7 @@ function AgendamentoEspecialidadeInner() {
 
           {/* Step 5: Sucesso */}
           {step === 5 && (
-            appointmentPayment?.status !== 'paid' ? (
+            !isPlanFundedAppointment && appointmentPayment?.status !== 'paid' ? (
               <PaymentStep
                 payment={appointmentPayment}
                 ownerType="appointment"
@@ -475,10 +531,14 @@ function AgendamentoEspecialidadeInner() {
                 </div>
                 <h2 className="text-2xl font-bold text-foreground mb-2">Solicitação Enviada!</h2>
                 <p className="text-muted-foreground mb-2">
-                  Sua solicitação foi enviada para profissionais de <strong>{selectedSpecialty}</strong>.
+                  {isPlanFundedAppointment
+                    ? 'Solicitacao enviada com cobertura do plano.'
+                    : <>Sua solicitação foi enviada para profissionais de <strong>{selectedSpecialty}</strong>.</>}
                 </p>
                 <p className="text-sm text-muted-foreground mb-6">
-                  Você será notificado quando um profissional aceitar o atendimento.
+                  {isPlanFundedAppointment
+                    ? 'Quando um profissional aceitar, confirmaremos o uso do credito antes do inicio da consulta.'
+                    : 'Você será notificado quando um profissional aceitar o atendimento.'}
                 </p>
                 <div className="p-4 bg-muted/40 rounded-xl text-left mb-6 text-sm space-y-2">
                   <div className="flex justify-between">

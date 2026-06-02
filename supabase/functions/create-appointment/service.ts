@@ -11,6 +11,7 @@ import type {
   CreateAppointmentCommand,
   CreateAppointmentRepository,
   CreateAppointmentResult,
+  PlanCoverageVerification,
 } from './types.ts';
 
 const VALID_MINUTES = new Set([0, 20, 40]);
@@ -193,8 +194,17 @@ export async function createAppointment({
   let serviceCode: ServiceCode = SPECIALTY_REQUEST_SERVICE_CODE;
   let pricingProfessionalProfileId: string | null = null;
   let pricingSpecialty: string | null = null;
+  let planCoverage: PlanCoverageVerification | null = null;
 
   if (input.professionalProfileId) {
+    if (input.fundingSource === 'plan') {
+      throw new AppError({
+        status: 422,
+        code: 'PLAN_FUNDING_NOT_ALLOWED_FOR_PROFILE',
+        message: 'Plan coverage is not available for appointments by professional profile.',
+      });
+    }
+
     const professional = await repository.findProfessionalTargetById(input.professionalProfileId);
 
     if (!professional?.profileId) {
@@ -259,6 +269,22 @@ export async function createAppointment({
     pricingSpecialty = specialty;
   }
 
+  if (input.fundingSource === 'plan') {
+    if (appointmentType !== 'ESPECIALIDADE' || professionalId) {
+      throw new AppError({
+        status: 422,
+        code: 'PLAN_FUNDING_NOT_ALLOWED_FOR_FLOW',
+        message: 'Plan coverage is only available for appointments by specialty.',
+      });
+    }
+
+    planCoverage = await repository.verifyPlanCoverageForSpecialty({
+      appUserId: appUser.id,
+      fallbackExternalKey: appUser.email || authenticatedUser.email || '',
+      specialtyCode: normalizePricingSpecialty(specialty),
+    });
+  }
+
   const pricing = await repository.resolveServicePricing({
     serviceCode,
     professionalProfileId: pricingProfessionalProfileId,
@@ -272,6 +298,7 @@ export async function createAppointment({
     professionalId,
     appointmentType,
     serviceCode,
+    fundingSource: input.fundingSource,
     scheduledDatetime,
     specialty: normalizePricingSpecialty(specialty),
   });
@@ -291,6 +318,8 @@ export async function createAppointment({
     price,
     pricing,
     symptoms: input.symptoms,
+    fundingSource: input.fundingSource,
+    planCoverage,
   });
 
   console.info('[create-appointment] request:success', {
@@ -301,6 +330,9 @@ export async function createAppointment({
     status: appointment.status,
     serviceCode: appointment.service_code,
     grossPrice: appointment.gross_price,
+    fundingSource: appointment.funding_source,
+    paymentRequired: appointment.payment_required,
+    planCreditUsageId: appointment.plan_credit_usage_id,
   });
 
   return {
@@ -316,7 +348,16 @@ export async function createAppointment({
       professionalName: appointment.professional_name || professionalName,
       price: Number(appointment.price || price || 0),
       paymentStatus: appointment.payment_status || 'payment_pending',
+      paymentRequired: Boolean(appointment.payment_required ?? true),
       currentPaymentChargeId: appointment.current_payment_charge_id || null,
+      fundingSource: appointment.funding_source || input.fundingSource,
+      coverageStatus: appointment.coverage_status || null,
+      planCreditUsageId: appointment.plan_credit_usage_id || null,
+      planSubscriptionOrderId: appointment.plan_subscription_order_id || null,
+      externalSubscriptionScoreId: appointment.external_subscription_score_id || null,
+      externalScoreId: appointment.external_score_id || null,
+      externalPlanId: appointment.external_plan_id || null,
+      externalSpecializationId: appointment.external_specialization_id || null,
     },
     payment: appointment.payment || null,
   };

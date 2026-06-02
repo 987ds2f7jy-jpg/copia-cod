@@ -20,6 +20,33 @@ export type ProfessionalProfileRecord = {
   source: 'professional_profiles';
 };
 
+export type PlanCreditUsageRecord = {
+  id: string;
+  status: string;
+  externalSubscriptionScoreId: string | null;
+  externalScoreId: string | null;
+  requestSnapshot: Record<string, unknown>;
+  responseSnapshot: Record<string, unknown>;
+};
+
+export type PlanAppointmentAcceptanceContext = {
+  appointment: {
+    id: string;
+    status: string;
+    fundingSource: string;
+    coverageStatus: string | null;
+    paymentRequired: boolean;
+    planCreditUsageId: string | null;
+    professionalId: string | null;
+    professionalName: string;
+    specialty: string;
+    scheduledDatetime: string | null;
+    acceptedAt: string | null;
+    consultaId: string | null;
+  };
+  usage: PlanCreditUsageRecord | null;
+};
+
 export type AcceptAppointmentTransactionRecord = {
   appointment_id: string;
   appointment_status: string;
@@ -57,6 +84,17 @@ export type ErrorResponse = ApiErrorResponse;
 export type AcceptAppointmentRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findActiveProfessionalProfileByUserId(appUserId: string): Promise<ProfessionalProfileRecord | null>;
+  findPlanAppointmentAcceptanceContext(appointmentId: string): Promise<PlanAppointmentAcceptanceContext | null>;
+  findAcceptedAppointmentResult(params: {
+    appointmentId: string;
+    professionalProfileId: string;
+  }): Promise<AcceptAppointmentTransactionRecord | null>;
+  confirmPlanCreditBeforeAcceptance(params: {
+    context: PlanAppointmentAcceptanceContext;
+  }): Promise<{
+    skipped: boolean;
+    reason: 'already_used' | 'used_now';
+  }>;
   acceptAppointment(params: {
     appointmentId: string;
     professionalAppUserId: string;

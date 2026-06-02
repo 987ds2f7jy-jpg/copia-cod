@@ -5,6 +5,7 @@ import type {
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
   AppUserRecord,
+  PlanAppointmentAcceptanceContext,
   ProfessionalProfileRecord,
 } from './types.ts';
 
@@ -21,6 +22,144 @@ type ProfessionalProfileRow = {
 type LoadedProfessionalProfile = ProfessionalProfileRow & {
   source: 'professional_profiles';
 };
+
+type PlanAppointmentRow = {
+  id: string;
+  status: string | null;
+  funding_source: string | null;
+  coverage_status: string | null;
+  payment_required: boolean | null;
+  plan_credit_usage_id: string | null;
+  professional_id: string | null;
+  professional_name: string | null;
+  specialty: string | null;
+  scheduled_datetime: string | null;
+  accepted_at: string | null;
+  consulta_id: string | null;
+};
+
+type PlanCreditUsageRow = {
+  id: string;
+  status: string | null;
+  external_subscription_score_id: string | null;
+  external_score_id: string | null;
+  request_snapshot: Record<string, unknown> | null;
+  response_snapshot: Record<string, unknown> | null;
+};
+
+type ConsultaRow = {
+  id: string;
+  status: string | null;
+  tipo_consulta: string | null;
+  datetime: string | null;
+};
+
+const REQUESTED_APPOINTMENT_STATUSES = new Set(['requested', 'pending', 'SOLICITADO']);
+const ACCEPTED_APPOINTMENT_STATUSES = new Set(['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento']);
+const USE_SCORE_PATH = '/subscription-score/use';
+const DEFAULT_PLANS_SERVICE_TIMEOUT_MS = 8_000;
+
+function normalizeString(value: unknown) {
+  return String(value ?? '').trim();
+}
+
+function normalizeComparable(value: unknown) {
+  return normalizeString(value).toLowerCase();
+}
+
+function toJsonRecord(value: unknown): Record<string, unknown> {
+  if (!value || typeof value !== 'object' || Array.isArray(value)) {
+    return {};
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function getPlansServiceApiBaseUrl() {
+  const rawUrl = normalizeString(
+    Deno.env.get('PLANS_SERVICE_URL') || Deno.env.get('PLANS_SERVICE_BASE_URL'),
+  );
+
+  if (!rawUrl) {
+    return '';
+  }
+
+  const baseUrl = rawUrl.replace(/\/+$/, '');
+  return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
+}
+
+function getPlansServiceTimeoutMs() {
+  const parsed = Number(Deno.env.get('PLANS_SERVICE_TIMEOUT_MS') || 0);
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : DEFAULT_PLANS_SERVICE_TIMEOUT_MS;
+}
+
+function buildUseScorePayload(context: PlanAppointmentAcceptanceContext) {
+  const subscriptionScoreId = Number(context.usage?.externalSubscriptionScoreId || 0);
+
+  if (!Number.isInteger(subscriptionScoreId) || subscriptionScoreId <= 0) {
+    throw new AppError({
+      status: 422,
+      code: 'PLAN_CREDIT_SUBSCRIPTION_SCORE_ID_REQUIRED',
+      message: 'Plan credit audit is missing the subscription score id required for consumption.',
+      details: {
+        appointmentId: context.appointment.id,
+        planCreditUsageId: context.usage?.id || context.appointment.planCreditUsageId,
+        externalScoreId: context.usage?.externalScoreId,
+      },
+    });
+  }
+
+  return { score_id: subscriptionScoreId };
+}
+
+async function postUseScoreToPlansService(payload: { score_id: number }) {
+  const apiBaseUrl = getPlansServiceApiBaseUrl();
+
+  if (!apiBaseUrl) {
+    throw new AppError({
+      status: 503,
+      code: 'PLANS_SERVICE_NOT_CONFIGURED',
+      message: 'Plan credit could not be consumed right now.',
+    });
+  }
+
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), getPlansServiceTimeoutMs());
+  const headers = new Headers({
+    Accept: 'application/json',
+    'Content-Type': 'application/json',
+  });
+  const internalApiKey = normalizeString(Deno.env.get('PLANS_SERVICE_INTERNAL_API_KEY'));
+
+  if (internalApiKey) {
+    headers.set('X-Internal-Api-Key', internalApiKey);
+  }
+
+  try {
+    const response = await fetch(`${apiBaseUrl}${USE_SCORE_PATH}`, {
+      method: 'POST',
+      headers,
+      body: JSON.stringify(payload),
+      signal: controller.signal,
+    });
+
+    let responsePayload: unknown = null;
+
+    try {
+      responsePayload = await response.json();
+    } catch {
+      responsePayload = null;
+    }
+
+    return {
+      ok: response.ok,
+      status: response.status,
+      payload: responsePayload,
+    };
+  } finally {
+    clearTimeout(timeoutId);
+  }
+}
 
 function getRequiredEnv(name: string) {
   const value = Deno.env.get(name)?.trim();
@@ -193,6 +332,53 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
   });
 }
 
+function mapPlanContext(appointment: PlanAppointmentRow, usage: PlanCreditUsageRow | null): PlanAppointmentAcceptanceContext {
+  return {
+    appointment: {
+      id: appointment.id,
+      status: appointment.status || '',
+      fundingSource: appointment.funding_source || 'self_pay',
+      coverageStatus: appointment.coverage_status || null,
+      paymentRequired: Boolean(appointment.payment_required ?? true),
+      planCreditUsageId: appointment.plan_credit_usage_id || null,
+      professionalId: appointment.professional_id || null,
+      professionalName: appointment.professional_name || '',
+      specialty: appointment.specialty || '',
+      scheduledDatetime: appointment.scheduled_datetime || null,
+      acceptedAt: appointment.accepted_at || null,
+      consultaId: appointment.consulta_id || null,
+    },
+    usage: usage?.id
+      ? {
+        id: usage.id,
+        status: usage.status || '',
+        externalSubscriptionScoreId: usage.external_subscription_score_id || null,
+        externalScoreId: usage.external_score_id || null,
+        requestSnapshot: usage.request_snapshot || {},
+        responseSnapshot: usage.response_snapshot || {},
+      }
+      : null,
+  };
+}
+
+function mapAcceptedAppointmentRow(
+  appointment: PlanAppointmentRow,
+  consulta: ConsultaRow,
+): AcceptAppointmentTransactionRecord {
+  return {
+    appointment_id: appointment.id,
+    appointment_status: appointment.status || 'accepted',
+    appointment_accepted_at: appointment.accepted_at || '',
+    appointment_scheduled_datetime: appointment.scheduled_datetime || '',
+    appointment_professional_id: appointment.professional_id || '',
+    appointment_professional_name: appointment.professional_name || '',
+    consulta_id: consulta.id,
+    consulta_status: consulta.status || '',
+    consulta_tipo: consulta.tipo_consulta || '',
+    consulta_datetime: consulta.datetime || '',
+  };
+}
+
 function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): AcceptAppointmentRepository {
   return {
     async findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null> {
@@ -238,6 +424,288 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         specialty: profile.specialty || '',
         source: profile.source,
       };
+    },
+
+    async findPlanAppointmentAcceptanceContext(appointmentId: string): Promise<PlanAppointmentAcceptanceContext | null> {
+      const { data: appointmentData, error: appointmentError } = await client
+        .from('appointments')
+        .select(`
+          id,
+          status,
+          funding_source,
+          coverage_status,
+          payment_required,
+          plan_credit_usage_id,
+          professional_id,
+          professional_name,
+          specialty,
+          scheduled_datetime,
+          accepted_at,
+          consulta_id
+        `)
+        .eq('id', appointmentId)
+        .maybeSingle();
+
+      if (appointmentError) {
+        throw new AppError({
+          status: 500,
+          code: 'APPOINTMENT_LOOKUP_FAILED',
+          message: 'Unable to load appointment before acceptance.',
+          details: appointmentError.message,
+        });
+      }
+
+      const appointment = appointmentData as PlanAppointmentRow | null;
+
+      if (!appointment?.id || appointment.funding_source !== 'plan') {
+        return null;
+      }
+
+      let usage: PlanCreditUsageRow | null = null;
+
+      if (appointment.plan_credit_usage_id) {
+        const { data: usageData, error: usageError } = await client
+          .from('plan_credit_usages')
+          .select(`
+            id,
+            status,
+            external_subscription_score_id,
+            external_score_id,
+            request_snapshot,
+            response_snapshot
+          `)
+          .eq('id', appointment.plan_credit_usage_id)
+          .maybeSingle();
+
+        if (usageError) {
+          throw new AppError({
+            status: 500,
+            code: 'PLAN_CREDIT_USAGE_LOOKUP_FAILED',
+            message: 'Unable to load plan credit usage before acceptance.',
+            details: usageError.message,
+          });
+        }
+
+        usage = usageData as PlanCreditUsageRow | null;
+      }
+
+      return mapPlanContext(appointment, usage);
+    },
+
+    async findAcceptedAppointmentResult({
+      appointmentId,
+      professionalProfileId,
+    }): Promise<AcceptAppointmentTransactionRecord | null> {
+      const { data: appointmentData, error: appointmentError } = await client
+        .from('appointments')
+        .select('id, status, accepted_at, scheduled_datetime, professional_id, professional_name, consulta_id')
+        .eq('id', appointmentId)
+        .maybeSingle();
+
+      if (appointmentError) {
+        throw new AppError({
+          status: 500,
+          code: 'APPOINTMENT_LOOKUP_FAILED',
+          message: 'Unable to load accepted appointment.',
+          details: appointmentError.message,
+        });
+      }
+
+      const appointment = appointmentData as PlanAppointmentRow | null;
+
+      if (
+        !appointment?.id
+        || !appointment.consulta_id
+        || normalizeString(appointment.professional_id) !== professionalProfileId
+        || !ACCEPTED_APPOINTMENT_STATUSES.has(appointment.status || '')
+      ) {
+        return null;
+      }
+
+      const { data: consultaData, error: consultaError } = await client
+        .from('consultas')
+        .select('id, status, tipo_consulta, datetime')
+        .eq('id', appointment.consulta_id)
+        .maybeSingle();
+
+      if (consultaError) {
+        throw new AppError({
+          status: 500,
+          code: 'CONSULTA_LOOKUP_FAILED',
+          message: 'Unable to load accepted consultation.',
+          details: consultaError.message,
+        });
+      }
+
+      const consulta = consultaData as ConsultaRow | null;
+
+      if (!consulta?.id) {
+        return null;
+      }
+
+      return mapAcceptedAppointmentRow(appointment, consulta);
+    },
+
+    async confirmPlanCreditBeforeAcceptance({ context }) {
+      const { appointment, usage } = context;
+
+      if (!usage?.id || appointment.planCreditUsageId !== usage.id) {
+        throw new AppError({
+          status: 409,
+          code: 'PLAN_CREDIT_USAGE_REQUIRED',
+          message: 'Plan-funded appointments require a pending credit usage audit.',
+          details: { appointmentId: appointment.id },
+        });
+      }
+
+      if (usage.status === 'used') {
+        return { skipped: true, reason: 'already_used' as const };
+      }
+
+      if (usage.status !== 'pending_use' && usage.status !== 'use_failed') {
+        throw new AppError({
+          status: 409,
+          code: 'PLAN_CREDIT_USAGE_NOT_PENDING',
+          message: 'Plan credit usage is not pending and cannot be consumed.',
+          details: {
+            appointmentId: appointment.id,
+            planCreditUsageId: usage.id,
+            status: usage.status,
+          },
+        });
+      }
+
+      let requestPayload: { score_id: number };
+
+      try {
+        requestPayload = buildUseScorePayload(context);
+      } catch (error) {
+        await client
+          .from('plan_credit_usages')
+          .update({
+            status: 'use_failed',
+            response_snapshot: {},
+            error_code: error instanceof AppError ? error.code : 'PLAN_CREDIT_PAYLOAD_INVALID',
+            error_message: error instanceof Error ? error.message : 'Plan credit payload is invalid.',
+          })
+          .eq('id', usage.id);
+
+        await client
+          .from('appointments')
+          .update({ coverage_status: 'plan_use_failed' })
+          .eq('id', appointment.id);
+
+        throw error;
+      }
+
+      let externalResponse: Awaited<ReturnType<typeof postUseScoreToPlansService>>;
+
+      try {
+        externalResponse = await postUseScoreToPlansService(requestPayload);
+      } catch (error) {
+        const errorMessage = error instanceof Error ? error.message : 'Unable to consume plan credit.';
+
+        await client
+          .from('plan_credit_usages')
+          .update({
+            status: 'use_failed',
+            request_snapshot: requestPayload,
+            response_snapshot: {},
+            error_code: error instanceof AppError ? error.code : 'PLANS_SERVICE_UNAVAILABLE',
+            error_message: errorMessage,
+          })
+          .eq('id', usage.id);
+
+        await client
+          .from('appointments')
+          .update({ coverage_status: 'plan_use_failed' })
+          .eq('id', appointment.id);
+
+        throw error;
+      }
+
+      if (!externalResponse.ok) {
+        const responsePayload = toJsonRecord(externalResponse.payload);
+        const externalError = normalizeString(responsePayload.error) || 'Failed to use subscription score';
+
+        if (externalResponse.status === 422 && externalError.toLowerCase().includes('already')) {
+          const { data: latestUsage } = await client
+            .from('plan_credit_usages')
+            .select('id, status')
+            .eq('id', usage.id)
+            .maybeSingle();
+
+          if (String(latestUsage?.status || '') === 'used') {
+            return { skipped: true, reason: 'already_used' as const };
+          }
+        }
+
+        await client
+          .from('plan_credit_usages')
+          .update({
+            status: 'use_failed',
+            request_snapshot: requestPayload,
+            response_snapshot: responsePayload,
+            error_code: `PLANS_SERVICE_${externalResponse.status}`,
+            error_message: externalError,
+          })
+          .eq('id', usage.id);
+
+        await client
+          .from('appointments')
+          .update({ coverage_status: 'plan_use_failed' })
+          .eq('id', appointment.id);
+
+        throw new AppError({
+          status: 409,
+          code: 'PLAN_CREDIT_USE_FAILED',
+          message: 'Nao foi possivel confirmar o credito do plano. Oriente o paciente a tentar pagamento avulso ou tente novamente.',
+          details: {
+            appointmentId: appointment.id,
+            planCreditUsageId: usage.id,
+            externalStatus: externalResponse.status,
+            externalError,
+          },
+        });
+      }
+
+      const responseSnapshot = toJsonRecord(externalResponse.payload);
+      const { error: usageUpdateError } = await client
+        .from('plan_credit_usages')
+        .update({
+          status: 'used',
+          used_at: new Date().toISOString(),
+          request_snapshot: requestPayload,
+          response_snapshot: responseSnapshot,
+          error_code: null,
+          error_message: null,
+        })
+        .eq('id', usage.id);
+
+      if (usageUpdateError) {
+        throw new AppError({
+          status: 500,
+          code: 'PLAN_CREDIT_USAGE_UPDATE_FAILED',
+          message: 'Plan credit was consumed but local audit could not be updated.',
+          details: usageUpdateError.message,
+        });
+      }
+
+      const { error: appointmentUpdateError } = await client
+        .from('appointments')
+        .update({ coverage_status: 'plan_used' })
+        .eq('id', appointment.id);
+
+      if (appointmentUpdateError) {
+        throw new AppError({
+          status: 500,
+          code: 'APPOINTMENT_COVERAGE_UPDATE_FAILED',
+          message: 'Plan credit was consumed but appointment coverage status could not be updated.',
+          details: appointmentUpdateError.message,
+        });
+      }
+
+      return { skipped: false, reason: 'used_now' as const };
     },
 
     async acceptAppointment({

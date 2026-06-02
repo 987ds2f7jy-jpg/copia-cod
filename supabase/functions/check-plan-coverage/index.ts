@@ -14,13 +14,14 @@ import { requireAppUserByAuthUserId, requireRole } from '../_shared/professional
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
+  type SupabaseClient,
 } from '../_shared/supabase.ts';
 
 const FUNCTION_NAME = 'check-plan-coverage';
 const CORS: CorsOptions = { allowedMethods: ['POST'] };
 const FIND_SCORE_PATH = '/subscription-score/find';
 const DEFAULT_STAGE_PLAN_ID = 1;
-const REQUEST_TIMEOUT_MS = 5_000;
+const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 
 type CoverageFlow =
   | 'specialty'
@@ -87,6 +88,20 @@ type SpecialtyPlanLookup = {
   planIds: number[];
 };
 
+type ActivePlanOrderRow = {
+  id: string;
+  external_plan_id: number | string | null;
+  external_key: string | null;
+  plans_service_subscription_id: string | null;
+  status: string | null;
+};
+
+type PlanScoreLookupCandidate = {
+  planId: number;
+  externalKey: string;
+  source: 'local_active_order' | 'session_email';
+};
+
 const SPECIALTY_PLAN_LOOKUPS: Record<string, SpecialtyPlanLookup> = {
   // IDs from plans-service SpecializationSeeder. Plan IDs are tried in order.
   medicina_integrativa: { externalSpecializationId: 1, planIds: [3] },
@@ -126,6 +141,12 @@ function normalizePlanId(value: unknown) {
 
 function getDefaultPlanId() {
   return normalizePlanId(Deno.env.get('PLANS_SERVICE_DEFAULT_PLAN_ID')) || DEFAULT_STAGE_PLAN_ID;
+}
+
+function getRequestTimeoutMs() {
+  const parsed = Number(Deno.env.get('PLANS_SERVICE_TIMEOUT_MS') || 0);
+
+  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : DEFAULT_REQUEST_TIMEOUT_MS;
 }
 
 function getPlansServiceApiBaseUrl() {
@@ -219,6 +240,72 @@ function resolvePlanLookup(specialtyCode: string, requestedPlanId: number | null
   };
 }
 
+async function listActivePlanOrders(client: SupabaseClient, appUserId: string) {
+  const { data, error } = await client
+    .from('plan_subscription_orders')
+    .select(`
+      id,
+      external_plan_id,
+      external_key,
+      plans_service_subscription_id,
+      status
+    `)
+    .or(`app_user_id.eq.${appUserId},patient_id.eq.${appUserId}`)
+    .eq('status', 'active')
+    .order('activated_at', { ascending: false, nullsFirst: false })
+    .limit(10);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PLAN_ORDERS_LOOKUP_FAILED',
+      message: 'Unable to load patient active plan orders.',
+      details: error.message,
+    });
+  }
+
+  return (data as ActivePlanOrderRow[] | null) || [];
+}
+
+function buildLookupCandidates({
+  planIds,
+  activePlanOrders,
+  fallbackExternalKey,
+}: {
+  planIds: number[];
+  activePlanOrders: ActivePlanOrderRow[];
+  fallbackExternalKey: string;
+}): PlanScoreLookupCandidate[] {
+  const candidates: PlanScoreLookupCandidate[] = [];
+
+  for (const planId of planIds) {
+    const order = activePlanOrders.find((activeOrder) => normalizePlanId(activeOrder.external_plan_id) === planId);
+    const orderExternalKey = normalizeString(order?.external_key);
+
+    if (order && orderExternalKey) {
+      candidates.push({
+        planId,
+        externalKey: orderExternalKey,
+        source: 'local_active_order',
+      });
+    }
+  }
+
+  if (candidates.length || activePlanOrders.length) {
+    return candidates;
+  }
+
+  if (!fallbackExternalKey) {
+    return [];
+  }
+
+  return planIds.map((planId) => ({
+    planId,
+    externalKey: fallbackExternalKey,
+    source: 'session_email' as const,
+  }));
+}
+
 function unwrapExternalResource(payload: unknown): ExternalScoreResource | null {
   if (!payload || typeof payload !== 'object' || Array.isArray(payload)) {
     return null;
@@ -283,7 +370,7 @@ async function postToPlansService({
   externalSpecializationId: number;
 }) {
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeoutId = setTimeout(() => controller.abort(), getRequestTimeoutMs());
 
   try {
     const response = await fetch(`${apiBaseUrl}${FIND_SCORE_PATH}`, {
@@ -381,8 +468,14 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
     }
 
     const externalKey = normalizeString(appUser.email || authenticatedUser.email);
+    const activePlanOrders = await listActivePlanOrders(client, appUser.id);
+    const lookupCandidates = buildLookupCandidates({
+      planIds: planLookup.planIds,
+      activePlanOrders,
+      fallbackExternalKey: externalKey,
+    });
 
-    if (!externalKey) {
+    if (!lookupCandidates.length && !externalKey) {
       const result = buildBaseResult({
         reason: 'plans_service_rejected_request',
         specialtyCode: input.specialtyCode,
@@ -393,22 +486,44 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
       return successResponse(result, requestId, { status: 200, cors: CORS });
     }
 
+    if (!lookupCandidates.length) {
+      const result = buildBaseResult({
+        reason: 'no_plan_credit_available',
+        specialtyCode: input.specialtyCode,
+        externalSpecializationId: planLookup.externalSpecializationId,
+        externalPlanId: input.planId || planLookup.planIds[0] || null,
+      });
+
+      console.log('[check-plan-coverage] coverage:no-local-plan-candidate', {
+        requestId,
+        flow: input.flow,
+        specialtyCode: input.specialtyCode,
+        externalSpecializationId: planLookup.externalSpecializationId,
+        lookupPlanIds: planLookup.planIds,
+        activeLocalPlanIds: activePlanOrders
+          .map((order) => normalizePlanId(order.external_plan_id))
+          .filter(Boolean),
+      });
+
+      return successResponse(result, requestId, { status: 200, cors: CORS });
+    }
+
     let result = buildBaseResult({
       reason: 'no_plan_credit_available',
       specialtyCode: input.specialtyCode,
       externalSpecializationId: planLookup.externalSpecializationId,
-      externalPlanId: planLookup.planIds[0] || null,
+      externalPlanId: lookupCandidates[0]?.planId || planLookup.planIds[0] || null,
     });
     let externalStatus: number | null = null;
 
-    for (const planId of planLookup.planIds) {
+    for (const candidate of lookupCandidates) {
       let externalResponse: Awaited<ReturnType<typeof postToPlansService>> | null = null;
 
       try {
         externalResponse = await postToPlansService({
           apiBaseUrl,
-          planId,
-          externalKey,
+          planId: candidate.planId,
+          externalKey: candidate.externalKey,
           externalSpecializationId: planLookup.externalSpecializationId,
         });
         externalStatus = externalResponse.status;
@@ -418,7 +533,8 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
           flow: input.flow,
           specialtyCode: input.specialtyCode,
           externalSpecializationId: planLookup.externalSpecializationId,
-          externalPlanId: planId,
+          externalPlanId: candidate.planId,
+          candidateSource: candidate.source,
           error: error instanceof Error ? error.name : 'unknown',
         });
 
@@ -426,7 +542,7 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
           reason: 'plans_service_unavailable',
           specialtyCode: input.specialtyCode,
           externalSpecializationId: planLookup.externalSpecializationId,
-          externalPlanId: planId,
+          externalPlanId: candidate.planId,
         });
 
         return successResponse(result, requestId, { status: 200, cors: CORS });
@@ -437,7 +553,7 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
           payload: externalResponse.payload,
           specialtyCode: input.specialtyCode,
           externalSpecializationId: planLookup.externalSpecializationId,
-          planId,
+          planId: candidate.planId,
         });
         break;
       }
@@ -447,7 +563,7 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
           reason: 'no_plan_credit_available',
           specialtyCode: input.specialtyCode,
           externalSpecializationId: planLookup.externalSpecializationId,
-          externalPlanId: planId,
+          externalPlanId: candidate.planId,
         });
         continue;
       }
@@ -457,7 +573,7 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
           reason: 'plans_service_rejected_request',
           specialtyCode: input.specialtyCode,
           externalSpecializationId: planLookup.externalSpecializationId,
-          externalPlanId: planId,
+          externalPlanId: candidate.planId,
         });
         break;
       }
@@ -466,7 +582,7 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
         reason: 'plans_service_unavailable',
         specialtyCode: input.specialtyCode,
         externalSpecializationId: planLookup.externalSpecializationId,
-        externalPlanId: planId,
+        externalPlanId: candidate.planId,
       });
       break;
     }
@@ -476,7 +592,11 @@ export async function handleCheckPlanCoverageRequest(req: Request) {
       flow: input.flow,
       specialtyCode: input.specialtyCode,
       externalSpecializationId: planLookup.externalSpecializationId,
-      externalPlanIds: planLookup.planIds,
+      lookupPlanIds: planLookup.planIds,
+      candidatePlanIds: lookupCandidates.map((candidate) => candidate.planId),
+      activeLocalPlanIds: activePlanOrders
+        .map((order) => normalizePlanId(order.external_plan_id))
+        .filter(Boolean),
       externalPlanId: result.external_plan_id,
       covered: result.covered,
       reason: result.reason,

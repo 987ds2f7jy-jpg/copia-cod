@@ -8,6 +8,7 @@ export async function createAppointmentRequest({
   time,
   symptoms = '',
   priority = false,
+  fundingSource = 'self_pay',
 }) {
   const result = await invokeEdgeFunction('create-appointment', {
     body: {
@@ -17,6 +18,7 @@ export async function createAppointmentRequest({
       time,
       symptoms,
       priority,
+      fundingSource,
     },
     fallbackMessage: 'Nao foi possivel criar o agendamento.',
   });

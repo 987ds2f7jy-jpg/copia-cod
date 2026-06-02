@@ -9,6 +9,32 @@ export type CreateAppointmentInput = {
   time: string;
   symptoms: string;
   priority: boolean;
+  fundingSource: FundingSource;
+};
+
+export type FundingSource = 'self_pay' | 'plan';
+
+export type CoverageStatus =
+  | 'plan_pending_use'
+  | 'plan_used'
+  | 'plan_use_failed'
+  | 'plan_canceled'
+  | null;
+
+export type PlanCoverageVerification = {
+  covered: true;
+  reason: 'plan_credit_available';
+  specialtyCode: string;
+  planSubscriptionOrderId: string;
+  plansServiceSubscriptionId: string | null;
+  externalSubscriptionId: string | number | null;
+  externalSubscriptionScoreId: string;
+  externalScoreId: string | number | null;
+  externalPlanId: number | null;
+  externalSpecializationId: number;
+  rawStatus: string | number | null;
+  requestSnapshot: Record<string, unknown>;
+  responseSnapshot: Record<string, unknown>;
 };
 
 export type AppUserRecord = {
@@ -60,7 +86,17 @@ export type AppointmentRecord = {
   pricing_rule_id: string | null;
   fee_rule_id: string | null;
   payment_status: string | null;
+  payment_required: boolean | null;
   current_payment_charge_id: string | null;
+  funding_source: FundingSource | null;
+  coverage_status: CoverageStatus;
+  plan_credit_usage_id: string | null;
+  plan_subscription_order_id: string | null;
+  external_subscription_score_id: string | null;
+  external_score_id: string | null;
+  external_plan_id: number | null;
+  external_specialization_id: number | null;
+  coverage_snapshot: Record<string, unknown> | null;
   symptoms: string | null;
   accepted_at: string | null;
   consulta_id: string | null;
@@ -80,7 +116,16 @@ export type CreateAppointmentResult = {
     professionalName: string;
     price: number;
     paymentStatus: string;
+    paymentRequired: boolean;
     currentPaymentChargeId: string | null;
+    fundingSource: FundingSource;
+    coverageStatus: CoverageStatus;
+    planCreditUsageId: string | null;
+    planSubscriptionOrderId: string | null;
+    externalSubscriptionScoreId: string | null;
+    externalScoreId: string | null;
+    externalPlanId: number | null;
+    externalSpecializationId: number | null;
   };
   payment: CreatedPaymentCharge | null;
 };
@@ -97,6 +142,11 @@ export type CreateAppointmentRepository = {
     professionalId: string;
     scheduledDatetime: string;
   }): Promise<boolean>;
+  verifyPlanCoverageForSpecialty(params: {
+    appUserId: string;
+    fallbackExternalKey: string;
+    specialtyCode: string;
+  }): Promise<PlanCoverageVerification>;
   createAppointment(params: {
     patientId: string;
     patientName: string;
@@ -112,6 +162,8 @@ export type CreateAppointmentRepository = {
     price: number;
     pricing: ResolvedServicePricing;
     symptoms: string;
+    fundingSource: FundingSource;
+    planCoverage: PlanCoverageVerification | null;
   }): Promise<AppointmentRecord>;
 };
 
