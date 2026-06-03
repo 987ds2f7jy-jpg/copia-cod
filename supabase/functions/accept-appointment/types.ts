@@ -20,6 +20,15 @@ export type ProfessionalProfileRecord = {
   source: 'professional_profiles';
 };
 
+export type AppointmentAcceptanceWindowRecord = {
+  id: string;
+  status: string;
+  appointmentType: string;
+  scheduledDatetime: string | null;
+  date: string | null;
+  time: string | null;
+};
+
 export type PlanCreditUsageRecord = {
   id: string;
   status: string;
@@ -84,6 +93,7 @@ export type ErrorResponse = ApiErrorResponse;
 export type AcceptAppointmentRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findActiveProfessionalProfileByUserId(appUserId: string): Promise<ProfessionalProfileRecord | null>;
+  findAppointmentAcceptanceWindow(appointmentId: string): Promise<AppointmentAcceptanceWindowRecord | null>;
   findPlanAppointmentAcceptanceContext(appointmentId: string): Promise<PlanAppointmentAcceptanceContext | null>;
   findAcceptedAppointmentResult(params: {
     appointmentId: string;

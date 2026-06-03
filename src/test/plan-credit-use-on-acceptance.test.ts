@@ -32,6 +32,24 @@ describe('plan credit consumption on professional acceptance', () => {
     );
   });
 
+  it('blocks expired specialty appointments before plan credit consumption', () => {
+    const acceptService = read('supabase/functions/accept-appointment/service.ts');
+    const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
+    const rpcPatch = read('supabase/migrations/20260602120000_block_expired_specialty_appointment_acceptance.sql');
+
+    expect(acceptService).toContain('assertAppointmentNotExpiredForAcceptance');
+    expect(acceptService).toContain('findAppointmentAcceptanceWindow');
+    expect(acceptService.indexOf('assertAppointmentNotExpiredForAcceptance')).toBeLessThan(
+      acceptService.indexOf('confirmPlanCreditBeforeAcceptance'),
+    );
+    expect(acceptRepository).toContain('APPOINTMENT_EXPIRED');
+    expect(rpcPatch).toContain('MESSAGE = \'APPOINTMENT_EXPIRED\'');
+    expect(rpcPatch).toContain("interval '10 minutes'");
+    expect(rpcPatch.indexOf('MESSAGE = \'APPOINTMENT_EXPIRED\'')).toBeLessThan(
+      rpcPatch.indexOf('INSERT INTO public.consultas'),
+    );
+  });
+
   it('updates local audit and appointment coverage status after use result', () => {
     const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
 

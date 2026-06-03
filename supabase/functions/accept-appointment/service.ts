@@ -1,9 +1,14 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  APPOINTMENT_EXPIRED_ERROR,
+  isSpecialtyAppointmentRequestExpired,
+} from '../_shared/appointments/expiration.ts';
 import type {
   AcceptAppointmentCommand,
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
   AcceptAppointmentResult,
+  AppointmentAcceptanceWindowRecord,
   PlanAppointmentAcceptanceContext,
   ProfessionalProfileRecord,
 } from './types.ts';
@@ -17,6 +22,31 @@ function normalizeString(value: unknown) {
 
 function normalizeComparable(value: unknown) {
   return normalizeString(value).toLowerCase();
+}
+
+function assertAppointmentNotExpiredForAcceptance(appointment: AppointmentAcceptanceWindowRecord | null) {
+  if (!appointment?.id) {
+    throw new AppError({
+      status: 404,
+      code: 'APPOINTMENT_NOT_FOUND',
+      message: 'Appointment not found.',
+    });
+  }
+
+  if (isSpecialtyAppointmentRequestExpired({
+    status: appointment.status,
+    appointmentType: appointment.appointmentType,
+    scheduledDatetime: appointment.scheduledDatetime,
+    date: appointment.date,
+    time: appointment.time,
+  })) {
+    throw new AppError({
+      status: 409,
+      code: APPOINTMENT_EXPIRED_ERROR.code,
+      message: APPOINTMENT_EXPIRED_ERROR.message,
+      details: { appointmentId: appointment.id },
+    });
+  }
 }
 
 function assertPlanAppointmentCanBeAcceptedByProfessional({
@@ -152,6 +182,9 @@ export async function acceptAppointment({
     appUserId: appUser.id,
     profileId: professional.profileId,
   });
+
+  const appointmentWindow = await repository.findAppointmentAcceptanceWindow(appointmentId);
+  assertAppointmentNotExpiredForAcceptance(appointmentWindow);
 
   const planContext = await repository.findPlanAppointmentAcceptanceContext(appointmentId);
   let row: AcceptAppointmentTransactionRecord | null = null;

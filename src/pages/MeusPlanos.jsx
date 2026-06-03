@@ -17,6 +17,7 @@ import { getMyPlans } from '@/client-api/plans';
 import { formatMoney } from '@/client-api/payments';
 
 const CREDIT_ICON_BY_CODE = {
+  clinica_medica: Stethoscope,
   clinico_geral: Stethoscope,
   clinico: Stethoscope,
   pediatria: Baby,

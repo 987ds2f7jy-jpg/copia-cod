@@ -25,7 +25,7 @@ type RequestBody = {
   limit?: number;
 };
 
-type OwnerType = 'appointment' | 'queue' | 'solicitacao_exame';
+type OwnerType = 'appointment' | 'queue' | 'solicitacao_exame' | 'plan_subscription';
 
 type PaymentStatus =
   | 'payment_pending'
@@ -82,6 +82,15 @@ type SolicitacaoExameRow = {
   paciente_nome: string | null;
   status: string | null;
   created_date: string | null;
+  updated_at: string | null;
+};
+
+type PlanSubscriptionOrderRow = {
+  id: string;
+  current_payment_charge_id: string | null;
+  plan_code: string | null;
+  status: string | null;
+  created_at: string | null;
   updated_at: string | null;
 };
 
@@ -142,6 +151,9 @@ function resolveServiceLabel(serviceCode: string, fallback = '') {
     on_duty_psicologia: 'Plantão - Psicologia',
     on_duty_psiquiatria: 'Plantão - Psiquiatria',
     extra_checkup: 'Check-up',
+    plan_subscription_weight_loss: 'Plano Emagrecimento',
+    plan_subscription_family: 'Plano Familiar',
+    plan_subscription_psychology: 'Plano Psicologia',
     extra_exames_especificos: 'Exames específicos',
     extra_renovacao_receitas: 'Renovação de receita',
     extra_laudo_medico: 'Laudo médico',
@@ -261,6 +273,23 @@ function mapSolicitacaoOwner(row: SolicitacaoExameRow): OwnerMetadata {
   };
 }
 
+function mapPlanSubscriptionOwner(row: PlanSubscriptionOrderRow): OwnerMetadata {
+  const planCode = normalizeString(row.plan_code);
+
+  return {
+    owner_type: 'plan_subscription',
+    id: row.id,
+    current_payment_charge_id: row.current_payment_charge_id || null,
+    service_code: planCode ? `plan_subscription_${planCode}` : 'plan_subscription',
+    specialty: '',
+    professional_name: '',
+    patient_name: '',
+    operational_status: normalizeString(row.status),
+    created_at: normalizeString(row.created_at),
+    updated_at: normalizeString(row.updated_at),
+  };
+}
+
 async function listAppointmentOwners(client: SupabaseClient, patientId: string, limit: number) {
   const { data, error } = await client
     .from('appointments')
@@ -351,6 +380,33 @@ async function listSolicitacaoOwners(client: SupabaseClient, patientId: string, 
   return ((data as SolicitacaoExameRow[] | null) || []).map(mapSolicitacaoOwner);
 }
 
+async function listPlanSubscriptionOwners(client: SupabaseClient, patientId: string, limit: number) {
+  const { data, error } = await client
+    .from('plan_subscription_orders')
+    .select(`
+      id,
+      current_payment_charge_id,
+      plan_code,
+      status,
+      created_at,
+      updated_at
+    `)
+    .or(`patient_id.eq.${patientId},app_user_id.eq.${patientId}`)
+    .order('created_at', { ascending: false, nullsFirst: false })
+    .limit(limit);
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'PATIENT_PAYMENT_PLAN_SUBSCRIPTIONS_LOOKUP_FAILED',
+      message: 'Unable to load patient plan payments.',
+      details: error.message,
+    });
+  }
+
+  return ((data as PlanSubscriptionOrderRow[] | null) || []).map(mapPlanSubscriptionOwner);
+}
+
 async function listChargesForOwnerType(
   client: SupabaseClient,
   ownerType: OwnerType,
@@ -407,24 +463,26 @@ async function getPatientPayments({
   patientId: string;
   limit: number;
 }) {
-  const [appointments, queues, solicitacoes] = await Promise.all([
+  const [appointments, queues, solicitacoes, planSubscriptions] = await Promise.all([
     listAppointmentOwners(client, patientId, limit),
     listQueueOwners(client, patientId, limit),
     listSolicitacaoOwners(client, patientId, limit),
+    listPlanSubscriptionOwners(client, patientId, limit),
   ]);
 
-  const owners = [...appointments, ...queues, ...solicitacoes];
+  const owners = [...appointments, ...queues, ...solicitacoes, ...planSubscriptions];
   const ownerByKey = new Map(
     owners.map((owner) => [`${owner.owner_type}:${owner.id}`, owner]),
   );
 
-  const [appointmentCharges, queueCharges, solicitacaoCharges] = await Promise.all([
+  const [appointmentCharges, queueCharges, solicitacaoCharges, planSubscriptionCharges] = await Promise.all([
     listChargesForOwnerType(client, 'appointment', appointments.map((owner) => owner.id)),
     listChargesForOwnerType(client, 'queue', queues.map((owner) => owner.id)),
     listChargesForOwnerType(client, 'solicitacao_exame', solicitacoes.map((owner) => owner.id)),
+    listChargesForOwnerType(client, 'plan_subscription', planSubscriptions.map((owner) => owner.id)),
   ]);
 
-  const items = [...appointmentCharges, ...queueCharges, ...solicitacaoCharges]
+  const items = [...appointmentCharges, ...queueCharges, ...solicitacaoCharges, ...planSubscriptionCharges]
     .map((charge) => {
       const owner = ownerByKey.get(`${charge.owner_type}:${charge.owner_id}`);
 

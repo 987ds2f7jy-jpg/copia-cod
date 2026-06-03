@@ -4,6 +4,7 @@ import { AppError } from '../_shared/errors.ts';
 import type {
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
+  AppointmentAcceptanceWindowRecord,
   AppUserRecord,
   PlanAppointmentAcceptanceContext,
   ProfessionalProfileRecord,
@@ -26,6 +27,7 @@ type LoadedProfessionalProfile = ProfessionalProfileRow & {
 type PlanAppointmentRow = {
   id: string;
   status: string | null;
+  appointment_type?: string | null;
   funding_source: string | null;
   coverage_status: string | null;
   payment_required: boolean | null;
@@ -34,6 +36,8 @@ type PlanAppointmentRow = {
   professional_name: string | null;
   specialty: string | null;
   scheduled_datetime: string | null;
+  date?: string | null;
+  time?: string | null;
   accepted_at: string | null;
   consulta_id: string | null;
 };
@@ -294,6 +298,15 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
+  if (code === 'APPOINTMENT_EXPIRED') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Esta solicitação já passou do horário e não pode mais ser aceita.',
+      details,
+    });
+  }
+
   if (
     code === 'APPOINTMENT_PRICING_SNAPSHOT_REQUIRED' ||
     code === 'APPOINTMENT_PRICE_SNAPSHOT_INVALID'
@@ -423,6 +436,38 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         fullName: profile.full_name || '',
         specialty: profile.specialty || '',
         source: profile.source,
+      };
+    },
+
+    async findAppointmentAcceptanceWindow(appointmentId: string): Promise<AppointmentAcceptanceWindowRecord | null> {
+      const { data, error } = await client
+        .from('appointments')
+        .select('id, status, appointment_type, scheduled_datetime, date, time')
+        .eq('id', appointmentId)
+        .maybeSingle();
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'APPOINTMENT_LOOKUP_FAILED',
+          message: 'Unable to load appointment before acceptance.',
+          details: error.message,
+        });
+      }
+
+      const row = data as Record<string, unknown> | null;
+
+      if (!row?.id) {
+        return null;
+      }
+
+      return {
+        id: normalizeString(row.id),
+        status: normalizeString(row.status),
+        appointmentType: normalizeString(row.appointment_type),
+        scheduledDatetime: normalizeString(row.scheduled_datetime) || null,
+        date: normalizeString(row.date) || null,
+        time: normalizeString(row.time) || null,
       };
     },
 

@@ -4,7 +4,7 @@ import { acceptAppointmentRequest } from '@/client-api/appointments';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users } from 'lucide-react';
+import { CalendarDays, CheckCircle, Loader2, AlertCircle, Users, ShieldCheck } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import NetAmountBadge from './NetAmountBadge';
@@ -98,6 +98,14 @@ export default function SolicitacoesAgendamento({ professional }) {
       setAcceptingId(null);
     },
     onError: (err) => {
+      if (err?.code === 'APPOINTMENT_EXPIRED') {
+        setErrorMsg('Esta solicitação já passou do horário e não pode mais ser aceita.');
+        queryClient.invalidateQueries({ queryKey: ['solicitacoes-esp'] });
+        queryClient.invalidateQueries({ queryKey: ['solicitacoes-pri'] });
+        setAcceptingId(null);
+        return;
+      }
+
       setErrorMsg(err.message || 'Erro ao aceitar solicitacao.');
       setAcceptingId(null);
     },
@@ -148,13 +156,24 @@ export default function SolicitacoesAgendamento({ professional }) {
           <div key={sol.id} className="px-5 py-3 flex items-start justify-between gap-3">
             <div className="min-w-0 flex-1">
               <p className="text-xs text-muted-foreground">{sol.patient_name}</p>
-              <p className="text-sm font-medium text-foreground">{sol.specialty}</p>
+              <div className="flex flex-wrap items-center gap-2">
+                <p className="text-sm font-medium text-foreground">{sol.specialty}</p>
+                {sol.funding_source === 'plan' && (
+                  <Badge variant="outline" className="border-emerald-200 bg-emerald-50 text-xs text-emerald-700 dark:border-emerald-500/30 dark:bg-emerald-500/10 dark:text-emerald-300">
+                    <ShieldCheck className="mr-1 h-3 w-3" />
+                    Coberto por plano
+                  </Badge>
+                )}
+              </div>
               <div className="flex items-center gap-3 mt-1 text-xs text-muted-foreground">
                 <span className="flex items-center gap-1">
                   <CalendarDays className="w-3.5 h-3.5" />
                   {formatDt(sol.scheduled_datetime)}
                 </span>
               </div>
+              {sol.funding_source === 'plan' && sol.coverage_status === 'plan_pending_use' && (
+                <p className="mt-1 text-xs text-emerald-700 dark:text-emerald-300">Crédito pendente de uso no aceite</p>
+              )}
               {sol.symptoms && (
                 <p className="text-xs text-muted-foreground mt-1 line-clamp-1">"{sol.symptoms}"</p>
               )}

@@ -43,6 +43,18 @@ function normalizeStatusLabel(value: unknown) {
   return normalizeString(value).toLowerCase();
 }
 
+const PRESENTATION_LABEL_BY_CODE: Record<string, string> = {
+  clinica_medica: 'Clínica Médica',
+  clinico_geral: 'Clínico Geral',
+  nutricao: 'Nutrição',
+  educacao_fisica: 'Educação Física',
+  psicologia: 'Psicologia',
+  psiquiatria: 'Psiquiatria',
+  pediatria: 'Pediatria',
+  endocrinologia: 'Endocrinologia',
+  endocrinologia_e_metabologia: 'Endocrinologia e Metabologia',
+};
+
 function toSafeCode(value: string) {
   const normalized = value
     .normalize('NFD')
@@ -54,8 +66,44 @@ function toSafeCode(value: string) {
   return normalized || 'score';
 }
 
+function displayLabelFor(code: string, fallback: string) {
+  return PRESENTATION_LABEL_BY_CODE[code] || fallback || code;
+}
+
 function firstDefined<TValue>(...values: TValue[]) {
   return values.find((value) => value !== undefined && value !== null && normalizeString(value) !== '');
+}
+
+function normalizeScoreStatus(score: ExternalPlanScore) {
+  const statusLabel = normalizeStatusLabel(score.status_label);
+
+  if (statusLabel === 'available' || statusLabel === 'enable' || statusLabel === 'enabled') {
+    return 'available';
+  }
+
+  if (statusLabel === 'used') {
+    return 'used';
+  }
+
+  if (statusLabel === 'disabled' || statusLabel === 'disable') {
+    return 'disabled';
+  }
+
+  const statusValue = normalizeString(score.status).toLowerCase();
+
+  if (statusValue === '1' || statusValue === 'available' || statusValue === 'enable' || statusValue === 'enabled') {
+    return 'available';
+  }
+
+  if (statusValue === '2' || statusValue === 'used') {
+    return 'used';
+  }
+
+  if (statusValue === '3' || statusValue === 'disabled' || statusValue === 'disable') {
+    return 'disabled';
+  }
+
+  return 'unknown';
 }
 
 function scoreIdentity(score: ExternalPlanScore) {
@@ -72,7 +120,7 @@ function scoreIdentity(score: ExternalPlanScore) {
   return {
     key: specializationId ? `specialization:${specializationId}` : code,
     code,
-    label,
+    label: displayLabelFor(code, label),
     specializationId: specializationId ?? null,
   };
 }
@@ -99,18 +147,17 @@ export function aggregateExternalScoresForCredits(
         scoreIds: [],
         subscriptionScoreIds: [],
       };
-      const statusLabel = normalizeStatusLabel(score.status_label);
+      const status = normalizeScoreStatus(score);
 
-      if (statusLabel === 'available') {
+      if (status === 'available') {
         existing.available += 1;
-        existing.total += 1;
-      } else if (statusLabel === 'used') {
+      } else if (status === 'used') {
         existing.used += 1;
-        existing.total += 1;
-      } else if (statusLabel === 'disabled') {
+      } else {
         existing.disabled += 1;
-        existing.total += 1;
       }
+
+      existing.total += 1;
 
       const scoreId = firstDefined(score.score_id);
       const subscriptionScoreId = firstDefined(score.subscription_score_id);
@@ -127,5 +174,5 @@ export function aggregateExternalScoresForCredits(
     }
   }
 
-  return [...groups.values()].filter((credit) => credit.total > 0);
+  return [...groups.values()];
 }

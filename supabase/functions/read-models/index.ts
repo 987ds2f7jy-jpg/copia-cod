@@ -10,6 +10,7 @@ import type { CorsOptions } from '../_shared/http.ts';
 import { AppError } from '../_shared/errors.ts';
 import { findAppUserByAuthUserId, type AppUserRecord } from '../_shared/appUsers.ts';
 import { createServiceRoleClient, type SupabaseClient } from '../_shared/supabase.ts';
+import { isSpecialtyAppointmentRequestExpired } from '../_shared/appointments/expiration.ts';
 
 const FUNCTION_NAME = 'read-models';
 const CORS: CorsOptions = {
@@ -336,13 +337,61 @@ function enforceServerFilters(entity: string, filters: Record<string, unknown>) 
     normalizeString(filters.status) === 'SOLICITADO' &&
     !normalizeString(filters.patient_id)
   ) {
-    return {
-      ...filters,
-      payment_status: 'paid',
-    };
+    return filters;
   }
 
   return filters;
+}
+
+function shouldApplyAppointmentSolicitationFinancialEligibility(
+  entity: string,
+  filters: Record<string, unknown>,
+) {
+  return (
+    entity === 'Appointment' &&
+    normalizeString(filters.status) === 'SOLICITADO' &&
+    !normalizeString(filters.patient_id)
+  );
+}
+
+function shouldFilterExpiredAppointmentSolicitations(
+  entity: string,
+  filters: Record<string, unknown>,
+) {
+  return (
+    entity === 'Appointment' &&
+    normalizeString(filters.status) === 'SOLICITADO' &&
+    !normalizeString(filters.patient_id)
+  );
+}
+
+function applyAppointmentSolicitationFinancialEligibility(query: any) {
+  return query.or(
+    [
+      'payment_status.eq.paid',
+      'and(funding_source.eq.plan,payment_required.eq.false,coverage_status.eq.plan_pending_use,plan_credit_usage_id.not.is.null)',
+    ].join(','),
+  );
+}
+
+function filterExpiredAppointmentSolicitations(
+  entity: string,
+  filters: Record<string, unknown>,
+  rows: Record<string, unknown>[],
+) {
+  if (!shouldFilterExpiredAppointmentSolicitations(entity, filters)) {
+    return rows;
+  }
+
+  return rows.filter((row) => !isSpecialtyAppointmentRequestExpired({
+    status: row.status,
+    appointmentType: row.appointment_type,
+    scheduledDatetime: row.scheduled_datetime,
+    date: row.date,
+    time: row.time,
+    scheduledDate: row.scheduled_date,
+    scheduledTime: row.scheduled_time,
+  }));
 }
 
 async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
@@ -448,6 +497,9 @@ async function readEntity({
   const filters = enforceServerFilters(input.entity, input.filters);
   let query = client.from(tableName).select('*');
   query = applyFilters(query, filters);
+  if (shouldApplyAppointmentSolicitationFinancialEligibility(input.entity, filters)) {
+    query = applyAppointmentSolicitationFinancialEligibility(query);
+  }
   query = applyOrder(query, input.orderBy);
 
   if (input.action === 'get') {
@@ -467,7 +519,11 @@ async function readEntity({
     });
   }
 
-  const rows = ((data as Record<string, unknown>[] | null) || []);
+  const rows = filterExpiredAppointmentSolicitations(
+    input.entity,
+    filters,
+    ((data as Record<string, unknown>[] | null) || []),
+  );
   const sanitizedRows = sanitizePublicRecords(input.entity, filters, rows);
   const records = await Promise.all(
     sanitizedRows.map((row) => decorateRecord(client, input.entity, row)),

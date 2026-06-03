@@ -142,18 +142,16 @@ const PLAN_READ_CATALOG: Record<PlanCode, PlanReadCatalog> = {
   },
   weight_loss: {
     credits: [
-      { code: 'endocrinologia', label: 'Endocrinologia', included: true },
+      { code: 'clinica_medica', label: 'Clinica Medica', included: true },
       { code: 'nutricao', label: 'Nutricao', included: true },
       { code: 'educacao_fisica', label: 'Educacao Fisica', included: true },
-      { code: 'clinico_geral', label: 'Clinico Geral', included: true },
       { code: 'pediatria', label: 'Pediatria', included: false },
       { code: 'psicologia', label: 'Psicologia', included: false },
     ],
     included: [
-      'Endocrinologia',
+      'Clinica Medica',
       'Nutricao',
       'Educacao fisica',
-      'Clinico geral',
     ],
     notIncluded: [
       'Pediatria',
@@ -316,7 +314,36 @@ async function resolveCredits({
   }
 }
 
-function buildCoverage(planCode: PlanCode | null) {
+function normalizeCoverageKey(value: string) {
+  return normalizeString(value)
+    .normalize('NFD')
+    .replace(/\p{Diacritic}/gu, '')
+    .toLowerCase();
+}
+
+function uniqueLabels(values: string[]) {
+  const seen = new Set<string>();
+  const result: string[] = [];
+
+  for (const value of values) {
+    const label = normalizeString(value);
+    const key = normalizeCoverageKey(label);
+
+    if (!label || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    result.push(label);
+  }
+
+  return result;
+}
+
+function buildCoverage(
+  planCode: PlanCode | null,
+  creditResolution: CreditResolution | null = null,
+) {
   if (!planCode) {
     return {
       included: [],
@@ -326,6 +353,21 @@ function buildCoverage(planCode: PlanCode | null) {
   }
 
   const catalog = PLAN_READ_CATALOG[planCode];
+
+  if (creditResolution?.source === 'plans_service') {
+    const included = uniqueLabels(
+      creditResolution.credits
+        .filter((credit) => credit.included && Number(credit.total || 0) > 0)
+        .map((credit) => credit.label),
+    );
+    const includedKeys = new Set(included.map(normalizeCoverageKey));
+
+    return {
+      included,
+      notIncluded: catalog.notIncluded.filter((item) => !includedKeys.has(normalizeCoverageKey(item))),
+      source: 'plans_service',
+    };
+  }
 
   return {
     included: catalog.included,
@@ -443,7 +485,7 @@ async function buildPlanResponse(
     creditsSource: creditResolution.source,
     creditsSourceReason: creditResolution.reason,
     creditsLastSyncedAt: creditResolution.lastSyncedAt,
-    coverage: buildCoverage(planCode),
+    coverage: buildCoverage(planCode, creditResolution),
     usageHistory: [],
     dependents: buildDependents({ appUser, planCode }),
     actions: buildActions(order),

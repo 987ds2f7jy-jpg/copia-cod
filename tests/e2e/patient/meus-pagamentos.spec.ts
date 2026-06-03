@@ -80,6 +80,25 @@ const paymentItems = [
     service_type: 'Check-up',
     patient_name: 'Wesley Paciente Teste',
   },
+  {
+    id: 'payment-plan-e2e-0004',
+    owner_type: 'plan_subscription',
+    owner_id: 'plan-family-e2e',
+    attempt_number: 1,
+    is_current: true,
+    status: 'paid',
+    amount: 249.9,
+    currency: 'BRL',
+    provider: 'mercado_pago',
+    checkout_url: '',
+    external_reference: 'rd-plan-family-ref-e2e',
+    created_at: '2026-05-05T09:00:00.000Z',
+    paid_at: '2026-05-05T09:03:00.000Z',
+    service_code: 'plan_subscription_family',
+    service_type: 'Plano Familiar',
+    operational_status: 'active',
+    patient_name: 'Wesley Paciente Teste',
+  },
 ];
 
 async function mockPatientPayments(page, items = paymentItems) {
@@ -87,7 +106,7 @@ async function mockPatientPayments(page, items = paymentItems) {
     await fulfillJson(route, 200, edgeOk({
       items,
       summary: {
-        total_paid: 96,
+        total_paid: 345.9,
         total_pending: 120,
         total_failed: 70,
         count: items.length,
@@ -164,12 +183,14 @@ rdTest.describe('Meus Pagamentos - paciente', () => {
     await expect(page.getByText('Consulta por especialidade').first()).toBeVisible();
     await expect(page.getByText('Plantão - Pediatria').first()).toBeVisible();
     await expect(page.getByText('Check-up').first()).toBeVisible();
+    await expect(page.getByText('Plano Familiar').first()).toBeVisible();
 
-    await expect(page.getByText('Pagamento confirmado')).toBeVisible();
+    await expect(page.getByText('Pagamento confirmado').first()).toBeVisible();
     await expect(page.getByText('Aguardando pagamento')).toBeVisible();
     await expect(page.getByText('Pagamento recusado')).toBeVisible();
 
     await expect(page.getByText('R$ 96,00').first()).toBeVisible();
+    await expect(page.getByText('R$ 249,90').first()).toBeVisible();
     await expect(page.getByText('R$ 120,00').first()).toBeVisible();
     await expect(page.getByText('04 de maio de 2026').first()).toBeVisible();
 
