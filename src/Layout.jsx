@@ -383,9 +383,9 @@ function LayoutInner({ children, currentPageName }) {
             <div>
               <h4 className="font-semibold mb-4">Suporte</h4>
               <ul className="space-y-2 text-sm text-gray-400">
-                <li><a href="#" className="hover:text-white">Central de Ajuda</a></li>
-                <li><a href="#" className="hover:text-white">Termos de Uso</a></li>
-                <li><a href="#" className="hover:text-white">Privacidade</a></li>
+                <li><Link to="/ajuda" className="hover:text-white">Central de Ajuda</Link></li>
+                <li><Link to="/termos-de-uso" className="hover:text-white">Termos de Uso</Link></li>
+                <li><Link to="/privacidade" className="hover:text-white">Privacidade</Link></li>
               </ul>
             </div>
           </div>
