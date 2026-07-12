@@ -24,7 +24,9 @@ function normalizeComparable(value: unknown) {
   return normalizeString(value).toLowerCase();
 }
 
-function assertAppointmentNotExpiredForAcceptance(appointment: AppointmentAcceptanceWindowRecord | null) {
+function assertAppointmentNotExpiredForAcceptance(
+  appointment: AppointmentAcceptanceWindowRecord | null,
+): asserts appointment is AppointmentAcceptanceWindowRecord {
   if (!appointment?.id) {
     throw new AppError({
       status: 404,
@@ -44,6 +46,30 @@ function assertAppointmentNotExpiredForAcceptance(appointment: AppointmentAccept
       status: 409,
       code: APPOINTMENT_EXPIRED_ERROR.code,
       message: APPOINTMENT_EXPIRED_ERROR.message,
+      details: { appointmentId: appointment.id },
+    });
+  }
+}
+
+function assertAppointmentPaymentReady(appointment: AppointmentAcceptanceWindowRecord) {
+  if (!appointment.paymentRequired) {
+    return;
+  }
+
+  if (appointment.paymentStatus !== 'paid') {
+    throw new AppError({
+      status: 402,
+      code: 'APPOINTMENT_PAYMENT_REQUIRED',
+      message: 'Appointment payment must be confirmed before acceptance.',
+      details: { appointmentId: appointment.id },
+    });
+  }
+
+  if (!appointment.currentPaymentChargeId) {
+    throw new AppError({
+      status: 409,
+      code: 'APPOINTMENT_PAYMENT_CHARGE_REQUIRED',
+      message: 'Appointment is missing the active payment charge required for acceptance.',
       details: { appointmentId: appointment.id },
     });
   }
@@ -185,6 +211,35 @@ export async function acceptAppointment({
 
   const appointmentWindow = await repository.findAppointmentAcceptanceWindow(appointmentId);
   assertAppointmentNotExpiredForAcceptance(appointmentWindow);
+
+  if (ACCEPTED_APPOINTMENT_STATUSES.has(normalizeString(appointmentWindow.status))) {
+    if (appointmentWindow.professionalId !== professional.profileId) {
+      throw new AppError({
+        status: 403,
+        code: 'PROFESSIONAL_PROFILE_MISMATCH',
+        message: 'Professional is not allowed to access this accepted appointment.',
+        details: { appointmentId },
+      });
+    }
+
+    const existingResult = await repository.findAcceptedAppointmentResult({
+      appointmentId,
+      professionalProfileId: professional.profileId,
+    });
+
+    if (!existingResult) {
+      throw new AppError({
+        status: 409,
+        code: 'APPOINTMENT_ACCEPTANCE_INCOMPLETE',
+        message: 'Appointment is accepted but has no valid consultation link.',
+        details: { appointmentId },
+      });
+    }
+
+    return mapAcceptAppointmentResult(existingResult);
+  }
+
+  assertAppointmentPaymentReady(appointmentWindow);
 
   const planContext = await repository.findPlanAppointmentAcceptanceContext(appointmentId);
   let row: AcceptAppointmentTransactionRecord | null = null;

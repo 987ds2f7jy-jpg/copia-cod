@@ -6,6 +6,9 @@ verify_jwt = false
 [functions.accept-queue-entry]
 verify_jwt = false
 
+[functions.accept-solicitacao-exame]
+verify_jwt = false
+
 [functions.answer-question]
 verify_jwt = false
 
@@ -51,6 +54,9 @@ verify_jwt = false
 [functions.finish-consulta]
 verify_jwt = false
 
+[functions.finish-solicitacao-exame-atendimento]
+verify_jwt = false
+
 [functions.get-admin-approval-queue]
 verify_jwt = false
 
@@ -63,7 +69,19 @@ verify_jwt = false
 [functions.get-my-plans]
 verify_jwt = false
 
+[functions.get-patient-payments]
+verify_jwt = false
+
+[functions.get-patient-prontuarios]
+verify_jwt = false
+
+[functions.get-payment-status]
+verify_jwt = false
+
 [functions.get-professional-dashboard]
+verify_jwt = false
+
+[functions.get-solicitacao-exame-atendimento]
 verify_jwt = false
 
 [functions.get-teleconsulta-context]

@@ -36,8 +36,19 @@ export default function SolicitacoesAgendamento({ professional }) {
     refetchInterval: 30_000,
   });
 
+  const { data: solStandardProfile = [] } = useQuery({
+    queryKey: ['solicitacoes-perfil', professional?.id],
+    queryFn: () => entities.Appointment.filter({
+      professional_id: professional.id,
+      appointment_type: 'PERFIL',
+      status: 'SOLICITADO',
+    }, '-scheduled_datetime', 50),
+    enabled: !!professional?.id,
+    refetchInterval: 30_000,
+  });
+
   const isLoading = false;
-  const solicitacoes = [...solBySpecialty, ...solPriority]
+  const solicitacoes = [...solBySpecialty, ...solPriority, ...solStandardProfile]
     .filter((item, idx, arr) => arr.findIndex((x) => x.id === item.id) === idx)
     .sort((a, b) => (b.scheduled_datetime || '').localeCompare(a.scheduled_datetime || ''));
 
@@ -70,6 +81,10 @@ export default function SolicitacoesAgendamento({ professional }) {
         ['solicitacoes-pri', professional?.id],
         removeAcceptedRequest,
       );
+      queryClient.setQueryData(
+        ['solicitacoes-perfil', professional?.id],
+        removeAcceptedRequest,
+      );
       queryClient.setQueryData(['profAppts', professional?.id], (items) => {
         if (!Array.isArray(items)) {
           return items;
@@ -93,6 +108,7 @@ export default function SolicitacoesAgendamento({ professional }) {
 
       queryClient.invalidateQueries({ queryKey: ['solicitacoes-esp'] });
       queryClient.invalidateQueries({ queryKey: ['solicitacoes-pri'] });
+      queryClient.invalidateQueries({ queryKey: ['solicitacoes-perfil'] });
       queryClient.invalidateQueries({ queryKey: ['profAppts'] });
       queryClient.invalidateQueries({ queryKey: ['patientAppointments'] });
       setAcceptingId(null);
@@ -102,6 +118,7 @@ export default function SolicitacoesAgendamento({ professional }) {
         setErrorMsg('Esta solicitação já passou do horário e não pode mais ser aceita.');
         queryClient.invalidateQueries({ queryKey: ['solicitacoes-esp'] });
         queryClient.invalidateQueries({ queryKey: ['solicitacoes-pri'] });
+        queryClient.invalidateQueries({ queryKey: ['solicitacoes-perfil'] });
         setAcceptingId(null);
         return;
       }

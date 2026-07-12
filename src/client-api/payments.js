@@ -133,8 +133,15 @@ export async function ensurePaymentChargeRequest({
   return normalizePayment(result?.payment || result);
 }
 
+export async function getPaymentStatusRequest({ chargeId = '' }) {
+  return invokeEdgeFunction('get-payment-status', {
+    body: { chargeId },
+    fallbackMessage: 'Nao foi possivel consultar o status do pagamento.',
+  });
+}
+
 export function canUsePaymentSimulation() {
-  return Boolean(env.paymentSimulationEnabled && env.paymentSimulationSecret);
+  return Boolean(env.paymentSimulationEnabled);
 }
 
 export async function simulatePaymentPaidRequest({
@@ -153,9 +160,6 @@ export async function simulatePaymentPaidRequest({
       paymentChargeId,
       ownerType,
       ownerId,
-    },
-    headers: {
-      'x-payment-simulation-secret': env.paymentSimulationSecret,
     },
     fallbackMessage: 'Nao foi possivel simular o pagamento.',
   });

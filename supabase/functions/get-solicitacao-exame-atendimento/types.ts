@@ -71,6 +71,9 @@ export type ErrorResponse = ApiErrorResponse;
 export type GetSolicitacaoExameAtendimentoRepository = {
   findProfessionalIdentityByAuthUserId(authUserId: string): Promise<ProfessionalIdentity | null>;
   findSolicitacaoExameById(solicitacaoId: string): Promise<SolicitacaoExameAtendimentoRecord | null>;
+  signAuthorizedMedicalFiles(
+    solicitacao: SolicitacaoExameAtendimentoRecord,
+  ): Promise<SolicitacaoExameAtendimentoRecord>;
   findPatientById(patientId: string): Promise<PatientSummary | null>;
 };
 

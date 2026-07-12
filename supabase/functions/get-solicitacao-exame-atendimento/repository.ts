@@ -26,6 +26,7 @@ type AppUserRow = {
 type ProfessionalProfileRow = {
   id: string;
   user_id: string | null;
+  status: string | null;
 };
 
 const SOLICITACAO_SELECT = `
@@ -68,6 +69,43 @@ const SOLICITACAO_SELECT = `
   created_date,
   updated_at
 `;
+
+async function createAuthorizedMedicalFileUrl(client: SupabaseClient, value: unknown) {
+  const path = String(value ?? '').trim();
+
+  if (!path) {
+    return '';
+  }
+
+  if (/^https?:\/\//i.test(path)) {
+    return path;
+  }
+
+  const { data, error } = await client.storage
+    .from('uploads')
+    .createSignedUrl(path, 5 * 60);
+
+  if (error || !data?.signedUrl) {
+    return '';
+  }
+
+  return data.signedUrl;
+}
+
+async function decorateAuthorizedMedicalFiles(
+  client: SupabaseClient,
+  record: SolicitacaoExameAtendimentoRecord,
+) {
+  const arquivos = Array.isArray(record.arquivos) ? record.arquivos : [];
+  const arquivosUrls = Array.isArray(record.arquivos_urls) ? record.arquivos_urls : [];
+
+  return {
+    ...record,
+    arquivo_receita_url: await createAuthorizedMedicalFileUrl(client, record.arquivo_receita_url),
+    arquivos: (await Promise.all(arquivos.map((path) => createAuthorizedMedicalFileUrl(client, path)))).filter(Boolean),
+    arquivos_urls: (await Promise.all(arquivosUrls.map((path) => createAuthorizedMedicalFileUrl(client, path)))).filter(Boolean),
+  };
+}
 
 function mapPatient(row: AppUserRow | null): PatientSummary | null {
   if (!row?.id) {
@@ -132,8 +170,9 @@ function createGetSolicitacaoExameAtendimentoRepository(
 
       const { data: profilesData, error: profilesError } = await client
         .from('professional_profiles')
-        .select('id, user_id')
+        .select('id, user_id, status')
         .eq('user_id', appUser.id)
+        .eq('status', 'approved')
         .order('created_date', { ascending: false });
 
       if (profilesError) {
@@ -181,6 +220,10 @@ function createGetSolicitacaoExameAtendimentoRepository(
       }
 
       return (data as SolicitacaoExameAtendimentoRecord | null) || null;
+    },
+
+    async signAuthorizedMedicalFiles(solicitacao) {
+      return decorateAuthorizedMedicalFiles(client, solicitacao);
     },
 
     async findPatientById(patientId: string): Promise<PatientSummary | null> {

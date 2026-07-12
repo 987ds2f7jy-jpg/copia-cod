@@ -465,7 +465,7 @@ function AgendamentoPerfilInner() {
                     className={appointmentType === 'priority' ? 'bg-amber-500 hover:bg-amber-600 text-white' : 'bg-emerald-600 hover:bg-emerald-700 text-white'}
                   >
                     {createAppointment.isPending && <Loader2 className="w-4 h-4 animate-spin mr-2" />}
-                    {appointmentType === 'priority' ? 'Solicitar Consulta Prioritária' : 'Confirmar Agendamento'}
+                    {appointmentType === 'priority' ? 'Solicitar Consulta Prioritária' : 'Solicitar Agendamento'}
                   </Button>
                 </div>
               </CardContent>
@@ -482,7 +482,7 @@ function AgendamentoPerfilInner() {
                 title="Pagamento do agendamento"
                 description="Sua consulta foi registrada, mas so sera liberada apos a confirmacao do pagamento."
                 paidTitle="Pagamento confirmado"
-                paidDescription="Agora sua consulta esta liberada no sistema."
+                paidDescription="Pagamento confirmado. A solicitacao aguarda o aceite do profissional."
                 continueLabel="Ver minhas consultas"
                 successRedirectPath={createPageUrl('DashboardPaciente')}
                 onPaid={(paidPayment) => {
@@ -503,20 +503,18 @@ function AgendamentoPerfilInner() {
                   }
                 </div>
                 <h2 className="text-2xl font-bold text-foreground mb-2">
-                  {appointmentType === 'priority' ? 'Solicitação Enviada!' : 'Agendamento Confirmado!'}
+                  Solicitação Enviada!
                 </h2>
                 <p className="text-muted-foreground mb-2">
                   {appointmentType === 'priority'
                     ? `Sua solicitação de consulta prioritária foi enviada para ${publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}${publicProfile.full_name}.`
-                    : `Sua consulta com ${publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}${publicProfile.full_name} foi confirmada.`
+                    : `Sua solicitação de agendamento foi enviada para ${publicProfile.profession === 'Medicina' ? 'Dr(a). ' : ''}${publicProfile.full_name}.`
                   }
                 </p>
-                {appointmentType === 'priority' && (
-                  <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-start gap-2 text-left dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
-                    <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
-                    O profissional precisa aceitar sua solicitação. Você será notificado quando isso acontecer.
-                  </div>
-                )}
+                <div className="mb-6 p-3 bg-amber-50 border border-amber-200 rounded-lg text-sm text-amber-700 flex items-start gap-2 text-left dark:border-amber-900/60 dark:bg-amber-950/40 dark:text-amber-300">
+                  <AlertCircle className="w-4 h-4 mt-0.5 shrink-0" />
+                  O profissional precisa aceitar sua solicitação. Você será notificado quando isso acontecer.
+                </div>
                 <div className="p-4 bg-muted/40 rounded-xl text-left mb-6 text-sm space-y-2">
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Data</span>
@@ -528,10 +526,7 @@ function AgendamentoPerfilInner() {
                   </div>
                   <div className="flex justify-between">
                     <span className="text-muted-foreground">Status</span>
-                    {appointmentType === 'priority'
-                      ? <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Aguardando aceite</Badge>
-                      : <Badge className="bg-emerald-100 text-emerald-700 dark:bg-emerald-500/15 dark:text-emerald-300">Confirmado</Badge>
-                    }
+                    <Badge className="bg-amber-100 text-amber-700 dark:bg-amber-500/15 dark:text-amber-300">Aguardando aceite</Badge>
                   </div>
                 </div>
                 <div className="flex gap-3 justify-center">

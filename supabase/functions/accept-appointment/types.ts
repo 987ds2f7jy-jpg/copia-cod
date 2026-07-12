@@ -27,6 +27,11 @@ export type AppointmentAcceptanceWindowRecord = {
   scheduledDatetime: string | null;
   date: string | null;
   time: string | null;
+  paymentRequired: boolean;
+  paymentStatus: string;
+  currentPaymentChargeId: string | null;
+  professionalId: string | null;
+  consultaId: string | null;
 };
 
 export type PlanCreditUsageRecord = {

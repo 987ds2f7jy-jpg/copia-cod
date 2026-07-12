@@ -1,4 +1,6 @@
 import { AppError } from '../_shared/errors.ts';
+import { requireAuthenticatedUser } from '../_shared/auth.ts';
+import { findAppUserByAuthUserId } from '../_shared/appUsers.ts';
 import {
   createRequestId,
   ensureMethod,
@@ -10,15 +12,16 @@ import {
 import type { CorsOptions } from '../_shared/http.ts';
 import { markPaymentAsPaid } from '../_shared/payments/mark-payment-as-paid.ts';
 import type { PaymentOwnerType } from '../_shared/payments/types.ts';
+import { isLocalPaymentEnvironment, normalizeAppEnvironment } from '../_shared/payments/environment-policy.ts';
 import {
   createServiceRoleClient,
+  createSupabaseAuthUserLookup,
   type SupabaseClient,
 } from '../_shared/supabase.ts';
 
 const FUNCTION_NAME = 'simulate-payment-paid';
 const CORS: CorsOptions = {
   allowedMethods: ['POST'],
-  allowedHeaders: ['x-payment-simulation-secret'],
 };
 
 type SimulatePaymentPaidInput = {
@@ -84,34 +87,91 @@ function parseInput(body: unknown): SimulatePaymentPaidInput {
   };
 }
 
-function assertSimulationEnabled(req: Request) {
+function assertSimulationEnabled() {
+  const environment = normalizeAppEnvironment(Deno.env.get('APP_ENV'));
   const enabled = normalizeString(Deno.env.get('ENABLE_PAYMENT_SIMULATION')).toLowerCase() === 'true';
 
-  if (!enabled) {
+  if (!isLocalPaymentEnvironment(environment) || !enabled) {
     throw new AppError({
       status: 403,
       code: 'PAYMENT_SIMULATION_DISABLED',
       message: 'Payment simulation is disabled for this environment.',
+      details: { environment },
+    });
+  }
+}
+
+async function assertPaymentChargeOwnership(
+  client: SupabaseClient,
+  paymentChargeId: string,
+  appUser: { id: string; role: string; isActive: boolean },
+) {
+  if (appUser.isActive === false) {
+    throw new AppError({
+      status: 403,
+      code: 'ACCOUNT_INACTIVE',
+      message: 'Authenticated account is inactive.',
     });
   }
 
-  const expectedSecret = normalizeString(Deno.env.get('PAYMENT_SIMULATION_SECRET'));
+  const { data: chargeData, error: chargeError } = await client
+    .from('payment_charges')
+    .select('id, owner_type, owner_id')
+    .eq('id', paymentChargeId)
+    .maybeSingle();
 
-  if (!expectedSecret) {
+  if (chargeError) {
     throw new AppError({
       status: 500,
-      code: 'PAYMENT_SIMULATION_SECRET_NOT_CONFIGURED',
-      message: 'Payment simulation requires PAYMENT_SIMULATION_SECRET.',
+      code: 'PAYMENT_CHARGE_LOOKUP_FAILED',
+      message: 'Unable to load payment charge for simulation.',
+      details: chargeError.message,
     });
   }
 
-  const providedSecret = normalizeString(req.headers.get('x-payment-simulation-secret'));
+  const charge = chargeData as { id: string; owner_type: PaymentOwnerType; owner_id: string } | null;
 
-  if (!providedSecret || providedSecret !== expectedSecret) {
+  if (!charge?.id || !OWNER_TABLE[charge.owner_type]) {
+    throw new AppError({
+      status: 404,
+      code: 'PAYMENT_CHARGE_NOT_FOUND',
+      message: 'Payment charge was not found.',
+    });
+  }
+
+  if (appUser.role === 'admin') {
+    return;
+  }
+
+  const ownerSelect = charge.owner_type === 'plan_subscription'
+    ? 'id, app_user_id, patient_id'
+    : 'id, patient_id';
+  const { data: ownerData, error: ownerError } = await client
+    .from(OWNER_TABLE[charge.owner_type])
+    .select(ownerSelect)
+    .eq('id', charge.owner_id)
+    .maybeSingle();
+
+  if (ownerError) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_OWNER_LOOKUP_FAILED',
+      message: 'Unable to validate payment owner for simulation.',
+      details: ownerError.message,
+    });
+  }
+
+  const owner = ownerData as { id?: string; patient_id?: string | null; app_user_id?: string | null } | null;
+  const ownerUserIds = new Set([
+    normalizeString(owner?.patient_id),
+    normalizeString(owner?.app_user_id),
+  ].filter(Boolean));
+
+  if (!owner?.id || !ownerUserIds.has(appUser.id)) {
     throw new AppError({
       status: 403,
       code: 'PAYMENT_SIMULATION_FORBIDDEN',
-      message: 'Payment simulation secret is invalid.',
+      message: 'Authenticated user cannot simulate this payment charge.',
     });
   }
 }
@@ -183,12 +243,24 @@ export async function handleSimulatePaymentPaidRequest(req: Request) {
   }
 
   try {
-    assertSimulationEnabled(req);
+    assertSimulationEnabled();
+
+    const client = createServiceRoleClient();
+    const authenticatedUser = await requireAuthenticatedUser(req, createSupabaseAuthUserLookup(client));
+    const appUser = await findAppUserByAuthUserId(client, authenticatedUser.authUserId);
+
+    if (!appUser?.id) {
+      throw new AppError({
+        status: 403,
+        code: 'APP_USER_NOT_FOUND',
+        message: 'Authenticated user is not linked to app_users.',
+      });
+    }
 
     const input = parseInput(await readJsonBody<unknown>(req));
-    const client = createServiceRoleClient();
     const paymentChargeId = input.paymentChargeId ||
       await findCurrentPaymentChargeId(client, input.ownerType as PaymentOwnerType, input.ownerId);
+    await assertPaymentChargeOwnership(client, paymentChargeId, appUser);
     const result = await markPaymentAsPaid(client, { paymentChargeId });
 
     return successResponse(result, requestId, {

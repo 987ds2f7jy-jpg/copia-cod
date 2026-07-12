@@ -8,9 +8,16 @@ export type SetProfessionalDutyResult = {
   isOnDuty: boolean;
 };
 
+export type ProfessionalDutyProfile = {
+  professionalId: string;
+  status: string;
+  specialty: string;
+  publicProfileId: string | null;
+  publicStatus: string | null;
+};
+
 export type SetProfessionalDutyRepository = {
-  findProfessionalProfileIdByAppUserId(appUserId: string): Promise<string | null>;
-  findPublicProfileIdByProfessionalId(professionalId: string): Promise<string | null>;
+  findProfessionalDutyProfileByAppUserId(appUserId: string): Promise<ProfessionalDutyProfile | null>;
   updateProfessionalDuty(params: { professionalId: string; isOnDuty: boolean }): Promise<void>;
   updatePublicDuty(params: { publicProfileId: string; isOnDuty: boolean }): Promise<void>;
 };

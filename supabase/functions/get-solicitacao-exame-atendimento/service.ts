@@ -83,6 +83,7 @@ export async function getSolicitacaoExameAtendimento({
   }
 
   assertAccessibleSolicitacao(solicitacao, professionalIdentity.profileIds);
+  const authorizedSolicitacao = await repository.signAuthorizedMedicalFiles(solicitacao);
 
   console.info('[get-solicitacao-exame-atendimento] request:success', {
     requestId,
@@ -92,7 +93,7 @@ export async function getSolicitacaoExameAtendimento({
   });
 
   return {
-    solicitacaoExame: solicitacao,
+    solicitacaoExame: authorizedSolicitacao,
     patient: await repository.findPatientById(solicitacao.paciente_id),
   };
 }

@@ -17,6 +17,59 @@ const CORS: CorsOptions = {
   allowedMethods: ['POST'],
 };
 const MAX_LIMIT = 500;
+const SOLICITACAO_AVAILABLE_TYPES = ['checkup', 'renovacao_receitas', 'laudo_medico'];
+const SOLICITACAO_PATIENT_SELECT = `
+  id,
+  paciente_id,
+  paciente_nome,
+  paciente_email,
+  paciente_telefone,
+  tipo,
+  exame_solicitado,
+  motivo,
+  sintomas,
+  status,
+  assintomatico_confirmado,
+  medico_id,
+  fluxo_destino,
+  especialidade_destino,
+  nome_medicamento,
+  dosagem,
+  frequencia,
+  arquivo_receita_url,
+  dados_identificacao,
+  informacoes_saude,
+  dados_saude,
+  especificacao_laudo,
+  arquivos,
+  arquivos_urls,
+  queue_id,
+  service_code,
+  quoted_gross_price,
+  quoted_professional_net_amount,
+  payment_status,
+  current_payment_charge_id,
+  accepted_at,
+  created_date,
+  updated_at
+`;
+const SOLICITACAO_PROFESSIONAL_AVAILABLE_SELECT = `
+  id,
+  paciente_id,
+  paciente_nome,
+  tipo,
+  exame_solicitado,
+  motivo,
+  sintomas,
+  status,
+  fluxo_destino,
+  especialidade_destino,
+  queue_id,
+  service_code,
+  quoted_professional_net_amount,
+  payment_status,
+  created_date
+`;
 const ENTITY_TABLES: Record<string, string> = {
   Appointment: 'appointments',
   AvailabilitySlot: 'availability_slots',
@@ -37,8 +90,18 @@ type ReadModelsInput = {
   limit: number | null;
 };
 
+type ReadAccessMode = 'default' | 'solicitacao_patient' | 'solicitacao_professional_available';
+
 function normalizeString(value: unknown) {
   return String(value ?? '').trim();
+}
+
+function normalizeSpecialty(value: unknown) {
+  return normalizeString(value)
+    .toLowerCase()
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_');
 }
 
 function normalizeLimit(value: unknown) {
@@ -143,8 +206,9 @@ function requireAppUser(appUser: AppUserRecord | null): AppUserRecord {
 async function listProfessionalContext(client: SupabaseClient, appUserId: string) {
   const { data, error } = await client
     .from('professional_profiles')
-    .select('id, specialty')
-    .eq('user_id', appUserId);
+    .select('id, specialty, status')
+    .eq('user_id', appUserId)
+    .eq('status', 'approved');
 
   if (error) {
     throw new AppError({
@@ -175,15 +239,15 @@ async function assertReadAllowed(params: {
   entity: string;
   filters: Record<string, unknown>;
   appUser: AppUserRecord | null;
-}) {
+}): Promise<ReadAccessMode> {
   const { client, entity, filters, appUser } = params;
 
   if (entity === 'ProfessionalPublicProfile' || entity === 'AvailabilitySlot') {
-    return;
+    return 'default';
   }
 
   if (entity === 'Appointment' && isPublicBookedAppointmentRead(filters)) {
-    return;
+    return 'default';
   }
 
   if (
@@ -191,11 +255,11 @@ async function assertReadAllowed(params: {
     normalizeString(filters.professional_id) &&
     !normalizeString(filters.patient_id)
   ) {
-    return;
+    return 'default';
   }
 
   if (entity === 'Question' && normalizeString(filters.status) === 'RESPONDIDA') {
-    return;
+    return 'default';
   }
 
   if (
@@ -204,14 +268,14 @@ async function assertReadAllowed(params: {
     normalizeString(filters.specialty) &&
     !normalizeString(filters.patient_id)
   ) {
-    return;
+    return 'default';
   }
 
   const authenticatedUser = requireAppUser(appUser);
 
   if (entity === 'Appointment') {
     if (normalizeString(filters.patient_id) === authenticatedUser.id) {
-      return;
+      return 'default';
     }
 
     if (authenticatedUser.role === 'professional') {
@@ -221,7 +285,7 @@ async function assertReadAllowed(params: {
       const requestedStatus = normalizeString(filters.status);
 
       if (requestedProfessionalId && context.profileIds.includes(requestedProfessionalId)) {
-        return;
+        return 'default';
       }
 
       if (
@@ -229,7 +293,7 @@ async function assertReadAllowed(params: {
         requestedSpecialty &&
         context.specialties.includes(requestedSpecialty)
       ) {
-        return;
+        return 'default';
       }
     }
   }
@@ -238,35 +302,45 @@ async function assertReadAllowed(params: {
     entity === 'Review' &&
     normalizeString(filters.patient_id) === authenticatedUser.id
   ) {
-    return;
+    return 'default';
   }
 
   if (
     entity === 'Question' &&
     normalizeString(filters.paciente_id) === authenticatedUser.id
   ) {
-    return;
+    return 'default';
   }
 
   if (
     entity === 'Queue' &&
     normalizeString(filters.patient_id) === authenticatedUser.id
   ) {
-    return;
+    return 'default';
   }
 
   if (
     entity === 'Consulta' &&
     normalizeString(filters.paciente_id) === authenticatedUser.id
   ) {
-    return;
+    return 'default';
   }
 
-  if (
-    entity === 'SolicitacaoExame' &&
-    (normalizeString(filters.paciente_id) === authenticatedUser.id || authenticatedUser.role === 'professional')
-  ) {
-    return;
+  if (entity === 'SolicitacaoExame') {
+    if (normalizeString(filters.paciente_id) === authenticatedUser.id) {
+      return 'solicitacao_patient';
+    }
+
+    if (authenticatedUser.role === 'professional') {
+      const context = await listProfessionalContext(client, authenticatedUser.id);
+      const eligibleForClinicalRequests = context.specialties
+        .map(normalizeSpecialty)
+        .includes('clinico_geral');
+
+      if (eligibleForClinicalRequests) {
+        return 'solicitacao_professional_available';
+      }
+    }
   }
 
   throw new AppError({
@@ -274,6 +348,40 @@ async function assertReadAllowed(params: {
     code: 'READ_FORBIDDEN',
     message: 'Authenticated user is not allowed to read this data.',
   });
+}
+
+function getEntitySelect(entity: string, accessMode: ReadAccessMode) {
+  if (entity !== 'SolicitacaoExame') {
+    return '*';
+  }
+
+  if (accessMode === 'solicitacao_patient') {
+    return SOLICITACAO_PATIENT_SELECT;
+  }
+
+  if (accessMode === 'solicitacao_professional_available') {
+    return SOLICITACAO_PROFESSIONAL_AVAILABLE_SELECT;
+  }
+
+  throw new AppError({
+    status: 403,
+    code: 'READ_FORBIDDEN',
+    message: 'Authenticated user is not allowed to read exam/service requests.',
+  });
+}
+
+function applySolicitacaoProfessionalAvailabilityFilters(query: any, accessMode: ReadAccessMode) {
+  if (accessMode !== 'solicitacao_professional_available') {
+    return query;
+  }
+
+  return query
+    .eq('status', 'pending')
+    .eq('payment_status', 'paid')
+    .eq('especialidade_destino', 'clinico_geral')
+    .is('medico_id', null)
+    .in('tipo', SOLICITACAO_AVAILABLE_TYPES)
+    .in('fluxo_destino', ['dashboard', 'plantao']);
 }
 
 function applyFilters(query: any, filters: Record<string, unknown>) {
@@ -394,7 +502,12 @@ function filterExpiredAppointmentSolicitations(
   }));
 }
 
-async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
+async function createSignedUploadUrl(
+  client: SupabaseClient,
+  value: unknown,
+  expiresInSeconds = 60 * 60,
+  returnPathOnFailure = true,
+) {
   const path = normalizeString(value);
 
   if (!path || /^https?:\/\//i.test(path)) {
@@ -403,16 +516,21 @@ async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
 
   const { data, error } = await client.storage
     .from('uploads')
-    .createSignedUrl(path, 60 * 60);
+    .createSignedUrl(path, expiresInSeconds);
 
   if (error || !data?.signedUrl) {
-    return path;
+    return returnPathOnFailure ? path : '';
   }
 
   return data.signedUrl;
 }
 
-async function decorateRecord(client: SupabaseClient, entity: string, record: Record<string, unknown>) {
+async function decorateRecord(
+  client: SupabaseClient,
+  entity: string,
+  record: Record<string, unknown>,
+  accessMode: ReadAccessMode,
+) {
   if (!record) {
     return record;
   }
@@ -433,13 +551,17 @@ async function decorateRecord(client: SupabaseClient, entity: string, record: Re
   }
 
   if (entity === 'SolicitacaoExame') {
+    if (accessMode !== 'solicitacao_patient') {
+      return record;
+    }
+
     const arquivos = Array.isArray(record.arquivos) ? record.arquivos : [];
     const arquivosUrls = Array.isArray(record.arquivos_urls) ? record.arquivos_urls : [];
     return {
       ...record,
-      arquivo_receita_url: await createSignedUploadUrl(client, record.arquivo_receita_url),
-      arquivos: await Promise.all(arquivos.map((url) => createSignedUploadUrl(client, url))),
-      arquivos_urls: await Promise.all(arquivosUrls.map((url) => createSignedUploadUrl(client, url))),
+      arquivo_receita_url: await createSignedUploadUrl(client, record.arquivo_receita_url, 5 * 60, false),
+      arquivos: (await Promise.all(arquivos.map((url) => createSignedUploadUrl(client, url, 5 * 60, false)))).filter(Boolean),
+      arquivos_urls: (await Promise.all(arquivosUrls.map((url) => createSignedUploadUrl(client, url, 5 * 60, false)))).filter(Boolean),
     };
   }
 
@@ -486,7 +608,7 @@ async function readEntity({
   input: ReadModelsInput;
   appUser: AppUserRecord | null;
 }) {
-  await assertReadAllowed({
+  const accessMode = await assertReadAllowed({
     client,
     entity: input.entity,
     filters: input.filters,
@@ -495,8 +617,11 @@ async function readEntity({
 
   const tableName = ENTITY_TABLES[input.entity];
   const filters = enforceServerFilters(input.entity, input.filters);
-  let query = client.from(tableName).select('*');
+  let query = client.from(tableName).select(getEntitySelect(input.entity, accessMode));
   query = applyFilters(query, filters);
+  if (input.entity === 'SolicitacaoExame') {
+    query = applySolicitacaoProfessionalAvailabilityFilters(query, accessMode);
+  }
   if (shouldApplyAppointmentSolicitationFinancialEligibility(input.entity, filters)) {
     query = applyAppointmentSolicitationFinancialEligibility(query);
   }
@@ -526,7 +651,7 @@ async function readEntity({
   );
   const sanitizedRows = sanitizePublicRecords(input.entity, filters, rows);
   const records = await Promise.all(
-    sanitizedRows.map((row) => decorateRecord(client, input.entity, row)),
+    sanitizedRows.map((row) => decorateRecord(client, input.entity, row, accessMode)),
   );
 
   return {

@@ -21,7 +21,19 @@ type ProfessionalRow = {
   user_id: string | null;
   full_name: string | null;
   specialty: string | null;
+  status?: string | null;
 };
+
+function collectPatientIds(
+  rows: Array<Record<string, unknown>> | null,
+  field: 'paciente_id' | 'patient_id',
+  target: Set<string>,
+) {
+  (rows || []).forEach((row) => {
+    const patientId = String(row[field] || '').trim();
+    if (patientId) target.add(patientId);
+  });
+}
 
 function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTeleconsultaContextRepository {
   return {
@@ -69,8 +81,9 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
     async findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null> {
       const { data, error } = await client
         .from('professional_profiles')
-        .select('id, user_id, full_name, specialty')
+        .select('id, user_id, full_name, specialty, status')
         .eq('user_id', appUserId)
+        .eq('status', 'approved')
         .order('created_date', { ascending: false });
 
       if (error) {
@@ -97,6 +110,69 @@ function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTele
         specialty: row.specialty || '',
         source: 'professional_profiles',
       };
+    },
+
+    async listAuthorizedPatientIdsForProfessional({
+      appUserId,
+      professionalProfileIds,
+      patientIds,
+    }): Promise<string[]> {
+      if (professionalProfileIds.length === 0 || patientIds.length === 0) {
+        return [];
+      }
+
+      const results = await Promise.all([
+        client
+          .from('consultas')
+          .select('paciente_id')
+          .in('paciente_id', patientIds)
+          .in('profissional_id', professionalProfileIds)
+          .in('status', ['aguardando', 'em_atendimento', 'in_progress', 'finalizada']),
+        client
+          .from('consultas')
+          .select('paciente_id')
+          .in('paciente_id', patientIds)
+          .eq('profissional_user_id', appUserId)
+          .in('status', ['aguardando', 'em_atendimento', 'in_progress', 'finalizada']),
+        client
+          .from('appointments')
+          .select('patient_id')
+          .in('patient_id', patientIds)
+          .in('professional_id', professionalProfileIds)
+          .in('status', ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento', 'completed', 'CONCLUIDO']),
+        client
+          .from('queues')
+          .select('patient_id')
+          .in('patient_id', patientIds)
+          .in('assigned_professional_id', professionalProfileIds)
+          .in('status', ['assigned', 'in_progress', 'em_atendimento', 'completed']),
+        client
+          .from('solicitacoes_exames')
+          .select('paciente_id')
+          .in('paciente_id', patientIds)
+          .in('medico_id', professionalProfileIds)
+          .in('status', ['in_progress', 'completed']),
+      ]);
+
+      const failedResult = results.find((result) => result.error);
+
+      if (failedResult?.error) {
+        throw new AppError({
+          status: 500,
+          code: 'CLINICAL_RELATIONSHIP_LOOKUP_FAILED',
+          message: 'Unable to validate professional care relationship.',
+          details: failedResult.error.message,
+        });
+      }
+
+      const authorized = new Set<string>();
+      collectPatientIds(results[0].data as Array<Record<string, unknown>> | null, 'paciente_id', authorized);
+      collectPatientIds(results[1].data as Array<Record<string, unknown>> | null, 'paciente_id', authorized);
+      collectPatientIds(results[2].data as Array<Record<string, unknown>> | null, 'patient_id', authorized);
+      collectPatientIds(results[3].data as Array<Record<string, unknown>> | null, 'patient_id', authorized);
+      collectPatientIds(results[4].data as Array<Record<string, unknown>> | null, 'paciente_id', authorized);
+
+      return patientIds.filter((patientId) => authorized.has(patientId));
     },
 
     async findPaymentOwnerByConsultationId(consultationId: string): Promise<AppointmentPaymentRecord | null> {

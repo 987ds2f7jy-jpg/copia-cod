@@ -337,6 +337,15 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
+  if (code === 'APPOINTMENT_PAYMENT_CHARGE_NOT_PAID') {
+    return new AppError({
+      status: 402,
+      code,
+      message: 'The active appointment charge has not been confirmed as paid.',
+      details,
+    });
+  }
+
   return new AppError({
     status: 500,
     code,
@@ -442,7 +451,19 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
     async findAppointmentAcceptanceWindow(appointmentId: string): Promise<AppointmentAcceptanceWindowRecord | null> {
       const { data, error } = await client
         .from('appointments')
-        .select('id, status, appointment_type, scheduled_datetime, date, time')
+        .select(`
+          id,
+          status,
+          appointment_type,
+          scheduled_datetime,
+          date,
+          time,
+          payment_required,
+          payment_status,
+          current_payment_charge_id,
+          professional_id,
+          consulta_id
+        `)
         .eq('id', appointmentId)
         .maybeSingle();
 
@@ -468,6 +489,11 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         scheduledDatetime: normalizeString(row.scheduled_datetime) || null,
         date: normalizeString(row.date) || null,
         time: normalizeString(row.time) || null,
+        paymentRequired: Boolean(row.payment_required ?? true),
+        paymentStatus: normalizeString(row.payment_status),
+        currentPaymentChargeId: normalizeString(row.current_payment_charge_id) || null,
+        professionalId: normalizeString(row.professional_id) || null,
+        consultaId: normalizeString(row.consulta_id) || null,
       };
     },
 

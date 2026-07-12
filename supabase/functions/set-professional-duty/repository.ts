@@ -6,12 +6,15 @@ import {
   createSupabaseAuthUserLookup,
   type SupabaseClient,
 } from '../_shared/supabase.ts';
-import type { SetProfessionalDutyRepository } from './types.ts';
+import type { ProfessionalDutyProfile, SetProfessionalDutyRepository } from './types.ts';
 
-async function findProfessionalProfileIdByAppUserId(client: SupabaseClient, appUserId: string) {
+async function findProfessionalDutyProfileByAppUserId(
+  client: SupabaseClient,
+  appUserId: string,
+): Promise<ProfessionalDutyProfile | null> {
   const { data, error } = await client
     .from('professional_profiles')
-    .select('id')
+    .select('id, status, specialty')
     .eq('user_id', appUserId)
     .order('created_date', { ascending: false })
     .limit(1)
@@ -26,28 +29,38 @@ async function findProfessionalProfileIdByAppUserId(client: SupabaseClient, appU
     });
   }
 
-  return (data as { id?: string } | null)?.id || null;
-}
+  const profile = data as { id?: string; status?: string; specialty?: string } | null;
 
-async function findPublicProfileIdByProfessionalId(client: SupabaseClient, professionalId: string) {
-  const { data, error } = await client
+  if (!profile?.id) {
+    return null;
+  }
+
+  const { data: publicData, error: publicError } = await client
     .from('professional_public_profiles')
-    .select('id')
-    .eq('professional_profile_id', professionalId)
+    .select('id, status')
+    .eq('professional_profile_id', profile.id)
     .order('created_date', { ascending: false })
     .limit(1)
     .maybeSingle();
 
-  if (error) {
+  if (publicError) {
     throw new AppError({
       status: 500,
       code: 'PUBLIC_PROFILE_LOOKUP_FAILED',
       message: 'Unable to load public profile.',
-      details: error.message,
+      details: publicError.message,
     });
   }
 
-  return (data as { id?: string } | null)?.id || null;
+  const publicProfile = publicData as { id?: string; status?: string } | null;
+
+  return {
+    professionalId: profile.id,
+    status: String(profile.status || ''),
+    specialty: String(profile.specialty || ''),
+    publicProfileId: publicProfile?.id || null,
+    publicStatus: publicProfile?.status || null,
+  };
 }
 
 async function updateProfessionalDuty(client: SupabaseClient, professionalId: string, isOnDuty: boolean) {
@@ -84,8 +97,7 @@ async function updatePublicDuty(client: SupabaseClient, publicProfileId: string,
 
 function createSetProfessionalDutyRepository(client: SupabaseClient): SetProfessionalDutyRepository {
   return {
-    findProfessionalProfileIdByAppUserId: (appUserId) => findProfessionalProfileIdByAppUserId(client, appUserId),
-    findPublicProfileIdByProfessionalId: (professionalId) => findPublicProfileIdByProfessionalId(client, professionalId),
+    findProfessionalDutyProfileByAppUserId: (appUserId) => findProfessionalDutyProfileByAppUserId(client, appUserId),
     updateProfessionalDuty: ({ professionalId, isOnDuty }) => updateProfessionalDuty(client, professionalId, isOnDuty),
     updatePublicDuty: ({ publicProfileId, isOnDuty }) => updatePublicDuty(client, publicProfileId, isOnDuty),
   };

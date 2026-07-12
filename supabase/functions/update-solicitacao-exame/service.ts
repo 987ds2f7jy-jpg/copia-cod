@@ -54,16 +54,13 @@ export async function updateSolicitacaoExame({
 
   const wantsQueueLink = Boolean(input.queueId);
   const wantsWorkflowUpdate = Boolean(input.status || input.medicoId);
-  const isProfessionalOperator = appUser.role === 'professional' || appUser.role === 'admin';
 
   if (wantsWorkflowUpdate) {
-    if (!isProfessionalOperator) {
-      throw new AppError({
-        status: 403,
-        code: 'PROFESSIONAL_ROLE_REQUIRED',
-        message: 'Only professional or admin accounts can change exam request workflow fields.',
-      });
-    }
+    throw new AppError({
+      status: 403,
+      code: 'SOLICITACAO_EXAME_WORKFLOW_ENDPOINT_REQUIRED',
+      message: 'Workflow ownership and status must be changed through the dedicated accept or finish endpoint.',
+    });
   } else {
     if (existing.paciente_id !== appUser.id) {
       throw new AppError({
@@ -74,7 +71,7 @@ export async function updateSolicitacaoExame({
     }
   }
 
-  if (wantsQueueLink && !wantsWorkflowUpdate && existing.paciente_id !== appUser.id) {
+  if (wantsQueueLink && existing.paciente_id !== appUser.id) {
     throw new AppError({
       status: 403,
       code: 'SOLICITACAO_EXAME_OWNERSHIP_REQUIRED',

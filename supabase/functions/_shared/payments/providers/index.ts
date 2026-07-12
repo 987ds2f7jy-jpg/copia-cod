@@ -4,9 +4,49 @@ import { createMockPaymentProvider } from './mock-provider.ts';
 import { createStripePaymentProvider } from './stripe-provider.ts';
 import type { PaymentProvider } from './provider-interface.ts';
 import type { PaymentProviderName } from './types.ts';
+import {
+  isLocalPaymentEnvironment,
+  normalizeAppEnvironment,
+} from '../environment-policy.ts';
+
+function getRuntimeEnvironment() {
+  return normalizeAppEnvironment(Deno.env.get('APP_ENV'));
+}
 
 export function getConfiguredPaymentProviderName(): PaymentProviderName {
-  return normalizePaymentProviderName(Deno.env.get('PAYMENT_PROVIDER') || 'mock');
+  return resolvePaymentProviderConfiguration(
+    Deno.env.get('PAYMENT_PROVIDER') || '',
+    getRuntimeEnvironment(),
+  );
+}
+
+export function resolvePaymentProviderConfiguration(
+  providerName: string,
+  environment: string,
+): PaymentProviderName {
+  const configuredProvider = providerName.trim();
+
+  if (!configuredProvider) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_PROVIDER_REQUIRED',
+      message: 'PAYMENT_PROVIDER must be configured explicitly.',
+    });
+  }
+
+  const normalizedProviderName = normalizePaymentProviderName(configuredProvider);
+  const normalizedEnvironment = normalizeAppEnvironment(environment);
+
+  if (normalizedProviderName === 'mock' && !isLocalPaymentEnvironment(normalizedEnvironment)) {
+    throw new AppError({
+      status: 500,
+      code: 'PAYMENT_PROVIDER_MOCK_FORBIDDEN',
+      message: 'Mock payments are restricted to local development and test environments.',
+      details: { environment: normalizedEnvironment },
+    });
+  }
+
+  return normalizedProviderName;
 }
 
 export function normalizePaymentProviderName(providerName: string): PaymentProviderName {
@@ -34,7 +74,7 @@ export function normalizePaymentProviderName(providerName: string): PaymentProvi
 
 export function createPaymentProvider(providerName?: string | PaymentProviderName): PaymentProvider {
   const normalizedProviderName = providerName
-    ? normalizePaymentProviderName(providerName)
+    ? resolvePaymentProviderConfiguration(providerName, getRuntimeEnvironment())
     : getConfiguredPaymentProviderName();
 
   if (normalizedProviderName === 'mock') {

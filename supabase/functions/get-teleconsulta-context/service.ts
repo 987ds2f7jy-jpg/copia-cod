@@ -66,7 +66,63 @@ function buildParticipantContext({
   };
 }
 
+async function assertClinicalHistoryAccess({
+  requestId,
+  appUser,
+  patientIds,
+  repository,
+}: {
+  requestId: string;
+  appUser: { id: string; role: string };
+  patientIds: string[];
+  repository: GetTeleconsultaContextRepository;
+}) {
+  if (appUser.role === 'admin') {
+    console.info('[get-teleconsulta-context] admin-clinical-history-access', {
+      requestId,
+      adminAppUserId: appUser.id,
+      patientCount: patientIds.length,
+    });
+    return;
+  }
+
+  if (appUser.role !== 'professional') {
+    throw new AppError({
+      status: 403,
+      code: 'CLINICAL_HISTORY_ACCESS_FORBIDDEN',
+      message: 'Authenticated user cannot access the requested clinical history.',
+    });
+  }
+
+  const professionalIdentity = await repository.findProfessionalIdentityByAppUserId(appUser.id);
+
+  if (!professionalIdentity?.profileIds?.length) {
+    throw new AppError({
+      status: 403,
+      code: 'PROFESSIONAL_PROFILE_NOT_ELIGIBLE',
+      message: 'An approved professional profile is required to access clinical history.',
+    });
+  }
+
+  const authorizedPatientIds = new Set(await repository.listAuthorizedPatientIdsForProfessional({
+    appUserId: appUser.id,
+    professionalProfileIds: professionalIdentity.profileIds,
+    patientIds,
+  }));
+  const unauthorizedCount = patientIds.filter((patientId) => !authorizedPatientIds.has(patientId)).length;
+
+  if (unauthorizedCount > 0) {
+    throw new AppError({
+      status: 403,
+      code: 'CLINICAL_HISTORY_ACCESS_FORBIDDEN',
+      message: 'Professional has no verified care relationship with one or more requested patients.',
+      details: { requestedCount: patientIds.length, unauthorizedCount },
+    });
+  }
+}
+
 export async function getTeleconsultaContext({
+  requestId,
   input,
   authenticatedUser,
   repository,
@@ -78,13 +134,12 @@ export async function getTeleconsultaContext({
   );
 
   if (input.patientIds.length > 0) {
-    if (!['professional', 'admin'].includes(appUser.role)) {
-      throw new AppError({
-        status: 403,
-        code: 'PROFESSIONAL_ROLE_REQUIRED',
-        message: 'Only professionals can load patient clinical summaries in bulk.',
-      });
-    }
+    await assertClinicalHistoryAccess({
+      requestId,
+      appUser,
+      patientIds: input.patientIds,
+      repository,
+    });
 
     const [patients, prontuarios] = await Promise.all([
       repository.listPatientsByIds(input.patientIds),
@@ -116,13 +171,12 @@ export async function getTeleconsultaContext({
   }
 
   if (input.patientId) {
-    if (!['professional', 'admin'].includes(appUser.role)) {
-      throw new AppError({
-        status: 403,
-        code: 'PROFESSIONAL_ROLE_REQUIRED',
-        message: 'Only professionals can load patient clinical summaries.',
-      });
-    }
+    await assertClinicalHistoryAccess({
+      requestId,
+      appUser,
+      patientIds: [input.patientId],
+      repository,
+    });
 
     const [patient, recentProntuarios] = await Promise.all([
       repository.findPatientById(input.patientId),

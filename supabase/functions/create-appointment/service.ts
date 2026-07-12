@@ -249,7 +249,7 @@ export async function createAppointment({
     professionalName = professional.fullName;
     specialty = professional.specialty;
     appointmentType = input.priority ? 'priority' : 'PERFIL';
-    status = input.priority ? 'SOLICITADO' : 'CONFIRMADO';
+    status = 'SOLICITADO';
     serviceCode = input.priority ? PROFILE_PRIORITY_SERVICE_CODE : PROFILE_STANDARD_SERVICE_CODE;
     pricingProfessionalProfileId = professional.profileId;
   } else {

@@ -12,6 +12,38 @@ dist
 dist-ssr
 *.local
 
+# Environment files (examples are intentionally versioned)
+.env
+.env.*
+!.env.example
+!.env.e2e.example
+tests/e2e/.env.e2e
+
+# Playwright authentication and generated artifacts
+tests/e2e/.auth/
+playwright-report/
+test-results/
+blob-report/
+playwright/.cache/
+**/trace.zip
+**/*.har
+**/*.webm
+screenshots/
+
+# Supabase local state
+.supabase/
+supabase/.temp/
+supabase/.branches/
+
+# Local dumps, backups and temporary artifacts
+tmp/
+*.dump
+*.backup
+*.bak
+*.sql.gz
+*.tar.gz
+*.zip
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

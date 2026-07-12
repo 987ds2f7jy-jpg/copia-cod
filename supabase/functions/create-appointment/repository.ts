@@ -555,7 +555,7 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
         .select('id', { count: 'exact', head: true })
         .eq('professional_id', professionalId)
         .eq('scheduled_datetime', scheduledDatetime)
-        .in('status', ['CONFIRMADO', 'accepted', 'confirmed', 'in_progress', 'em_atendimento']);
+        .in('status', ['SOLICITADO', 'requested', 'pending', 'CONFIRMADO', 'accepted', 'confirmed', 'in_progress', 'em_atendimento']);
 
       if (error) {
         throw new AppError({
@@ -692,10 +692,15 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           }
         }
 
+        const isScheduleConflict = error.code === '23505'
+          && String(error.message || '').includes('appointments_active_professional_schedule_unique');
+
         throw new AppError({
-          status: 500,
-          code: 'APPOINTMENT_CREATE_FAILED',
-          message: 'Unable to create appointment.',
+          status: isScheduleConflict ? 409 : 500,
+          code: isScheduleConflict ? 'APPOINTMENT_SCHEDULE_CONFLICT' : 'APPOINTMENT_CREATE_FAILED',
+          message: isScheduleConflict
+            ? 'Selected slot is no longer available.'
+            : 'Unable to create appointment.',
           details: error.message,
         });
       }
