@@ -188,7 +188,7 @@ test.describe('controle de acesso — paciente em rotas restritas', () => {
     { route: ROUTES.renovacaoReceitas, expected: /Renovacao de Receitas/i },
     { route: ROUTES.agendamentoEspecialidade, expected: /Agendamento por Especialidade/i },
     { route: ROUTES.agendamentoPerfil, expected: /Profissional não encontrado|Profissional nao encontrado/i },
-    { route: ROUTES.pagamentoStatus('sucesso'), expected: /Pagamento recebido/i },
+    { route: ROUTES.pagamentoStatus('sucesso'), expected: /Pagamento nao identificado/i },
   ]) {
     test(`paciente autenticado acessa ${route} sem cair no login`, async ({
       page, goto,
@@ -237,15 +237,14 @@ test.describe('controle de acesso — profissional em rotas de agendamento', () 
       .toBeVisible({ timeout: 10_000 });
   });
 
-  test('profissional acessa /DashboardPaciente sem bloqueio de role', async ({
+  test('profissional em /DashboardPaciente ve "Acesso Restrito" @critical', async ({
     page, goto,
   }) => {
-    // DashboardPaciente não tem guard de role — qualquer autenticado acessa.
-    // Este comportamento pode ser intencional (profissional pode ter consultas como paciente).
     await goto(ROUTES.dashboardPaciente);
 
     await expect(page).toHaveURL(/DashboardPaciente/);
-    await expect(page.getByRole('heading', { name: 'Acesso Restrito' })).not.toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Acesso Restrito' }))
+      .toBeVisible({ timeout: 10_000 });
   });
 
   test('profissional aprovado acessa /DashboardProfissional sem bloqueio @critical', async ({

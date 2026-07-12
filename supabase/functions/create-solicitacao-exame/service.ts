@@ -1,6 +1,7 @@
 import { AppError } from '../_shared/errors.ts';
 import type { AppUserRecord } from '../_shared/appUsers.ts';
 import { getSolicitacaoExameServiceCode } from '../_shared/pricing/service-codes.ts';
+import { normalizeUploadPath, normalizeUploadPathList } from '../_shared/uploadPaths.ts';
 import type {
   CreateSolicitacaoExameCommand,
   CreateSolicitacaoExameRepository,
@@ -31,7 +32,7 @@ function ensurePatientAppUser(appUser: {
     });
   }
 
-  if (appUser.role === 'professional') {
+  if (appUser.role !== 'patient') {
     throw new AppError({
       status: 403,
       code: 'PATIENT_ROLE_REQUIRED',
@@ -74,6 +75,21 @@ export async function createSolicitacaoExame({
   let especificacaoLaudo = input.especificacaoLaudo;
   let arquivos = input.arquivos;
   let queueId = input.queueId;
+
+  arquivoReceitaUrl = normalizeUploadPath(arquivoReceitaUrl, {
+    allowedPrefixes: ['renovacao_receitas/'],
+    fieldName: 'arquivoReceitaUrl',
+    ownerSegment: appUser.id,
+  });
+  arquivos = normalizeUploadPathList(arquivos, {
+    allowedPrefixes: [
+      'laudos/documento_identidade/',
+      'laudos/exames/',
+      'laudos/relatorios/',
+    ],
+    fieldName: 'arquivos',
+    ownerSegment: appUser.id,
+  });
 
   switch (input.tipo) {
     case 'checkup':

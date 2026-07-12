@@ -34,6 +34,19 @@ const ALLOWED_MIME_TYPES = new Set([
   'image/webp',
 ]);
 const ALLOWED_EXTENSIONS = new Set(['pdf', 'jpg', 'jpeg', 'png', 'webp']);
+const MIME_TYPES_BY_EXTENSION: Record<string, Set<string>> = {
+  pdf: new Set(['application/pdf']),
+  jpg: new Set(['image/jpeg']),
+  jpeg: new Set(['image/jpeg']),
+  png: new Set(['image/png']),
+  webp: new Set(['image/webp']),
+};
+const MEDICAL_FOLDERS = new Set([
+  'renovacao_receitas',
+  'laudos/documento_identidade',
+  'laudos/exames',
+  'laudos/relatorios',
+]);
 
 function normalizeFolder(folder: string) {
   return folder.trim().replace(/^\/+|\/+$/g, '');
@@ -53,7 +66,7 @@ function sanitizeExtension(fileName: string) {
   return extension;
 }
 
-function ensureAllowedFile(file: File) {
+function ensureAllowedFile(file: File, extension: string) {
   if (!file || typeof file.size !== 'number') {
     throw new AppError({
       status: 400,
@@ -80,11 +93,37 @@ function ensureAllowedFile(file: File) {
 
   const contentType = file.type?.trim().toLowerCase() || '';
 
-  if (contentType && !ALLOWED_MIME_TYPES.has(contentType)) {
+  if (!contentType || !ALLOWED_MIME_TYPES.has(contentType)) {
     throw new AppError({
       status: 422,
       code: 'UPLOAD_CONTENT_TYPE_INVALID',
       message: 'Unsupported file type.',
+    });
+  }
+
+  if (!MIME_TYPES_BY_EXTENSION[extension]?.has(contentType)) {
+    throw new AppError({
+      status: 422,
+      code: 'UPLOAD_MIME_EXTENSION_MISMATCH',
+      message: 'File extension does not match its declared content type.',
+    });
+  }
+}
+
+function assertFolderAllowedForRole(folder: string, role: string) {
+  if (MEDICAL_FOLDERS.has(folder) && role !== 'patient') {
+    throw new AppError({
+      status: 403,
+      code: 'UPLOAD_FOLDER_FORBIDDEN',
+      message: 'This upload folder is restricted to patient medical flows.',
+    });
+  }
+
+  if (folder.startsWith('professionals/') && role !== 'patient' && role !== 'professional') {
+    throw new AppError({
+      status: 403,
+      code: 'UPLOAD_FOLDER_FORBIDDEN',
+      message: 'This upload folder is restricted to professional onboarding and profiles.',
     });
   }
 }
@@ -131,11 +170,21 @@ async function handleUploadFileRequest(req: Request) {
       });
     }
 
-    ensureAllowedFile(file);
-
     const appUser = await findAppUserByAuthUserId(client, authenticatedUser.authUserId);
-    const ownerSegment = appUser?.id || authenticatedUser.authUserId;
+
+    if (!appUser?.id || appUser.isActive === false) {
+      throw new AppError({
+        status: 403,
+        code: 'APP_USER_NOT_AUTHORIZED',
+        message: 'An active application user is required to upload files.',
+      });
+    }
+
+    assertFolderAllowedForRole(folder, appUser.role);
+
+    const ownerSegment = appUser.id;
     const extension = sanitizeExtension(file.name || 'file');
+    ensureAllowedFile(file, extension);
     const randomSuffix = crypto.randomUUID().slice(0, 8);
     const filePath = `${folder}/${ownerSegment}/${Date.now()}_${randomSuffix}.${extension}`;
 
@@ -158,7 +207,7 @@ async function handleUploadFileRequest(req: Request) {
 
     const { data: signedData, error: signedError } = await client.storage
       .from(BUCKET_NAME)
-      .createSignedUrl(filePath, 60 * 60);
+      .createSignedUrl(filePath, 5 * 60);
 
     if (signedError) {
       throw new AppError({

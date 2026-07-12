@@ -33,5 +33,13 @@ export function parseDeleteUploadedFilesInput(body: unknown): DeleteUploadedFile
     });
   }
 
+  if (paths.length > 20) {
+    throw new AppError({
+      status: 422,
+      code: 'UPLOAD_PATHS_LIMIT_EXCEEDED',
+      message: 'At most 20 file paths can be deleted at once.',
+    });
+  }
+
   return { paths };
 }

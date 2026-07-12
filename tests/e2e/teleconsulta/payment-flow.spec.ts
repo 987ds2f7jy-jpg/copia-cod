@@ -19,27 +19,52 @@
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES, PAYMENT_STATUS_ROUTES } from '../support/constants';
 import { skipIfNoAuth } from '../support/auth-harness';
+import { edgeOk, fulfillJson } from '../support/edge-mocks';
+
+const PAYMENT_RETURN_CONTEXT_KEY = 'rd.payment.return_context.v1';
 
 const PAYMENT_EXPECTATIONS = [
   {
     status: 'sucesso',
     route: PAYMENT_STATUS_ROUTES.sucesso,
-    title: 'Pagamento recebido',
-    detail: /redirecionado automaticamente/i,
   },
   {
     status: 'falha',
     route: PAYMENT_STATUS_ROUTES.falha,
-    title: /Pagamento n.o conclu.do/i,
-    detail: /tentar novamente/i,
   },
   {
     status: 'pendente',
     route: PAYMENT_STATUS_ROUTES.pendente,
-    title: 'Pagamento pendente',
-    detail: /acompanhar o status/i,
   },
 ] as const;
+
+async function installPaymentContext(page: import('@playwright/test').Page) {
+  await page.addInitScript(({ key }) => {
+    window.sessionStorage.setItem(key, JSON.stringify({
+      paymentChargeId: 'payment-charge-e2e',
+      successRedirectPath: '/DashboardPaciente',
+      pendingRedirectPath: '/MeusPagamentos',
+      failureRedirectPath: '/MeusPagamentos',
+    }));
+  }, { key: PAYMENT_RETURN_CONTEXT_KEY });
+}
+
+async function mockPaymentStatus(
+  page: import('@playwright/test').Page,
+  status: string,
+  serviceReleased: boolean,
+) {
+  await page.route('**/functions/v1/get-payment-status', async (route) => {
+    await fulfillJson(route, 200, edgeOk({
+      chargeId: 'payment-charge-e2e',
+      ownerType: 'queue',
+      ownerId: 'queue-e2e',
+      status,
+      serviceReleased,
+      updatedAt: '2026-07-12T12:00:00.000Z',
+    }));
+  });
+}
 
 rdTest.describe('pagamento retorno — sem autenticação', () => {
   for (const { status, route } of PAYMENT_EXPECTATIONS) {
@@ -62,52 +87,89 @@ rdTest.describe('pagamento retorno — sem autenticação', () => {
 rdTest.describe('pagamento retorno — paciente autenticado', () => {
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach((_fixtures, testInfo) => {
     skipIfNoAuth(testInfo, 'patient');
   });
 
-  for (const { status, route, title, detail } of PAYMENT_EXPECTATIONS) {
-    rdTest(`/pagamento/${status} exibe mensagem de retorno automatico @critical`, async ({
+  for (const { status, route } of PAYMENT_EXPECTATIONS) {
+    rdTest(`/pagamento/${status} sem contexto nao confirma pagamento @critical`, async ({
       page, goto,
     }) => {
+      let statusRequests = 0;
+      page.on('request', (request) => {
+        if (request.url().includes('/functions/v1/get-payment-status')) statusRequests += 1;
+      });
+
       await goto(route);
 
       await expect(page).not.toHaveURL(/\/Entrar/);
-      await expect(page.getByRole('heading', { name: title }))
+      await expect(page.getByRole('heading', { name: 'Pagamento nao identificado' }))
         .toBeVisible({ timeout: 10_000 });
-      await expect(page.getByText(detail)).toBeVisible();
-      await expect(page.getByText(/Voc. est. sendo redirecionado/i)).toBeVisible();
-      await expect(page.getByRole('button', { name: 'Ver painel' })).not.toBeVisible();
-      await expect(page.getByRole('button', { name: 'Voltar ao inicio' })).not.toBeVisible();
+      await expect(page.getByText(/nao comprova pagamento/i)).toBeVisible();
+      await expect(page.getByRole('button', { name: 'Ver Meus Pagamentos' })).toBeVisible();
+      expect(statusRequests).toBe(0);
     });
   }
 
-  rdTest('pagamento com sucesso redireciona automaticamente para DashboardPaciente @critical', async ({
+  rdTest('rota de sucesso mantem cobranca pendente sem liberar servico @critical', async ({
     page, goto,
   }) => {
+    await installPaymentContext(page);
+    await mockPaymentStatus(page, 'payment_pending', false);
     await goto(PAYMENT_STATUS_ROUTES.sucesso);
-    await expect(page.getByRole('heading', { name: 'Pagamento recebido' }))
-      .toBeVisible({ timeout: 10_000 });
 
-    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 8_000 });
+    await expect(page.getByRole('heading', { name: 'Pagamento em processamento' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/aguardando a confirmacao segura/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continuar/i })).not.toBeVisible();
+  });
+
+  rdTest('pagamento pago so conclui quando backend informa servico liberado @critical', async ({
+    page, goto,
+  }) => {
+    await installPaymentContext(page);
+    await mockPaymentStatus(page, 'paid', true);
+    await goto(PAYMENT_STATUS_ROUTES.sucesso);
+
+    await expect(page.getByRole('heading', { name: 'Pagamento confirmado' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/servico esta liberado/i)).toBeVisible();
+    await page.getByRole('button', { name: /Continuar/i }).click();
+
+    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 10_000 });
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible({ timeout: 12_000 });
   });
 
-  rdTest('pagamento com falha redireciona automaticamente sem quebrar a UI @critical', async ({
+  rdTest('pagamento pago sem liberacao permanece em processamento @critical', async ({
     page, goto,
   }) => {
-    await goto(PAYMENT_STATUS_ROUTES.falha);
-    await expect(page.getByRole('heading', { name: /Pagamento n.o conclu.do/i }))
-      .toBeVisible({ timeout: 10_000 });
+    await installPaymentContext(page);
+    await mockPaymentStatus(page, 'paid', false);
+    await goto(PAYMENT_STATUS_ROUTES.sucesso);
 
-    await expect(page).toHaveURL(/\/DashboardPaciente/, { timeout: 8_000 });
+    await expect(page.getByRole('heading', { name: 'Pagamento confirmado' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page.getByText(/finalizando processamento/i)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Continuar/i })).not.toBeVisible();
   });
 
-  rdTest('status desconhecido usa estado pendente como fallback', async ({ page, goto }) => {
+  rdTest('falha confirmada pelo backend nao redireciona automaticamente @critical', async ({
+    page, goto,
+  }) => {
+    await installPaymentContext(page);
+    await mockPaymentStatus(page, 'payment_failed', false);
+    await goto(PAYMENT_STATUS_ROUTES.falha);
+
+    await expect(page.getByRole('heading', { name: 'Pagamento nao concluido' }))
+      .toBeVisible({ timeout: 10_000 });
+    await expect(page).toHaveURL(/\/pagamento\/falha/);
+  });
+
+  rdTest('status desconhecido sem contexto continua sem comprovar pagamento', async ({ page, goto }) => {
     await goto(ROUTES.pagamentoStatus('status-desconhecido-e2e'));
 
     await expect(page).not.toHaveURL(/\/Entrar/);
-    await expect(page.getByRole('heading', { name: 'Pagamento pendente' }))
+    await expect(page.getByRole('heading', { name: 'Pagamento nao identificado' }))
       .toBeVisible({ timeout: 10_000 });
   });
 });
@@ -115,7 +177,7 @@ rdTest.describe('pagamento retorno — paciente autenticado', () => {
 rdTest.describe('consulta-agora — etapa de pagamento do plantão', () => {
   rdTest.use({ storageState: AUTH_STATE.patient });
 
-  rdTest.beforeEach(async ({}, testInfo) => {
+  rdTest.beforeEach((_fixtures, testInfo) => {
     skipIfNoAuth(testInfo, 'patient');
   });
 

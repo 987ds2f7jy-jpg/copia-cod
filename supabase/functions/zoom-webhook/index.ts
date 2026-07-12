@@ -638,11 +638,11 @@ Deno.serve(async (req) => {
     const body = parseJsonBody(rawBody);
     const eventType = firstString(body.event);
 
+    await verifyZoomSignature({ req, rawBody, secret });
+
     if (eventType === 'endpoint.url_validation') {
       return await handleUrlValidation(body, secret);
     }
-
-    await verifyZoomSignature({ req, rawBody, secret });
 
     if (!ALLOWED_EVENTS.has(eventType)) {
       return jsonResponse({

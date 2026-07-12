@@ -108,14 +108,17 @@ export async function registerProfessional({
   const diplomaUrl = normalizeUploadPath(input.diplomaUrl, {
     allowedPrefixes: ['professionals/diplomas/'],
     fieldName: 'diplomaUrl',
+    ownerSegment: appUser.id,
   });
   const photoUrl = normalizeUploadPath(input.photoUrl, {
     allowedPrefixes: ['professionals/photos/'],
     fieldName: 'photoUrl',
+    ownerSegment: appUser.id,
   });
   const galleryUrls = normalizeUploadPathList(input.galleryUrls, {
     allowedPrefixes: ['professionals/gallery/'],
     fieldName: 'galleryUrls',
+    ownerSegment: appUser.id,
   });
 
   console.info('[register-professional] request:start', {

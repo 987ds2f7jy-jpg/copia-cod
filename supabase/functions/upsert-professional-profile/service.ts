@@ -73,6 +73,7 @@ export async function upsertProfessionalProfile({
     const photoUrl = normalizeUploadPath(input.photoUrl, {
       allowedPrefixes: ['professionals/photos/'],
       fieldName: 'photoUrl',
+      ownerSegment: appUserId,
     });
     privateUpdates.photo_url = photoUrl;
     publicUpdates.photo_url = photoUrl;
@@ -119,6 +120,7 @@ export async function upsertProfessionalProfile({
     publicUpdates.gallery_urls = normalizeUploadPathList(input.galleryUrls, {
       allowedPrefixes: ['professionals/gallery/'],
       fieldName: 'galleryUrls',
+      ownerSegment: appUserId,
     });
   }
 

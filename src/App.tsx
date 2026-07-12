@@ -1,4 +1,4 @@
-import { Suspense, lazy } from 'react';
+import { Suspense, lazy, type ComponentType } from 'react';
 import { Toaster } from "@/components/ui/toaster"
 import { QueryClientProvider } from '@tanstack/react-query'
 import { queryClientInstance } from '@/lib/query-client'
@@ -32,6 +32,7 @@ const LayoutWrapper = ({ children, currentPageName }) => Layout ?
 
 const routeProtection = {
   AdminAprovacao: { requiredRole: 'admin' },
+  DashboardPaciente: { requiredRole: 'patient' },
   MeusPagamentos: { requiredRole: 'patient' },
   MeusPlanos: { requiredRole: 'patient' },
   Teleconsulta: {},
@@ -66,7 +67,7 @@ function App() {
                     <MainPage />
                   </LayoutWrapper>
                 } />
-                {Object.entries(Pages).map(([path, Page]: [string, any]) => (
+                {Object.entries(Pages).map(([path, Page]: [string, ComponentType]) => (
                   <Route
                     key={path}
                     path={`/${path}`}

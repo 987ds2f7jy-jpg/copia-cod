@@ -4,6 +4,29 @@ import { createServiceRoleClient } from '../_shared/supabase.ts';
 import type { DeleteUploadedFilesCommand, DeleteUploadedFilesResult } from './types.ts';
 
 const BUCKET_NAME = 'uploads';
+const ALLOWED_PREFIXES = [
+  'public/',
+  'renovacao_receitas/',
+  'laudos/documento_identidade/',
+  'laudos/exames/',
+  'laudos/relatorios/',
+  'professionals/diplomas/',
+  'professionals/photos/',
+  'professionals/gallery/',
+];
+
+function isOwnedUploadPath(path: string, ownerSegment: string) {
+  if (!path || path.startsWith('/') || path.includes('\\')) {
+    return false;
+  }
+
+  const segments = path.split('/');
+  if (segments.some((segment) => segment === '.' || segment === '..')) {
+    return false;
+  }
+
+  return ALLOWED_PREFIXES.some((prefix) => path.startsWith(`${prefix}${ownerSegment}/`));
+}
 
 export async function deleteUploadedFiles({
   requestId,
@@ -12,17 +35,25 @@ export async function deleteUploadedFiles({
 }: DeleteUploadedFilesCommand): Promise<DeleteUploadedFilesResult> {
   const client = createServiceRoleClient();
   const appUser = await findAppUserByAuthUserId(client, authenticatedUser.authUserId);
-  const ownerSegment = appUser?.id || authenticatedUser.authUserId;
+
+  if (!appUser?.id || appUser.isActive === false) {
+    throw new AppError({
+      status: 403,
+      code: 'APP_USER_NOT_AUTHORIZED',
+      message: 'An active application user is required to delete uploaded files.',
+    });
+  }
+
+  const ownerSegment = appUser.id;
   const normalizedPaths = [...new Set(input.paths.map((path) => path.trim()).filter(Boolean))];
 
-  const invalidPath = normalizedPaths.find((path) => !path.includes(`/${ownerSegment}/`));
+  const invalidPath = normalizedPaths.find((path) => !isOwnedUploadPath(path, ownerSegment));
 
   if (invalidPath) {
     throw new AppError({
       status: 403,
       code: 'UPLOAD_DELETE_FORBIDDEN',
       message: 'One or more files do not belong to the authenticated user.',
-      details: invalidPath,
     });
   }
 

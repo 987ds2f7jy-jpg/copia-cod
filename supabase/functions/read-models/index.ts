@@ -70,6 +70,88 @@ const SOLICITACAO_PROFESSIONAL_AVAILABLE_SELECT = `
   payment_status,
   created_date
 `;
+const PUBLIC_PROFESSIONAL_PROFILE_SELECT = `
+  id,
+  professional_profile_id,
+  full_name,
+  slug,
+  profession,
+  specialty,
+  register_number,
+  register_state,
+  rqe,
+  bio,
+  photo_url,
+  education,
+  graduation_year,
+  tags,
+  patient_types,
+  modality,
+  languages,
+  office_city,
+  office_state,
+  office_address,
+  instagram_url,
+  gallery_urls,
+  price_standard,
+  price_priority,
+  available_days,
+  available_hours,
+  is_on_duty,
+  rating,
+  total_reviews,
+  perfil_ativo,
+  prioritario_ativo,
+  status,
+  created_date,
+  updated_at
+`;
+const PUBLIC_AVAILABILITY_SELECT = `
+  id,
+  professional_id,
+  weekday,
+  time_slot,
+  created_date,
+  updated_at
+`;
+const PUBLIC_APPOINTMENT_SELECT = `
+  id,
+  professional_id,
+  scheduled_datetime,
+  date,
+  time,
+  status
+`;
+const PUBLIC_REVIEW_SELECT = `
+  id,
+  professional_id,
+  rating,
+  comment,
+  created_date,
+  updated_at
+`;
+const PUBLIC_QUESTION_SELECT = `
+  id,
+  specialty,
+  pergunta,
+  status,
+  resposta,
+  answered_by_professional_id,
+  answered_by_professional_name,
+  answered_at,
+  public_profile_id,
+  created_date,
+  updated_at
+`;
+const PUBLIC_QUEUE_SELECT = `
+  id,
+  specialty,
+  status,
+  position,
+  estimated_wait_time,
+  created_date,
+  updated_at
+`;
 const ENTITY_TABLES: Record<string, string> = {
   Appointment: 'appointments',
   AvailabilitySlot: 'availability_slots',
@@ -90,7 +172,16 @@ type ReadModelsInput = {
   limit: number | null;
 };
 
-type ReadAccessMode = 'default' | 'solicitacao_patient' | 'solicitacao_professional_available';
+type ReadAccessMode =
+  | 'default'
+  | 'public_professional_profile'
+  | 'public_availability'
+  | 'public_appointment'
+  | 'public_review'
+  | 'public_question'
+  | 'public_queue'
+  | 'solicitacao_patient'
+  | 'solicitacao_professional_available';
 
 function normalizeString(value: unknown) {
   return String(value ?? '').trim();
@@ -242,12 +333,16 @@ async function assertReadAllowed(params: {
 }): Promise<ReadAccessMode> {
   const { client, entity, filters, appUser } = params;
 
-  if (entity === 'ProfessionalPublicProfile' || entity === 'AvailabilitySlot') {
-    return 'default';
+  if (entity === 'ProfessionalPublicProfile') {
+    return 'public_professional_profile';
+  }
+
+  if (entity === 'AvailabilitySlot') {
+    return 'public_availability';
   }
 
   if (entity === 'Appointment' && isPublicBookedAppointmentRead(filters)) {
-    return 'default';
+    return 'public_appointment';
   }
 
   if (
@@ -255,11 +350,11 @@ async function assertReadAllowed(params: {
     normalizeString(filters.professional_id) &&
     !normalizeString(filters.patient_id)
   ) {
-    return 'default';
+    return 'public_review';
   }
 
   if (entity === 'Question' && normalizeString(filters.status) === 'RESPONDIDA') {
-    return 'default';
+    return 'public_question';
   }
 
   if (
@@ -268,7 +363,7 @@ async function assertReadAllowed(params: {
     normalizeString(filters.specialty) &&
     !normalizeString(filters.patient_id)
   ) {
-    return 'default';
+    return 'public_queue';
   }
 
   const authenticatedUser = requireAppUser(appUser);
@@ -351,6 +446,20 @@ async function assertReadAllowed(params: {
 }
 
 function getEntitySelect(entity: string, accessMode: ReadAccessMode) {
+  const publicSelects: Partial<Record<ReadAccessMode, string>> = {
+    public_professional_profile: PUBLIC_PROFESSIONAL_PROFILE_SELECT,
+    public_availability: PUBLIC_AVAILABILITY_SELECT,
+    public_appointment: PUBLIC_APPOINTMENT_SELECT,
+    public_review: PUBLIC_REVIEW_SELECT,
+    public_question: PUBLIC_QUESTION_SELECT,
+    public_queue: PUBLIC_QUEUE_SELECT,
+  };
+  const publicSelect = publicSelects[accessMode];
+
+  if (publicSelect) {
+    return publicSelect;
+  }
+
   if (entity !== 'SolicitacaoExame') {
     return '*';
   }

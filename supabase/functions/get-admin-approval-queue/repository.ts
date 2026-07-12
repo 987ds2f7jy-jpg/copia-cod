@@ -25,7 +25,7 @@ async function createSignedUploadUrl(client: SupabaseClient, value: unknown) {
 
   const { data, error } = await client.storage
     .from('uploads')
-    .createSignedUrl(path, 60 * 60);
+    .createSignedUrl(path, 5 * 60);
 
   if (error || !data?.signedUrl) {
     return path;

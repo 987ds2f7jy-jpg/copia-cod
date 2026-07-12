@@ -3,6 +3,7 @@ import { AppError } from './errors.ts';
 type NormalizeUploadPathOptions = {
   allowedPrefixes: string[];
   fieldName: string;
+  ownerSegment?: string;
 };
 
 function toStringValue(value: unknown) {
@@ -31,9 +32,18 @@ export function normalizeUploadPath(value: unknown, options: NormalizeUploadPath
   }
 
   const path = extractUploadPath(rawValue);
-  const isAllowed = options.allowedPrefixes.some((prefix) => path.startsWith(prefix));
+  const containsUnsafeSegment = path.includes('\\')
+    || path.split('/').some((segment) => segment === '..' || segment === '.');
+  const ownerSegment = toStringValue(options.ownerSegment);
+  const isAllowed = options.allowedPrefixes.some((prefix) => {
+    const normalizedPrefix = prefix.endsWith('/') ? prefix : `${prefix}/`;
+    const requiredPrefix = ownerSegment
+      ? `${normalizedPrefix}${ownerSegment}/`
+      : normalizedPrefix;
+    return path.startsWith(requiredPrefix);
+  });
 
-  if (!path || !isAllowed || /^https?:\/\//i.test(path)) {
+  if (!path || containsUnsafeSegment || !isAllowed || /^https?:\/\//i.test(path)) {
     throw new AppError({
       status: 422,
       code: 'UPLOAD_PATH_INVALID',
