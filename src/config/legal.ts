@@ -52,7 +52,6 @@ export function warnLegalPlaceholders(): void {
       .filter(([, v]) => isLegalPlaceholder(v))
       .map(([k]) => k);
     if (pending.length > 0) {
-      // eslint-disable-next-line no-console
       console.warn(
         `[legalConfig] Valores pendentes de preenchimento: ${pending.join(', ')}`,
       );
