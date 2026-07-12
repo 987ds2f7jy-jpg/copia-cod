@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Link2, Check } from 'lucide-react';
+import { isLegalPlaceholder } from '@/config/legal';
 import { legalConfig, legalRoutes, warnLegalPlaceholders } from '@/config/legal';
 
 /**
