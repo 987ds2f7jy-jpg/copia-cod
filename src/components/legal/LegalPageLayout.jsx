@@ -1,6 +1,7 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ArrowLeft, ChevronRight } from 'lucide-react';
+import { ArrowLeft, ChevronRight, Link2, Check } from 'lucide-react';
+import { isLegalPlaceholder } from '@/config/legal';
 import { legalConfig, legalRoutes, warnLegalPlaceholders } from '@/config/legal';
 
 /**
@@ -136,12 +137,44 @@ export default function LegalPageLayout({
   );
 }
 
-/** Bloco de seção reutilizável com âncora e título semântico. */
+/** Botão que copia o link da âncora para a área de transferência. */
+function AnchorCopyButton({ id }) {
+  const [copied, setCopied] = useState(false);
+  const copy = () => {
+    try {
+      const url = `${window.location.origin}${window.location.pathname}#${id}`;
+      navigator.clipboard?.writeText(url);
+      window.history.replaceState(null, '', `#${id}`);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 1500);
+    } catch {
+      /* silencioso — sem rede, sem alerta ao usuário */
+    }
+  };
+  return (
+    <button
+      type="button"
+      onClick={copy}
+      aria-label="Copiar link desta seção"
+      className="inline-flex items-center text-muted-foreground/60 hover:text-primary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md opacity-0 group-hover:opacity-100 focus-visible:opacity-100 transition-opacity"
+    >
+      {copied ? <Check className="h-4 w-4" /> : <Link2 className="h-4 w-4" />}
+    </button>
+  );
+}
+
+/** Bloco de seção reutilizável com âncora e título semântico (H2). */
 export function LegalSection({ id, title, children }) {
   return (
-    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24">
-      <h2 id={`${id}-title`} className="text-xl sm:text-2xl font-semibold text-foreground">
-        {title}
+    <section id={id} aria-labelledby={`${id}-title`} className="scroll-mt-24 group">
+      <h2
+        id={`${id}-title`}
+        className="flex items-center gap-2 text-xl sm:text-2xl font-semibold text-foreground"
+      >
+        <a href={`#${id}`} className="hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md">
+          {title}
+        </a>
+        <AnchorCopyButton id={id} />
       </h2>
       <div className="mt-3 space-y-3 text-base leading-relaxed text-muted-foreground">
         {children}
@@ -149,3 +182,34 @@ export function LegalSection({ id, title, children }) {
     </section>
   );
 }
+
+/** Subseção com título H3. */
+export function LegalSubSection({ id, title, children }) {
+  return (
+    <div id={id} className="scroll-mt-24 mt-6">
+      <h3 className="text-lg font-semibold text-foreground">{title}</h3>
+      <div className="mt-2 space-y-3 text-base leading-relaxed text-muted-foreground">
+        {children}
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Renderiza um e-mail: como texto comum quando ainda é placeholder,
+ * como link mailto quando for um valor real.
+ */
+export function LegalEmail({ value }) {
+  if (!value || isLegalPlaceholder(value)) {
+    return <span>{value}</span>;
+  }
+  return (
+    <a
+      href={`mailto:${value}`}
+      className="text-primary hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring rounded-md"
+    >
+      {value}
+    </a>
+  );
+}
+
