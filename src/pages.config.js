@@ -1,6 +1,9 @@
 import { lazy } from 'react';
 
 const AdminAprovacao = lazy(() => import('./pages/AdminAprovacao'));
+const Ajuda = lazy(() => import('./pages/Ajuda'));
+const TermosDeUso = lazy(() => import('./pages/TermosDeUso'));
+const Privacidade = lazy(() => import('./pages/Privacidade'));
 const AgendamentoPerfil = lazy(() => import('./pages/AgendamentoPerfil'));
 const AgendamentoEspecialidade = lazy(() => import('./pages/AgendamentoEspecialidade'));
 const AtenderServicoExtra = lazy(() => import('./pages/AtenderServicoExtra'));
@@ -51,6 +54,9 @@ export const PAGES = {
     "SolicitacaoExames": SolicitacaoExames,
     "RenovacaoReceitas": RenovacaoReceitas,
     "Teleconsulta": Teleconsulta,
+    "ajuda": Ajuda,
+    "termos-de-uso": TermosDeUso,
+    "privacidade": Privacidade,
 }
 
 export const pagesConfig = {
