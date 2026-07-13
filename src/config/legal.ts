@@ -46,7 +46,7 @@ export function isLegalPlaceholder(value: unknown): boolean {
  * Não exibe nada ao usuário final e não faz chamadas de rede.
  */
 export function warnLegalPlaceholders(): void {
-  if (typeof import.meta !== 'undefined' && import.meta.env?.DEV) {
+  if (import.meta.env.DEV) {
     const pending = Object.entries(legalConfig)
       .filter(([, v]) => isLegalPlaceholder(v))
       .map(([k]) => k);

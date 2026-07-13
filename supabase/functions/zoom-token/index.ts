@@ -6,12 +6,9 @@ import {
   type ConsultationRecord,
 } from '../_shared/teleconsultaAccess.ts';
 import { requireTelemedicineConsent } from '../_shared/consultation-consent.ts';
+import { buildCorsHeaders, handlePreflight } from '../_shared/http.ts';
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-supabase-client-platform, x-supabase-client-platform-version, x-supabase-client-runtime, x-supabase-client-runtime-version',
-  'Access-Control-Allow-Methods': 'POST, OPTIONS',
-};
+const corsHeaders = buildCorsHeaders({ allowedMethods: ['POST'] });
 
 function jsonResponse(body: unknown, status = 200) {
   return new Response(JSON.stringify(body), {
@@ -139,9 +136,8 @@ async function createZoomSignature(secret: string, payload: Record<string, unkno
 }
 
 Deno.serve(async (req) => {
-  if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
-  }
+  const preflightResponse = handlePreflight(req, { allowedMethods: ['POST'] });
+  if (preflightResponse) return preflightResponse;
 
   if (req.method !== 'POST') {
     return jsonResponse({ error: 'Method not allowed.' }, 405);

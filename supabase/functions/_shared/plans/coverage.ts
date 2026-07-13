@@ -88,7 +88,7 @@ function unwrapResource(payload: unknown): ExternalScoreResource | null {
 
 function getApiBaseUrl() {
   const rawUrl = normalizeString(
-    Deno.env.get('PLANS_SERVICE_URL') || Deno.env.get('PLANS_SERVICE_BASE_URL'),
+    Deno.env.get('PLANS_SERVICE_BASE_URL') || Deno.env.get('PLANS_SERVICE_URL'),
   );
 
   if (!rawUrl) {

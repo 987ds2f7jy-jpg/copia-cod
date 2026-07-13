@@ -1,6 +1,11 @@
 import { AppError, isAppError, toAppError } from './errors.ts';
 import { logTechnicalEvent, sanitizeErrorCode } from './observability.ts';
 import type { ApiErrorResponse, ApiSuccess } from './types.ts';
+import {
+  getCanonicalCorsOrigin,
+  isCorsOriginAllowed,
+  resolveAllowedCorsOrigins,
+} from './cors-policy.ts';
 
 const DEFAULT_ALLOWED_HEADERS = [
   'authorization',
@@ -23,6 +28,17 @@ function uniqueValues(values: string[]) {
   return [...new Set(values.map((value) => value.trim()).filter(Boolean))];
 }
 
+function getRuntimeEnv(name: string) {
+  return Deno.env.get(name)?.trim() || '';
+}
+
+function getRuntimeAllowedOrigins() {
+  return resolveAllowedCorsOrigins({
+    appEnvironment: getRuntimeEnv('APP_ENV'),
+    configuredOrigins: getRuntimeEnv('EDGE_ALLOWED_ORIGINS'),
+  });
+}
+
 export function buildCorsHeaders(options: CorsOptions = {}) {
   const allowedMethods = uniqueValues([...(options.allowedMethods || ['POST']), 'OPTIONS']);
   const allowedHeaders = uniqueValues([
@@ -30,11 +46,18 @@ export function buildCorsHeaders(options: CorsOptions = {}) {
     ...(options.allowedHeaders || []),
   ]);
 
-  return {
-    'Access-Control-Allow-Origin': options.allowOrigin || '*',
+  const allowOrigin = options.allowOrigin || getCanonicalCorsOrigin(getRuntimeAllowedOrigins());
+  const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': allowedHeaders.join(', '),
     'Access-Control-Allow-Methods': allowedMethods.join(', '),
+    'Vary': 'Origin',
   };
+
+  if (allowOrigin) {
+    headers['Access-Control-Allow-Origin'] = allowOrigin;
+  }
+
+  return headers;
 }
 
 export function createRequestId() {
@@ -125,8 +148,23 @@ export function handlePreflight(req: Request, cors?: CorsOptions) {
     return null;
   }
 
+  if (cors?.allowOrigin === '*') {
+    return new Response('ok', { headers: buildCorsHeaders(cors) });
+  }
+
+  const allowedOrigins = getRuntimeAllowedOrigins();
+  const requestOrigin = req.headers.get('Origin');
+
+  if (requestOrigin && !isCorsOriginAllowed(requestOrigin, allowedOrigins)) {
+    return new Response('Origin not allowed.', {
+      status: 403,
+      headers: buildCorsHeaders({ ...cors, allowOrigin: '' }),
+    });
+  }
+
+  const allowOrigin = requestOrigin || getCanonicalCorsOrigin(allowedOrigins);
   return new Response('ok', {
-    headers: buildCorsHeaders(cors),
+    headers: buildCorsHeaders({ ...cors, allowOrigin }),
   });
 }
 

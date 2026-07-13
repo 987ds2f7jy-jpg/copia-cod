@@ -31,6 +31,18 @@ function getDeepgramApiKey() {
   return deepgramApiKey;
 }
 
+function getDeepgramTimeoutMs() {
+  const value = Number(Deno.env.get('DEEPGRAM_TIMEOUT_MS'));
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new AppError({
+      status: 500,
+      code: 'DEEPGRAM_TIMEOUT_MS_INVALID',
+      message: 'DEEPGRAM_TIMEOUT_MS must be configured as a positive integer.',
+    });
+  }
+  return value;
+}
+
 function normalizeConsultationId(body: unknown) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new AppError({
@@ -96,6 +108,7 @@ async function handleDeepgramTokenRequest(req: Request) {
     });
 
     const deepgramApiKey = getDeepgramApiKey();
+    const timeoutMs = getDeepgramTimeoutMs();
     const grantResponse = await fetch('https://api.deepgram.com/v1/auth/grant', {
       method: 'POST',
       headers: {
@@ -103,6 +116,7 @@ async function handleDeepgramTokenRequest(req: Request) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({ ttl_seconds: 30 }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!grantResponse.ok) {

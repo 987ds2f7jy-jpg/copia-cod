@@ -12,6 +12,7 @@ import { isTransientApiError } from '@/lib/api-errors';
 import { AppError, normalizeError } from '@/lib/errors';
 import { logUiWarning, serializeError } from '@/lib/observability';
 import { createPageUrl } from '@/utils';
+import { env } from '@/config/env';
 
 const loginSchema = z.object({
   email: z.string().trim().email('Email invalido.'),
@@ -70,7 +71,8 @@ function buildPasswordRecoveryRedirectUrl() {
     return '';
   }
 
-  const url = new URL(createPageUrl('RecuperarSenha'), window.location.origin);
+  const baseUrl = env.siteUrl || window.location.origin;
+  const url = new URL(createPageUrl('RecuperarSenha'), baseUrl);
   url.searchParams.set('mode', 'reset');
   return url.toString();
 }

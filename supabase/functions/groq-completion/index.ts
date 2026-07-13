@@ -32,7 +32,19 @@ function getGroqApiKey() {
   return groqApiKey;
 }
 
-function parseInput(body: unknown) {
+function getRequiredPositiveInteger(name: string) {
+  const value = Number(Deno.env.get(name));
+  if (!Number.isInteger(value) || value <= 0) {
+    throw new AppError({
+      status: 500,
+      code: `${name}_INVALID`,
+      message: `${name} must be configured as a positive integer.`,
+    });
+  }
+  return value;
+}
+
+function parseInput(body: unknown, maxTranscriptChars: number) {
   if (!body || typeof body !== 'object' || Array.isArray(body)) {
     throw new AppError({
       status: 400,
@@ -58,6 +70,14 @@ function parseInput(body: unknown) {
       status: 400,
       code: 'TRANSCRIPT_REQUIRED',
       message: 'Campo "transcript" e obrigatorio.',
+    });
+  }
+
+  if (transcript.length > maxTranscriptChars) {
+    throw new AppError({
+      status: 413,
+      code: 'TRANSCRIPT_TOO_LARGE',
+      message: 'Transcript exceeds the configured processing limit.',
     });
   }
 
@@ -87,7 +107,9 @@ async function handleGroqCompletionRequest(req: Request) {
   }
 
   try {
-    const input = parseInput(await readJsonBody<unknown>(req));
+    const timeoutMs = getRequiredPositiveInteger('GROQ_TIMEOUT_MS');
+    const maxTranscriptChars = getRequiredPositiveInteger('GROQ_MAX_TRANSCRIPT_CHARS');
+    const input = parseInput(await readJsonBody<unknown>(req), maxTranscriptChars);
     const client = createSessionAccountServiceClient();
     const { appUser, consultation } = await requireConsultationAccess({
       req,
@@ -136,6 +158,7 @@ Responda APENAS com o JSON valido, sem nenhum texto adicional.`;
         temperature: 0.2,
         messages: [{ role: 'user', content: prompt }],
       }),
+      signal: AbortSignal.timeout(timeoutMs),
     });
 
     if (!response.ok) {

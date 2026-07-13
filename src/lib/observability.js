@@ -1,4 +1,4 @@
-const isDev = typeof import.meta !== 'undefined' && Boolean(import.meta.env?.DEV);
+const isDev = import.meta.env.DEV;
 
 function buildEntry(type, payload = {}) {
   return {

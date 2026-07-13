@@ -24,7 +24,7 @@ function toRecord(value: unknown): Record<string, unknown> {
 
 function getApiBaseUrl() {
   const rawUrl = normalizeString(
-    Deno.env.get('PLANS_SERVICE_URL') || Deno.env.get('PLANS_SERVICE_BASE_URL'),
+    Deno.env.get('PLANS_SERVICE_BASE_URL') || Deno.env.get('PLANS_SERVICE_URL'),
   );
 
   if (!rawUrl) {

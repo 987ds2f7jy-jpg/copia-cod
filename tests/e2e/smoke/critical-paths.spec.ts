@@ -29,7 +29,7 @@ test.describe('smoke — app de pé', () => {
   test('home renderiza conteúdo principal @smoke', async ({ page, goto }) => {
     await goto(ROUTES.home);
 
-    // O título do documento é "Lovable App" (index.html ainda não foi atualizado),
+    // O titulo do documento pode variar entre builds de staging,
     // então validamos por conteúdo da UI — mais robusto que toHaveTitle.
     // Em mobile, o CTA "Criar conta" some do header, então o mínimo estável
     // aqui é a presença do acesso "Entrar" e do conteúdo principal.
