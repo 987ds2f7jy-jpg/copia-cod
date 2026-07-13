@@ -15,6 +15,14 @@ export type BootstrapAppUserInput = {
   address: string;
   city: string;
   state: string;
+  termsAccepted: boolean;
+  privacyAcknowledged: boolean;
+};
+
+export type LegalEventRecord = {
+  documentKey: 'terms_of_use' | 'privacy_notice';
+  documentVersion: string;
+  eventType: 'accepted' | 'acknowledged';
 };
 
 export type BootstrapAuthenticatedUser = {
@@ -69,6 +77,7 @@ export type BootstrapAppUserResult = {
   appUser: AppUserRecord;
   session: AuthSessionRecord | null;
   created: boolean;
+  legalEvents?: LegalEventRecord[];
 };
 
 export type BootstrapAppUserSuccessResponse = ApiSuccess<BootstrapAppUserResult>;
@@ -93,8 +102,13 @@ export type BootstrapAppUserRepository = {
     role: BootstrapRole;
   }): Promise<BootstrapAuthUserRecord>;
   deleteAuthUser(authUserId: string): Promise<void>;
+  deleteAppUser(appUserId: string): Promise<void>;
   createAppUser(payload: AppUserUpsertPayload): Promise<AppUserRecord>;
   updateAppUser(appUserId: string, payload: AppUserUpsertPayload): Promise<AppUserRecord>;
+  recordSignupLegalEvents(params: {
+    userId: string;
+    role: BootstrapRole;
+  }): Promise<LegalEventRecord[]>;
   signInWithPassword(params: {
     email: string;
     password: string;

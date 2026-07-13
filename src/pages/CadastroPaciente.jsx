@@ -9,6 +9,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Checkbox } from '@/components/ui/checkbox';
+import { legalRoutes } from '@/config/legal';
 
 function isValidCPF(cpf) {
   const normalizedCpf = String(cpf || '').replace(/\D/g, '');
@@ -54,6 +56,8 @@ export default function CadastroPaciente() {
   const [loading, setLoading] = useState(false);
   const [showPassword, setShowPassword] = useState(false);
   const [errors, setErrors] = useState({});
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [formData, setFormData] = useState({
     full_name: '',
     email: '',
@@ -108,6 +112,14 @@ export default function CadastroPaciente() {
       nextErrors.sex = 'Sexo obrigatorio.';
     }
 
+    if (!termsAccepted) {
+      nextErrors.terms = 'O aceite dos Termos de Uso e obrigatorio.';
+    }
+
+    if (!privacyAcknowledged) {
+      nextErrors.privacy = 'Confirme que teve acesso ao Aviso de Privacidade.';
+    }
+
     setErrors(nextErrors);
     return Object.keys(nextErrors).length === 0;
   };
@@ -131,6 +143,8 @@ export default function CadastroPaciente() {
         phone: formData.phone,
         birth_date: formData.birth_date,
         sex: formData.sex,
+        termsAccepted,
+        privacyAcknowledged,
       });
 
       navigate(createPageUrl('DashboardPaciente'), { replace: true });
@@ -246,6 +260,46 @@ export default function CadastroPaciente() {
                 {errors.sex ? (
                   <p className="mt-1 text-xs text-red-500">{errors.sex}</p>
                 ) : null}
+              </div>
+
+              <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="patient-terms"
+                    checked={termsAccepted}
+                    onCheckedChange={(checked) => {
+                      setTermsAccepted(checked === true);
+                      setErrors((current) => ({ ...current, terms: '', submit: '' }));
+                    }}
+                    aria-invalid={Boolean(errors.terms)}
+                  />
+                  <Label htmlFor="patient-terms" className="text-sm font-normal leading-5">
+                    Li e aceito os{' '}
+                    <Link to={legalRoutes.termos} target="_blank" rel="noreferrer" className="text-emerald-700 underline dark:text-emerald-300">
+                      Termos de Uso
+                    </Link>.
+                  </Label>
+                </div>
+                {errors.terms ? <p className="text-xs text-red-500">{errors.terms}</p> : null}
+
+                <div className="flex items-start gap-3">
+                  <Checkbox
+                    id="patient-privacy"
+                    checked={privacyAcknowledged}
+                    onCheckedChange={(checked) => {
+                      setPrivacyAcknowledged(checked === true);
+                      setErrors((current) => ({ ...current, privacy: '', submit: '' }));
+                    }}
+                    aria-invalid={Boolean(errors.privacy)}
+                  />
+                  <Label htmlFor="patient-privacy" className="text-sm font-normal leading-5">
+                    Declaro que tive acesso ao{' '}
+                    <Link to={legalRoutes.privacidade} target="_blank" rel="noreferrer" className="text-emerald-700 underline dark:text-emerald-300">
+                      Aviso de Privacidade
+                    </Link>.
+                  </Label>
+                </div>
+                {errors.privacy ? <p className="text-xs text-red-500">{errors.privacy}</p> : null}
               </div>
 
               {errors.submit ? (

@@ -586,7 +586,7 @@ function applyAppointmentSolicitationFinancialEligibility(query: any) {
   return query.or(
     [
       'payment_status.eq.paid',
-      'and(funding_source.eq.plan,payment_required.eq.false,coverage_status.eq.plan_pending_use,plan_credit_usage_id.not.is.null)',
+      'and(funding_source.eq.plan,payment_required.eq.false,coverage_status.in.(plan_pending_use,plan_use_failed),plan_credit_usage_id.not.is.null)',
     ].join(','),
   );
 }

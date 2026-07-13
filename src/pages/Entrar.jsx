@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import { legalRoutes } from '@/config/legal';
 
 function resolveRedirectPath(user) {
   if (user?.role === 'professional') {
@@ -168,6 +169,14 @@ export default function Entrar() {
                 Cadastrar-se como profissional
               </Link>
             </div>
+
+            <nav aria-label="Documentos jurídicos" className="mt-6 border-t border-border pt-4">
+              <ul className="flex flex-wrap justify-center gap-x-4 gap-y-2 text-xs text-muted-foreground">
+                <li><Link to={legalRoutes.termos} className="hover:text-foreground hover:underline">Termos de Uso</Link></li>
+                <li><Link to={legalRoutes.privacidade} className="hover:text-foreground hover:underline">Privacidade</Link></li>
+                <li><Link to={legalRoutes.ajuda} className="hover:text-foreground hover:underline">Central de Ajuda</Link></li>
+              </ul>
+            </nav>
           </CardContent>
         </Card>
       </div>

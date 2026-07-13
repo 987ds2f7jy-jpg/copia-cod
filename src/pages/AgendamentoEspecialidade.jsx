@@ -57,9 +57,9 @@ const PLAN_COVERAGE_OPERATIONAL_REASONS = new Set([
 const PLAN_COVERAGE_STATUS_MESSAGES = {
   flow_not_plan_eligible: 'Este fluxo nao e elegivel para planos. Pagamento avulso disponivel.',
   no_plan_credit_available: 'Nenhum credito de plano disponivel para esta especialidade.',
-  plans_service_not_configured: 'Servico de planos ainda nao configurado. Pagamento avulso disponivel.',
-  plans_service_rejected_request: 'Nao foi possivel validar plano para esta especialidade. Pagamento avulso disponivel.',
-  plans_service_unavailable: 'Nao foi possivel verificar plano agora. Pagamento avulso disponivel.',
+  plans_service_not_configured: 'Plano indisponivel temporariamente. Tente novamente em instantes.',
+  plans_service_rejected_request: 'Plano indisponivel temporariamente. Tente novamente em instantes.',
+  plans_service_unavailable: 'Plano indisponivel temporariamente. Tente novamente em instantes.',
   specialty_not_mapped: 'Esta especialidade ainda nao esta vinculada aos planos.',
 };
 
@@ -69,7 +69,7 @@ function shouldShowDetailedPlanCoverageStatus() {
 
 function getPlanCoverageStatusMessage(planCoverage, planCoverageError) {
   if (planCoverageError) {
-    return 'Nao foi possivel verificar plano agora. Voce ainda pode seguir com pagamento avulso.';
+    return 'Plano indisponivel temporariamente. Tente novamente em instantes.';
   }
 
   if (!planCoverage || planCoverage.covered) {
@@ -104,7 +104,6 @@ function AgendamentoEspecialidadeInner() {
   const [submitError, setSubmitError] = useState(null);
   const [createdAppointment, setCreatedAppointment] = useState(null);
   const [appointmentPayment, setAppointmentPayment] = useState(null);
-  const [fundingSource, setFundingSource] = useState('self_pay');
   const canQuotePatientService = Boolean(user?.id) && user?.role === 'patient';
 
   const availableSlots = useMemo(() => {
@@ -144,22 +143,9 @@ function AgendamentoEspecialidadeInner() {
 
   const planCoverageStatusMessage = getPlanCoverageStatusMessage(planCoverage, planCoverageError);
   const canUsePlanFunding = Boolean(planCoverage?.covered);
-  const effectiveFundingSource = canUsePlanFunding && fundingSource === 'plan' ? 'plan' : 'self_pay';
+  const effectiveFundingSource = canUsePlanFunding ? 'plan' : 'self_pay';
   const isPlanFundedAppointment = createdAppointment?.fundingSource === 'plan'
     || createdAppointment?.funding_source === 'plan';
-
-  useEffect(() => {
-    setFundingSource('self_pay');
-  }, [selectedSpecialty]);
-
-  useEffect(() => {
-    if (canUsePlanFunding) {
-      setFundingSource((current) => (current === 'self_pay' ? 'plan' : current));
-      return;
-    }
-
-    setFundingSource('self_pay');
-  }, [canUsePlanFunding]);
 
   const createRequest = useMutation({
     mutationFn: async () => {
@@ -186,13 +172,9 @@ function AgendamentoEspecialidadeInner() {
       setStep(5);
     },
     onError: (err) => {
-      if (effectiveFundingSource === 'plan') {
-        setFundingSource('self_pay');
-      }
-
       setSubmitError(
         err.message
-          ? `${err.message} Voce pode seguir com pagamento avulso.`
+          ? err.message
           : 'Erro ao criar solicitação. Tente novamente.',
       );
     },
@@ -431,34 +413,9 @@ function AgendamentoEspecialidadeInner() {
                       confirmado quando um profissional aceitar sua solicitacao. Nesta etapa, ele
                       ficara pendente e nao sera consumido definitivamente.
                     </p>
-                    <div className="grid gap-2 sm:grid-cols-2">
-                      <button
-                        type="button"
-                        aria-pressed={fundingSource === 'plan'}
-                        onClick={() => setFundingSource('plan')}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
-                          fundingSource === 'plan'
-                            ? 'border-emerald-500 bg-white text-emerald-800 shadow-sm dark:bg-emerald-950/45 dark:text-emerald-100'
-                            : 'border-emerald-200 bg-white/70 text-emerald-700 hover:bg-white dark:bg-emerald-950/20 dark:text-emerald-200'
-                        }`}
-                      >
-                        <span className="block font-semibold">Usar meu plano</span>
-                        <span className="block text-xs opacity-80">Sem pagamento avulso agora</span>
-                      </button>
-                      <button
-                        type="button"
-                        aria-pressed={fundingSource === 'self_pay'}
-                        onClick={() => setFundingSource('self_pay')}
-                        className={`rounded-lg border p-3 text-left transition-colors ${
-                          fundingSource === 'self_pay'
-                            ? 'border-emerald-500 bg-white text-emerald-800 shadow-sm dark:bg-emerald-950/45 dark:text-emerald-100'
-                            : 'border-emerald-200 bg-white/70 text-emerald-700 hover:bg-white dark:bg-emerald-950/20 dark:text-emerald-200'
-                        }`}
-                      >
-                        <span className="block font-semibold">Pagar avulso</span>
-                        <span className="block text-xs opacity-80">Gerar cobranca normalmente</span>
-                      </button>
-                    </div>
+                    <p className="font-medium text-emerald-800 dark:text-emerald-200">
+                      Coberto pelo plano. A cobertura sera revalidada ao enviar.
+                    </p>
                   </div>
                 )}
 

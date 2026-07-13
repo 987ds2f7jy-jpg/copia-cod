@@ -1,4 +1,5 @@
 import { AppError, isAppError } from '../errors.ts';
+import { logTechnicalEvent } from '../observability.ts';
 import {
   activateExternalPlanSubscription,
   type ActivateExternalPlanPayload,
@@ -494,12 +495,14 @@ export async function activatePlanSubscriptionForPayment(
       plansServiceSubscriptionId: response.subscriptionId,
     });
 
-    console.info('[plans] activation:completed', {
+    logTechnicalEvent('info', {
+      functionName: 'plan-activation',
       requestId,
-      orderId: order.id,
-      paymentChargeId: charge.id,
-      planCode: order.plan_code,
-      plansServiceSubscriptionId: response.subscriptionId,
+      operation: 'plan_subscription.activate',
+      resourceType: 'plan_subscription',
+      resourceId: order.id,
+      status: 'active',
+      provider: charge.provider,
     });
 
     return {
@@ -523,13 +526,15 @@ export async function activatePlanSubscriptionForPayment(
       error: appError,
     });
 
-    console.warn('[plans] activation:failed', {
+    logTechnicalEvent('warn', {
+      functionName: 'plan-activation',
       requestId,
-      orderId: order.id,
-      paymentChargeId: charge.id,
-      planCode: order.plan_code,
-      code: appError.code,
-      message: appError.message,
+      operation: 'plan_subscription.activate',
+      resourceType: 'plan_subscription',
+      resourceId: order.id,
+      status: 'activation_failed',
+      errorCode: appError.code,
+      provider: charge.provider,
     });
 
     return {

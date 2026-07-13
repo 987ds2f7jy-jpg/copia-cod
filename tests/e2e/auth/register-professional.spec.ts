@@ -47,6 +47,11 @@
 import { test as rdTest, expect } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
 
+async function confirmLegalDeclarations(page) {
+  await page.getByRole('checkbox', { name: /li e aceito os termos de uso/i }).check();
+  await page.getByRole('checkbox', { name: /declaro que tive acesso ao aviso de privacidade/i }).check();
+}
+
 // ===========================================================================
 // Step 2 — Informações Básicas (sem auth, é step 2 do fluxo de 4 passos)
 // ===========================================================================
@@ -88,6 +93,7 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
     // Preencher email e senha
     await page.getByLabel(/email/i).fill(`prof-e2e-${Date.now()}@rapidodoutor.test`);
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await confirmLegalDeclarations(page);
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // Step 2: Dados Pessoais e Profissionais
@@ -103,6 +109,7 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
 
     await page.getByLabel(/email/i).fill(`prof-e2e-${Date.now()}@rapidodoutor.test`);
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await confirmLegalDeclarations(page);
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
@@ -121,6 +128,7 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
 
     await page.getByLabel(/email/i).fill(`prof-e2e-${Date.now()}@rapidodoutor.test`);
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await confirmLegalDeclarations(page);
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
@@ -139,6 +147,7 @@ rdTest.describe('cadastro-profissional — step 2 (dados básicos)', () => {
 
     await page.getByLabel(/email/i).fill(`prof-e2e-${Date.now()}@rapidodoutor.test`);
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await confirmLegalDeclarations(page);
     await page.getByRole('button', { name: /continuar/i }).click();
 
     await expect(
@@ -179,6 +188,7 @@ rdTest.describe('cadastro-profissional — step 3 (formação)', () => {
     ).toBeVisible({ timeout: 12_000 });
     await page.getByLabel(/email/i).fill(`prof-e2e-step3-${Date.now()}@rapidodoutor.test`);
     await page.getByLabel(/senha/i).fill('senha-e2e-123');
+    await confirmLegalDeclarations(page);
     await page.getByRole('button', { name: /continuar/i }).click();
 
     // Step 2

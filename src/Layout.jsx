@@ -17,6 +17,7 @@ import {
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
 import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
+import { legalRoutes } from '@/config/legal';
 
 function BrandMark({ className = 'h-8 w-8' }) {
   return (
@@ -393,6 +394,16 @@ function LayoutInner({ children, currentPageName }) {
             © 2026 Rápido Doutor. Todos os direitos reservados.
           </div>
         </div>
+      </footer>
+
+      <footer className="lg:hidden mt-12 border-t border-border bg-muted/40 px-4 py-8 pb-24">
+        <nav aria-label="Suporte e documentos jurídicos">
+          <ul className="flex flex-wrap justify-center gap-x-5 gap-y-3 text-sm text-muted-foreground">
+            <li><Link to={legalRoutes.ajuda} className="hover:text-foreground">Central de Ajuda</Link></li>
+            <li><Link to={legalRoutes.termos} className="hover:text-foreground">Termos de Uso</Link></li>
+            <li><Link to={legalRoutes.privacidade} className="hover:text-foreground">Privacidade</Link></li>
+          </ul>
+        </nav>
       </footer>
 
       {/* Mobile Bottom Navigation Bar */}

@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import type {
   LeaveQueueCommand,
   LeaveQueueRepository,
@@ -75,18 +76,27 @@ export async function leaveQueue({
     };
   }
 
-  console.info('[leave-queue] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'leave-queue',
     requestId,
-    patientId: appUser.id,
-    queueId: activeEntry.id,
+    operation: 'queue.leave',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    resourceId: activeEntry.id,
+    status: 'started',
   });
 
   const cancelledEntry = await repository.cancelQueueEntry(activeEntry.id);
 
-  console.info('[leave-queue] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'leave-queue',
     requestId,
-    patientId: appUser.id,
-    queueId: cancelledEntry.id,
+    operation: 'queue.leave',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    resourceId: cancelledEntry.id,
     status: cancelledEntry.status,
   });
 

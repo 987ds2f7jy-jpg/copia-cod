@@ -1,35 +1,34 @@
 // ============================================================
-// Configuração centralizada de dados legais (frontend).
+// Configuração centralizada de dados legais e empresariais (frontend).
 // Não espalhe estes valores diretamente pelos componentes:
 // importe deste arquivo. Valores contendo "(ADICIONAR" são
 // placeholders e devem ser substituídos por dados reais.
 // ============================================================
 
+import { LEGAL_DOCUMENTS } from '../../supabase/functions/_shared/legal-documents';
+
+export { LEGAL_DOCUMENTS };
+
 export const legalConfig = {
   brandName: 'Rápido Doutor',
   legalName: '(ADICIONAR RAZÃO SOCIAL)',
   cnpj: '(ADICIONAR CNPJ)',
-  companyAddress: '(ADICIONAR ENDEREÇO COMPLETO)',
+  companyAddress: '(ADICIONAR ENDEREÇO)',
   companyCityState: '(ADICIONAR CIDADE E ESTADO)',
-  supportEmail: '(ADICIONAR EMAIL DE SUPORTE)',
-  privacyEmail: '(ADICIONAR EMAIL DE PRIVACIDADE)',
-  professionalSupportEmail: '(ADICIONAR EMAIL DE SUPORTE AOS PROFISSIONAIS)',
+  supportEmail: '(ADICIONAR E-MAIL)',
+  privacyEmail: '(ADICIONAR CONTATO)',
+  professionalSupportEmail: '(ADICIONAR E-MAIL)',
   phone: '(ADICIONAR TELEFONE)',
-  dpoName: '(ADICIONAR NOME DO ENCARREGADO DE DADOS)',
-  medicalDirectorName: '(ADICIONAR NOME DO DIRETOR TÉCNICO)',
-  medicalDirectorCrm: '(ADICIONAR CRM DO DIRETOR TÉCNICO)',
-  companyCrm: '(ADICIONAR REGISTRO DA EMPRESA NO CRM)',
-  termsVersion: '1.0',
-  privacyVersion: '1.0',
-  helpVersion: '1.0',
-  lastUpdated: '(ADICIONAR DATA DA ÚLTIMA ATUALIZAÇÃO)',
-  effectiveDate: '(ADICIONAR DATA DE VIGÊNCIA)',
-  cancellationDeadline: '(ADICIONAR PRAZO DE CANCELAMENTO SEM CUSTO)',
-  patientDelayTolerance: '(ADICIONAR TOLERÂNCIA PARA ATRASO DO PACIENTE)',
-  professionalDelayTolerance: '(ADICIONAR TOLERÂNCIA PARA ATRASO DO PROFISSIONAL)',
-  refundDeadline: '(ADICIONAR PRAZO ESTIMADO PARA ESTORNO)',
-  privacyResponseDeadline: '(ADICIONAR PRAZO INTERNO DE RESPOSTA)',
-  dpaUrl: '(ADICIONAR LINK DO ACORDO DE TRATAMENTO DE DADOS)',
+  dpoName: '(ADICIONAR CONTATO)',
+  medicalDirectorName: '(ADICIONAR RESPONSÁVEL TÉCNICO)',
+  medicalDirectorCrm: '(VALIDAR E ADICIONAR, SE APLICÁVEL)',
+  companyCrm: '(VALIDAR E ADICIONAR, SE APLICÁVEL)',
+  cancellationDeadline: '(VALIDAR REGRA COMERCIAL)',
+  patientDelayTolerance: '(VALIDAR REGRA COMERCIAL)',
+  professionalDelayTolerance: '(VALIDAR REGRA COMERCIAL)',
+  refundDeadline: '(VALIDAR REGRA COMERCIAL)',
+  privacyResponseDeadline: '(VALIDAR PROCEDIMENTO INTERNO)',
+  dpaUrl: '(VALIDAR E ADICIONAR, SE APLICÁVEL)',
 } as const;
 
 export type LegalConfig = typeof legalConfig;
@@ -61,7 +60,7 @@ export function warnLegalPlaceholders(): void {
 
 /** Rotas públicas das páginas legais/suporte. */
 export const legalRoutes = {
-  ajuda: '/ajuda',
-  termos: '/termos-de-uso',
-  privacidade: '/privacidade',
+  ajuda: LEGAL_DOCUMENTS.help_center.route,
+  termos: LEGAL_DOCUMENTS.terms_of_use.route,
+  privacidade: LEGAL_DOCUMENTS.privacy_notice.route,
 } as const;

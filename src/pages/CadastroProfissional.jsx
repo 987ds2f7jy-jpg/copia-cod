@@ -13,6 +13,8 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
+import { Checkbox } from '@/components/ui/checkbox';
+import { legalRoutes } from '@/config/legal';
 import {
   Stethoscope, CheckCircle, ArrowRight, ArrowLeft,
   Loader2, Upload, GraduationCap, Award, User, Camera,
@@ -57,6 +59,8 @@ export default function CadastroProfissional() {
   const [galleryPreviewUrls, setGalleryPreviewUrls] = useState([]);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [termsAccepted, setTermsAccepted] = useState(false);
+  const [privacyAcknowledged, setPrivacyAcknowledged] = useState(false);
   const [tagInput, setTagInput] = useState('');
 
   const [formData, setFormData] = useState({
@@ -186,6 +190,8 @@ export default function CadastroProfissional() {
           phone: data.phone,
           cpf: data.cpf,
           sex: data.sex,
+          termsAccepted,
+          privacyAcknowledged,
         });
       }
 
@@ -280,8 +286,36 @@ export default function CadastroProfissional() {
                   Já tem conta?{' '}
                   <Link to={createPageUrl('Entrar')} className="text-emerald-600 underline">Entrar</Link>
                 </p>
+                <div className="space-y-3 rounded-lg border border-border bg-muted/30 p-4">
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="professional-terms"
+                      checked={termsAccepted}
+                      onCheckedChange={(checked) => setTermsAccepted(checked === true)}
+                    />
+                    <Label htmlFor="professional-terms" className="text-sm font-normal leading-5">
+                      Li e aceito os{' '}
+                      <Link to={legalRoutes.termos} target="_blank" rel="noreferrer" className="text-emerald-700 underline dark:text-emerald-300">
+                        Termos de Uso
+                      </Link>.
+                    </Label>
+                  </div>
+                  <div className="flex items-start gap-3">
+                    <Checkbox
+                      id="professional-privacy"
+                      checked={privacyAcknowledged}
+                      onCheckedChange={(checked) => setPrivacyAcknowledged(checked === true)}
+                    />
+                    <Label htmlFor="professional-privacy" className="text-sm font-normal leading-5">
+                      Declaro que tive acesso ao{' '}
+                      <Link to={legalRoutes.privacidade} target="_blank" rel="noreferrer" className="text-emerald-700 underline dark:text-emerald-300">
+                        Aviso de Privacidade
+                      </Link>.
+                    </Label>
+                  </div>
+                </div>
                 <div className="flex justify-end">
-                  <Button onClick={nextStep} disabled={!email || !password || password.length < 6} className="bg-emerald-600 hover:bg-emerald-700 text-white">
+                  <Button onClick={nextStep} disabled={!email || !password || password.length < 6 || !termsAccepted || !privacyAcknowledged} className="bg-emerald-600 hover:bg-emerald-700 text-white">
                     Continuar <ArrowRight className="w-4 h-4 ml-2" />
                   </Button>
                 </div>
@@ -362,6 +396,8 @@ export default function CadastroProfissional() {
                               phone: formData.phone,
                               cpf: formData.cpf,
                               sex: formData.sex,
+                              termsAccepted,
+                              privacyAcknowledged,
                             });
                           } catch (error) {
                             toast.error(error?.message || 'Nao foi possivel criar sua conta profissional.');

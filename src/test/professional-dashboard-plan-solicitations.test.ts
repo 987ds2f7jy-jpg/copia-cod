@@ -13,7 +13,7 @@ describe('professional dashboard plan-funded solicitations', () => {
     expect(readModels).toContain('payment_status.eq.paid');
     expect(readModels).toContain('funding_source.eq.plan');
     expect(readModels).toContain('payment_required.eq.false');
-    expect(readModels).toContain('coverage_status.eq.plan_pending_use');
+    expect(readModels).toContain('coverage_status.in.(plan_pending_use,plan_use_failed)');
     expect(readModels).toContain('plan_credit_usage_id.not.is.null');
     expect(readModels).not.toContain("payment_status: 'paid',\n    };\n  }\n\n  return filters;");
   });

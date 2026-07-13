@@ -1,4 +1,5 @@
 import { AppError } from '../errors.ts';
+import { logTechnicalEvent, sanitizeErrorCode } from '../observability.ts';
 import type { SupabaseClient } from '../supabase.ts';
 import { createPaymentProvider } from './providers/index.ts';
 import type { ProviderCreateChargeResult } from './providers/types.ts';
@@ -12,12 +13,15 @@ import type {
 type OwnerConfig = {
   table: string;
   amountField: string;
+  coverageAware?: boolean;
 };
 
 type OwnerSnapshotRow = {
   id: string;
   payment_status: string | null;
   current_payment_charge_id: string | null;
+  payment_required: boolean | null;
+  funding_source?: string | null;
   [key: string]: unknown;
 };
 
@@ -39,10 +43,12 @@ const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
   appointment: {
     table: 'appointments',
     amountField: 'gross_price',
+    coverageAware: true,
   },
   queue: {
     table: 'queues',
     amountField: 'quoted_gross_price',
+    coverageAware: true,
   },
   solicitacao_exame: {
     table: 'solicitacoes_exames',
@@ -89,7 +95,8 @@ function normalizeCurrency(currency: string | undefined) {
 }
 
 function buildSelect(config: OwnerConfig) {
-  return `id, ${config.amountField}, payment_status, current_payment_charge_id`;
+  const coverageFields = config.coverageAware ? ', funding_source, coverage_status' : '';
+  return `id, ${config.amountField}, payment_status, payment_required, current_payment_charge_id${coverageFields}`;
 }
 
 async function loadOwnerSnapshot(
@@ -120,6 +127,15 @@ async function loadOwnerSnapshot(
       status: 404,
       code: 'PAYMENT_OWNER_NOT_FOUND',
       message: 'Payment owner was not found.',
+      details: { ownerType, ownerId },
+    });
+  }
+
+  if (row.payment_required === false || (config.coverageAware && row.funding_source === 'plan')) {
+    throw new AppError({
+      status: 409,
+      code: 'PAYMENT_NOT_REQUIRED_FOR_COVERED_OWNER',
+      message: 'A one-off payment charge cannot be created for a plan-funded owner.',
       details: { ownerType, ownerId },
     });
   }
@@ -379,6 +395,20 @@ export async function createPaymentCharge(
     .single();
 
   if (error) {
+    if (error.code === '23505') {
+      const concurrentCharges = await loadExistingCharges(client, ownerType, ownerId);
+      const concurrentCharge = concurrentCharges.find((item) =>
+        REUSABLE_STATUSES.has(item.status)
+        && parseMoney(item.amount) === amount
+        && item.currency === currency
+      );
+
+      if (concurrentCharge) {
+        await updateOwnerPaymentState(client, ownerType, ownerId, concurrentCharge.id, concurrentCharge.status);
+        return mapChargeRow(concurrentCharge, true);
+      }
+    }
+
     throw new AppError({
       status: 500,
       code: 'PAYMENT_CHARGE_CREATE_FAILED',
@@ -430,12 +460,14 @@ export async function createPaymentCharge(
 
     await updateOwnerPaymentState(client, ownerType, ownerId, charge.id, 'payment_failed');
 
-    console.error('[payments] charge:create-failed', {
-      ownerType,
-      ownerId,
-      paymentChargeId: charge.id,
+    logTechnicalEvent('error', {
+      functionName: 'payments',
+      operation: 'payment_charge.create',
+      resourceType: ownerType,
+      resourceId: ownerId,
       provider,
-      error,
+      status: 'failed',
+      errorCode: sanitizeErrorCode(error),
     });
 
     throw error;
@@ -489,14 +521,13 @@ export async function createPaymentCharge(
     });
   }
 
-  console.info('[payments] charge:created', {
-    ownerType,
-    ownerId,
-    paymentChargeId: charge.id,
+  logTechnicalEvent('info', {
+    functionName: 'payments',
+    operation: 'payment_charge.create',
+    resourceType: ownerType,
+    resourceId: ownerId,
     provider: providerResult.provider,
-    providerChargeId: providerResult.providerChargeId,
-    amount,
-    currency,
+    status: updatedCharge.status,
   });
 
   return mapChargeRow(updatedCharge as PaymentChargeRow, false);

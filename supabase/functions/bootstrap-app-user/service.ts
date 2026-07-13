@@ -200,6 +200,21 @@ async function rollbackAuthUser(
   }
 }
 
+async function rollbackAppUser(
+  repository: BootstrapAppUserCommand['repository'],
+  appUserId: string,
+  requestId: string,
+) {
+  try {
+    await repository.deleteAppUser(appUserId);
+  } catch {
+    console.error('[bootstrap-app-user] app-user-rollback:failed', {
+      requestId,
+      appUserId,
+    });
+  }
+}
+
 async function runSignupBootstrap({
   requestId,
   input,
@@ -218,6 +233,14 @@ async function runSignupBootstrap({
       status: 400,
       code: 'FULL_NAME_REQUIRED',
       message: 'Full name is required for signup bootstrap.',
+    });
+  }
+
+  if (!input.termsAccepted || !input.privacyAcknowledged) {
+    throw new AppError({
+      status: 400,
+      code: 'LEGAL_ACKNOWLEDGEMENTS_REQUIRED',
+      message: 'Terms acceptance and privacy notice acknowledgement are required for signup.',
     });
   }
 
@@ -253,6 +276,19 @@ async function runSignupBootstrap({
       payload,
       repository,
     }));
+    let legalEvents;
+
+    try {
+      legalEvents = await repository.recordSignupLegalEvents({
+        userId: appUser.id,
+        role,
+      });
+    } catch (error) {
+      if (!existingUser?.id) {
+        await rollbackAppUser(repository, appUser.id, requestId);
+      }
+      throw error;
+    }
 
     console.info('[bootstrap-app-user] signup:success', {
       requestId,
@@ -265,6 +301,7 @@ async function runSignupBootstrap({
       appUser,
       session,
       created: !existingUser?.id,
+      legalEvents,
     };
   } catch (error) {
     await rollbackAuthUser(repository, createdAuthUser.authUserId, requestId);

@@ -91,26 +91,18 @@ function createLeaveQueueRepository(client: SupabaseClient): LeaveQueueRepositor
 
     async cancelQueueEntry(queueId: string): Promise<QueueRecord> {
       const { data, error } = await client
-        .from('queues')
-        .update({ status: 'cancelled' })
-        .eq('id', queueId)
-        .select(`
-          id,
-          patient_id,
-          status,
-          specialty,
-          position,
-          estimated_wait_time,
-          assigned_professional_id,
-          solicitacao_exame_id
-        `)
+        .rpc('cancel_queue_entry_transaction', { p_queue_id: queueId })
         .single();
 
       if (error) {
         throw new AppError({
-          status: 500,
-          code: 'QUEUE_CANCEL_FAILED',
-          message: 'Unable to leave queue.',
+          status: error.message === 'QUEUE_PLAN_CREDIT_CANNOT_BE_RELEASED' ? 409 : 500,
+          code: error.message === 'QUEUE_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            ? 'QUEUE_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            : 'QUEUE_CANCEL_FAILED',
+          message: error.message === 'QUEUE_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            ? 'Plan credit confirmation is in progress and the queue cannot be left yet.'
+            : 'Unable to leave queue.',
           details: error.message,
         });
       }

@@ -14,7 +14,11 @@ function normalizeQueueEntry(queueEntry, payment = null) {
     serviceCode: queueEntry.serviceCode ?? queueEntry.service_code ?? '',
     quotedGrossPrice: queueEntry.quotedGrossPrice ?? queueEntry.quoted_gross_price ?? 0,
     paymentStatus: queueEntry.paymentStatus ?? queueEntry.payment_status ?? 'payment_pending',
+    paymentRequired: queueEntry.paymentRequired ?? queueEntry.payment_required ?? true,
     currentPaymentChargeId: queueEntry.currentPaymentChargeId ?? queueEntry.current_payment_charge_id ?? null,
+    fundingSource: queueEntry.fundingSource ?? queueEntry.funding_source ?? 'self_pay',
+    coverageStatus: queueEntry.coverageStatus ?? queueEntry.coverage_status ?? null,
+    planCreditUsageId: queueEntry.planCreditUsageId ?? queueEntry.plan_credit_usage_id ?? null,
   };
   const normalizedPayment = normalizePayment(payment || queueEntry.payment, normalized);
 
@@ -26,7 +30,11 @@ function normalizeQueueEntry(queueEntry, payment = null) {
     service_code: normalized.serviceCode,
     quoted_gross_price: normalized.quotedGrossPrice,
     payment_status: normalized.paymentStatus,
+    payment_required: normalized.paymentRequired,
     current_payment_charge_id: normalized.currentPaymentChargeId,
+    funding_source: normalized.fundingSource,
+    coverage_status: normalized.coverageStatus,
+    plan_credit_usage_id: normalized.planCreditUsageId,
     payment: normalizedPayment,
   };
 }

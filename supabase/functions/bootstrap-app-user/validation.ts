@@ -46,6 +46,8 @@ export function parseBootstrapAppUserInput(body: unknown): BootstrapAppUserInput
   const city = normalizeOptionalString(record.city);
   const state = normalizeOptionalString(record.state).toUpperCase();
   const role = normalizeRole(record.role);
+  const termsAccepted = record.termsAccepted === true;
+  const privacyAcknowledged = record.privacyAcknowledged === true;
 
   if ((email && !password) || (!email && password)) {
     throw new AppError({
@@ -83,5 +85,7 @@ export function parseBootstrapAppUserInput(body: unknown): BootstrapAppUserInput
     address,
     city,
     state,
+    termsAccepted,
+    privacyAcknowledged,
   };
 }

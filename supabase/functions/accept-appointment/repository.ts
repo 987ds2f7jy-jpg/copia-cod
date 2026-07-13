@@ -646,6 +646,50 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         });
       }
 
+      const { data: claimedUsage, error: claimError } = await client
+        .from('plan_credit_usages')
+        .update({ status: 'consuming', error_code: null, error_message: null })
+        .eq('id', usage.id)
+        .eq('owner_type', 'appointment')
+        .eq('owner_id', appointment.id)
+        .in('status', ['pending_use', 'use_failed'])
+        .select('id, status')
+        .maybeSingle();
+
+      if (claimError) {
+        throw new AppError({
+          status: 500,
+          code: 'PLAN_CREDIT_CLAIM_FAILED',
+          message: 'Unable to claim the plan credit for confirmation.',
+          details: claimError.message,
+        });
+      }
+
+      if (!claimedUsage?.id) {
+        const { data: currentUsage } = await client
+          .from('plan_credit_usages')
+          .select('id, status')
+          .eq('id', usage.id)
+          .maybeSingle();
+
+        if (String(currentUsage?.status || '') === 'used') {
+          return { skipped: true, reason: 'already_used' as const };
+        }
+
+        throw new AppError({
+          status: 409,
+          code: String(currentUsage?.status || '') === 'consuming'
+            ? 'PLAN_CREDIT_CONFIRMATION_IN_PROGRESS'
+            : 'PLAN_CREDIT_RECONCILIATION_REQUIRED',
+          message: 'Plan credit is already being confirmed or requires reconciliation.',
+          details: {
+            appointmentId: appointment.id,
+            planCreditUsageId: usage.id,
+            status: currentUsage?.status || null,
+          },
+        });
+      }
+
       let requestPayload: { score_id: number };
 
       try {
@@ -679,7 +723,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         await client
           .from('plan_credit_usages')
           .update({
-            status: 'use_failed',
+            status: 'reconciliation_required',
             request_snapshot: requestPayload,
             response_snapshot: {},
             error_code: error instanceof AppError ? error.code : 'PLANS_SERVICE_UNAVAILABLE',
@@ -689,7 +733,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
 
         await client
           .from('appointments')
-          .update({ coverage_status: 'plan_use_failed' })
+          .update({ coverage_status: 'plan_reconciliation_required' })
           .eq('id', appointment.id);
 
         throw error;
@@ -698,25 +742,19 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
       if (!externalResponse.ok) {
         const responsePayload = toJsonRecord(externalResponse.payload);
         const externalError = normalizeString(responsePayload.error) || 'Failed to use subscription score';
-
-        if (externalResponse.status === 422 && externalError.toLowerCase().includes('already')) {
-          const { data: latestUsage } = await client
-            .from('plan_credit_usages')
-            .select('id, status')
-            .eq('id', usage.id)
-            .maybeSingle();
-
-          if (String(latestUsage?.status || '') === 'used') {
-            return { skipped: true, reason: 'already_used' as const };
-          }
-        }
+        const ambiguous = externalResponse.status >= 500
+          || externalResponse.status === 409
+          || externalResponse.status === 422;
 
         await client
           .from('plan_credit_usages')
           .update({
-            status: 'use_failed',
+            status: ambiguous ? 'reconciliation_required' : 'use_failed',
             request_snapshot: requestPayload,
-            response_snapshot: responsePayload,
+            response_snapshot: {
+              external_status: externalResponse.status,
+              error: externalError,
+            },
             error_code: `PLANS_SERVICE_${externalResponse.status}`,
             error_message: externalError,
           })
@@ -724,13 +762,17 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
 
         await client
           .from('appointments')
-          .update({ coverage_status: 'plan_use_failed' })
+          .update({
+            coverage_status: ambiguous ? 'plan_reconciliation_required' : 'plan_use_failed',
+          })
           .eq('id', appointment.id);
 
         throw new AppError({
           status: 409,
-          code: 'PLAN_CREDIT_USE_FAILED',
-          message: 'Nao foi possivel confirmar o credito do plano. Oriente o paciente a tentar pagamento avulso ou tente novamente.',
+          code: ambiguous ? 'PLAN_CREDIT_RECONCILIATION_REQUIRED' : 'PLAN_CREDIT_USE_FAILED',
+          message: ambiguous
+            ? 'A confirmacao do credito ficou ambigua e requer reconciliacao antes de liberar o atendimento.'
+            : 'Nao foi possivel confirmar o credito do plano.',
           details: {
             appointmentId: appointment.id,
             planCreditUsageId: usage.id,
@@ -740,39 +782,41 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         });
       }
 
-      const responseSnapshot = toJsonRecord(externalResponse.payload);
-      const { error: usageUpdateError } = await client
-        .from('plan_credit_usages')
-        .update({
-          status: 'used',
-          used_at: new Date().toISOString(),
-          request_snapshot: requestPayload,
-          response_snapshot: responseSnapshot,
-          error_code: null,
-          error_message: null,
-        })
-        .eq('id', usage.id);
+      const responseSnapshot = {
+        external_status: externalResponse.status,
+        confirmed: true,
+      };
+      const { error: finalizeError } = await client.rpc('finalize_plan_credit_usage', {
+        p_usage_id: usage.id,
+        p_owner_type: 'appointment',
+        p_owner_id: appointment.id,
+        p_request_snapshot: requestPayload,
+        p_response_snapshot: responseSnapshot,
+      });
 
-      if (usageUpdateError) {
+      if (finalizeError) {
+        await client
+          .from('plan_credit_usages')
+          .update({
+            status: 'reconciliation_required',
+            request_snapshot: requestPayload,
+            response_snapshot: { external_confirmed: true },
+            error_code: 'PLAN_CREDIT_LOCAL_FINALIZE_FAILED',
+            error_message: finalizeError.message,
+          })
+          .eq('id', usage.id)
+          .eq('status', 'consuming');
+
+        await client
+          .from('appointments')
+          .update({ coverage_status: 'plan_reconciliation_required' })
+          .eq('id', appointment.id);
+
         throw new AppError({
           status: 500,
-          code: 'PLAN_CREDIT_USAGE_UPDATE_FAILED',
-          message: 'Plan credit was consumed but local audit could not be updated.',
-          details: usageUpdateError.message,
-        });
-      }
-
-      const { error: appointmentUpdateError } = await client
-        .from('appointments')
-        .update({ coverage_status: 'plan_used' })
-        .eq('id', appointment.id);
-
-      if (appointmentUpdateError) {
-        throw new AppError({
-          status: 500,
-          code: 'APPOINTMENT_COVERAGE_UPDATE_FAILED',
-          message: 'Plan credit was consumed but appointment coverage status could not be updated.',
-          details: appointmentUpdateError.message,
+          code: 'PLAN_CREDIT_LOCAL_FINALIZE_FAILED',
+          message: 'Plan credit was confirmed externally but requires local reconciliation.',
+          details: { appointmentId: appointment.id, planCreditUsageId: usage.id },
         });
       }
 

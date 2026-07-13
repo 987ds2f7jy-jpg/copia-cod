@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { consumePlanCreditOnce } from '../_shared/plans/credit-consumption.ts';
 import type {
   AcceptQueueEntryRepository,
   AcceptQueueEntryTransactionRecord,
@@ -216,11 +217,29 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
-  if (code === 'QUEUE_PAYMENT_CHARGE_REQUIRED') {
+  if (code === 'QUEUE_PAYMENT_CHARGE_REQUIRED' || code === 'QUEUE_PAYMENT_CHARGE_NOT_PAID') {
     return new AppError({
       status: 409,
       code,
       message: 'Queue entry is missing the active payment charge required for acceptance.',
+      details,
+    });
+  }
+
+  if (code === 'QUEUE_PLAN_CREDIT_NOT_CONFIRMED') {
+    return new AppError({
+      status: 409,
+      code,
+      message: 'Queue plan credit must be confirmed before acceptance.',
+      details,
+    });
+  }
+
+  if (code === 'PLAN_QUEUE_APPOINTMENT_LINK_FAILED') {
+    return new AppError({
+      status: 500,
+      code,
+      message: 'Plan-funded queue consultation could not be linked safely.',
       details,
     });
   }
@@ -304,13 +323,98 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
       };
     },
 
+    async findPlanQueueAcceptanceContext(queueId) {
+      const { data: queueData, error: queueError } = await client
+        .from('queues')
+        .select('id, specialty, status, funding_source, coverage_status, payment_required, plan_credit_usage_id')
+        .eq('id', queueId)
+        .maybeSingle();
+
+      if (queueError) {
+        throw new AppError({
+          status: 500,
+          code: 'QUEUE_LOOKUP_FAILED',
+          message: 'Unable to load queue coverage before acceptance.',
+          details: queueError.message,
+        });
+      }
+
+      if (!queueData?.id || queueData.funding_source !== 'plan') {
+        return null;
+      }
+
+      let usage = null;
+
+      if (queueData.plan_credit_usage_id) {
+        const { data: usageData, error: usageError } = await client
+          .from('plan_credit_usages')
+          .select('id, status, external_subscription_score_id')
+          .eq('id', queueData.plan_credit_usage_id)
+          .eq('owner_type', 'queue')
+          .eq('owner_id', queueId)
+          .maybeSingle();
+
+        if (usageError) {
+          throw new AppError({
+            status: 500,
+            code: 'PLAN_CREDIT_USAGE_LOOKUP_FAILED',
+            message: 'Unable to load queue plan credit usage.',
+            details: usageError.message,
+          });
+        }
+
+        usage = usageData?.id
+          ? {
+            id: String(usageData.id),
+            status: String(usageData.status || ''),
+            externalSubscriptionScoreId: usageData.external_subscription_score_id
+              ? String(usageData.external_subscription_score_id)
+              : null,
+          }
+          : null;
+      }
+
+      return {
+        queue: {
+          id: String(queueData.id),
+          specialty: String(queueData.specialty || ''),
+          status: String(queueData.status || ''),
+          fundingSource: String(queueData.funding_source || ''),
+          coverageStatus: queueData.coverage_status ? String(queueData.coverage_status) : null,
+          paymentRequired: Boolean(queueData.payment_required ?? true),
+          planCreditUsageId: queueData.plan_credit_usage_id ? String(queueData.plan_credit_usage_id) : null,
+        },
+        usage,
+      };
+    },
+
+    async confirmPlanCreditBeforeAcceptance({ context }) {
+      if (!context.usage?.id || !context.usage.externalSubscriptionScoreId) {
+        throw new AppError({
+          status: 409,
+          code: 'PLAN_QUEUE_CREDIT_USAGE_REQUIRED',
+          message: 'Plan-funded queue entry has no consumable credit reservation.',
+          details: { queueId: context.queue.id },
+        });
+      }
+
+      return consumePlanCreditOnce({
+        client,
+        ownerType: 'queue',
+        ownerId: context.queue.id,
+        usageId: context.usage.id,
+        externalSubscriptionScoreId: context.usage.externalSubscriptionScoreId,
+      });
+    },
+
     async acceptQueueEntry({
       queueId,
       professionalAppUserId,
       professionalProfileId,
+      planFunded,
     }): Promise<AcceptQueueEntryTransactionRecord> {
       const { data, error } = await client
-        .rpc('accept_queue_entry_transaction', {
+        .rpc(planFunded ? 'accept_plan_queue_entry_transaction' : 'accept_queue_entry_transaction', {
           p_queue_id: queueId,
           p_professional_app_user_id: professionalAppUserId,
           p_professional_profile_id: professionalProfileId,

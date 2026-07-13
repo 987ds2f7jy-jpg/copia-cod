@@ -6,7 +6,9 @@ import LegalPageLayout, {
   LegalSubSection,
   LegalEmail,
 } from '@/components/legal/LegalPageLayout';
-import { legalConfig, legalRoutes } from '@/config/legal';
+import { LEGAL_DOCUMENTS, legalConfig, legalRoutes } from '@/config/legal';
+
+const DOCUMENT = LEGAL_DOCUMENTS.terms_of_use;
 
 const SECTIONS = [
   { id: 's1', title: '1. Identificação e objeto' },
@@ -20,7 +22,7 @@ const SECTIONS = [
   { id: 's9', title: '9. Autonomia do profissional de saúde' },
   { id: 's10', title: '10. Preços e pagamentos' },
   { id: 's11', title: '11. Cancelamentos, atrasos e reembolsos' },
-  { id: 's12', title: '12. Planos de saúde e coberturas' },
+  { id: 's12', title: '12. Planos da Plataforma, créditos e coberturas' },
   { id: 's13', title: '13. Receitas, atestados, pedidos de exame e laudos' },
   { id: 's14', title: '14. Condutas proibidas' },
   { id: 's15', title: '15. Avaliações, comentários e conteúdos enviados' },
@@ -49,8 +51,10 @@ export default function TermosDeUso() {
       metaTitle="Termos de Uso | Rápido Doutor"
       metaDescription="Termos aplicáveis ao uso da plataforma Rápido Doutor por pacientes e profissionais de saúde."
       intro="Regras aplicáveis ao acesso e à utilização da plataforma por pacientes, profissionais de saúde e demais usuários."
-      version={legalConfig.termsVersion}
-      lastUpdated={legalConfig.lastUpdated}
+      version={DOCUMENT.version}
+      effectiveDate={DOCUMENT.effectiveDate}
+      lastUpdated={DOCUMENT.lastUpdated}
+      contactChannel={legalConfig.supportEmail}
       sections={SECTIONS}
       currentRoute={legalRoutes.termos}
     >
@@ -74,7 +78,8 @@ export default function TermosDeUso() {
       <div className="rounded-lg border border-border bg-muted/50 p-4 text-sm leading-relaxed text-muted-foreground">
         Leia estes Termos com atenção. As regras específicas de preço, horário,
         cancelamento e reembolso apresentadas antes da contratação de cada
-        serviço também integram estes Termos.
+        serviço também integram estes Termos. Esta versão precisa de revisão
+        jurídica antes da entrada em produção.
       </div>
 
       <LegalSection id="s1" title="1. Identificação e objeto">
@@ -151,7 +156,7 @@ export default function TermosDeUso() {
         <LegalSubSection id="s6-3" title="6.3. Consulta pelo perfil do profissional">
           <p>O paciente poderá escolher diretamente um profissional e um horário disponível em seu perfil.</p>
           <p>Nessa modalidade, o preço poderá ser definido pelo próprio profissional, conforme indicado antes da contratação.</p>
-          <p>A consulta pelo perfil não terá cobertura por plano de saúde, salvo quando a própria Plataforma informar expressamente o contrário no fluxo de contratação.</p>
+          <p>A consulta contratada pelo perfil do profissional, padrão ou prioritária, não é coberta pelos planos da Plataforma e utiliza o preço individual informado no perfil.</p>
         </LegalSubSection>
         <LegalSubSection id="s6-4" title="6.4. Serviços adicionais">
           <p>Serviços como renovação de receita, solicitação de exames, check-up e emissão de laudos não constituem venda automática de documentos.</p>
@@ -231,12 +236,13 @@ export default function TermosDeUso() {
         <p>O exercício de direitos legalmente assegurados ao consumidor não será limitado por estes Termos.</p>
       </LegalSection>
 
-      <LegalSection id="s12" title="12. Planos de saúde e coberturas">
-        <p>Quando houver opção de atendimento por plano de saúde, a utilização poderá depender de elegibilidade, cobertura, autorização, validação cadastral, rede credenciada e regras da operadora.</p>
-        <p>A indicação de um plano na Plataforma não garante autorização para todos os serviços.</p>
+      <LegalSection id="s12" title="12. Planos da Plataforma, créditos e coberturas">
+        <p>Os planos comercializados na Plataforma podem conceder créditos para modalidades e especialidades elegíveis. Eles não devem ser confundidos com seguro-saúde ou plano de saúde regulado, salvo se uma oferta futura for identificada expressamente dessa forma após validação jurídica e regulatória.</p>
+        <p>A utilização depende de assinatura ativa, elegibilidade, modalidade, especialidade e crédito disponível. A indicação de um plano não garante cobertura para todos os serviços.</p>
+        <p>Consulta Agora e Agendamento por Especialidade podem utilizar cobertura quando o backend confirmar os requisitos e o consumo do crédito.</p>
         <p>O paciente deverá conferir as condições apresentadas antes da contratação.</p>
         <p>A negativa de cobertura poderá resultar na oferta de atendimento particular, caso o paciente concorde.</p>
-        <p>Na consulta contratada diretamente pelo perfil do profissional, não haverá cobertura por plano, salvo informação expressa em sentido contrário.</p>
+        <p>Na consulta contratada diretamente pelo perfil do profissional, padrão ou prioritária, não haverá cobertura pelos planos da Plataforma.</p>
       </LegalSection>
 
       <LegalSection id="s13" title="13. Receitas, atestados, pedidos de exame e laudos">
@@ -347,6 +353,7 @@ export default function TermosDeUso() {
         <p>Estes Termos são regidos pela legislação brasileira.</p>
         <p>Nada nestes Termos restringe direitos assegurados ao consumidor ou ao titular de dados pessoais.</p>
         <p>Quando aplicável uma relação de consumo, fica resguardado ao consumidor o direito de utilizar o foro de seu domicílio e os canais administrativos legalmente disponíveis.</p>
+        <p>Foro contratual adicional: (VALIDAR COM ASSESSORIA JURÍDICA).</p>
       </LegalSection>
 
       {/* Bloco de condições específicas para profissionais */}
@@ -392,15 +399,15 @@ export default function TermosDeUso() {
           <dl className="space-y-3 rounded-lg border border-border bg-card p-4">
             <div>
               <dt className="text-sm font-medium text-foreground">Comissão da Plataforma</dt>
-              <dd>(ADICIONAR REGRA DE COMISSÃO)</dd>
+              <dd>(VALIDAR REGRA COMERCIAL)</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-foreground">Prazo de repasse</dt>
-              <dd>(ADICIONAR PRAZO DE REPASSE)</dd>
+              <dd>(VALIDAR REGRA COMERCIAL)</dd>
             </div>
             <div>
               <dt className="text-sm font-medium text-foreground">Regras fiscais e emissão de documentos</dt>
-              <dd>(ADICIONAR REGRAS FISCAIS)</dd>
+              <dd>(VALIDAR REGRA COMERCIAL)</dd>
             </div>
           </dl>
           <p>As condições comerciais específicas deverão ser exibidas ou formalizadas no credenciamento.</p>

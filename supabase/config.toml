@@ -15,6 +15,9 @@ verify_jwt = false
 [functions.bootstrap-app-user]
 verify_jwt = false
 
+[functions.record-legal-event]
+verify_jwt = false
+
 [functions.check-plan-coverage]
 verify_jwt = false
 
@@ -81,6 +84,9 @@ verify_jwt = false
 [functions.get-professional-dashboard]
 verify_jwt = false
 
+[functions.get-reconciliation-queue]
+verify_jwt = false
+
 [functions.get-solicitacao-exame-atendimento]
 verify_jwt = false
 
@@ -115,6 +121,9 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.refresh-app-session]
+verify_jwt = false
+
+[functions.reconcile-financial-owner]
 verify_jwt = false
 
 [functions.register-professional]

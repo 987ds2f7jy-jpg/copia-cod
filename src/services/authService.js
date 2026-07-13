@@ -163,6 +163,8 @@ function mapRegisterPayload(registrationData) {
     address: registrationData.address?.trim() || '',
     city: registrationData.city?.trim() || '',
     state: registrationData.state?.trim().toUpperCase() || '',
+    termsAccepted: registrationData.termsAccepted === true,
+    privacyAcknowledged: registrationData.privacyAcknowledged === true,
   };
 }
 

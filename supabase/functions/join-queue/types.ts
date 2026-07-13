@@ -1,6 +1,7 @@
 import type { ApiErrorResponse, ApiSuccess, AuthenticatedUser } from '../_shared/types.ts';
 import type { CreatedPaymentCharge } from '../_shared/payments/types.ts';
 import type { ResolveServicePricingInput, ResolvedServicePricing } from '../_shared/pricing/types.ts';
+import type { PlanCoverageVerification } from '../_shared/plans/coverage.ts';
 
 export type JoinQueueInput = {
   specialty: string;
@@ -40,8 +41,17 @@ export type QueueRecord = {
   pricing_rule_id: string | null;
   fee_rule_id: string | null;
   payment_status: string | null;
+  payment_required: boolean | null;
   current_payment_charge_id: string | null;
   paid_at: string | null;
+  funding_source: 'self_pay' | 'plan' | null;
+  coverage_status: string | null;
+  plan_credit_usage_id: string | null;
+  plan_subscription_order_id: string | null;
+  external_subscription_score_id: string | null;
+  external_score_id: string | null;
+  external_plan_id: number | null;
+  external_specialization_id: number | null;
   payment?: CreatedPaymentCharge;
 };
 
@@ -86,7 +96,11 @@ export type JoinQueueResult = {
     serviceCode: string;
     quotedGrossPrice: number;
     paymentStatus: string;
+    paymentRequired: boolean;
     currentPaymentChargeId: string | null;
+    fundingSource: 'self_pay' | 'plan';
+    coverageStatus: string | null;
+    planCreditUsageId: string | null;
   };
   payment: CreatedPaymentCharge | null;
   reusedExisting: boolean;
@@ -105,6 +119,11 @@ export type JoinQueueRepository = {
   }): Promise<SolicitacaoPaymentSnapshotRecord | null>;
   listOnDutyPublicProfiles(): Promise<PublicProfileRecord[]>;
   resolveServicePricing(input: ResolveServicePricingInput): Promise<ResolvedServicePricing>;
+  resolvePlanCoverage(params: {
+    appUserId: string;
+    fallbackExternalKey: string;
+    specialtyCode: string;
+  }): Promise<PlanCoverageVerification | null>;
   countWaitingQueueBySpecialty(specialty: string): Promise<number>;
   createQueueEntry(params: {
     patientId: string;
@@ -121,6 +140,7 @@ export type JoinQueueRepository = {
       currentPaymentChargeId: string;
       paidAt: string | null;
     } | null;
+    planCoverage?: PlanCoverageVerification | null;
   }): Promise<QueueRecord>;
 };
 

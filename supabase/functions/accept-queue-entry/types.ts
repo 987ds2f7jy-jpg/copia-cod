@@ -22,6 +22,23 @@ export type ProfessionalDutyRecord = {
   source: 'professional_profiles';
 };
 
+export type PlanQueueAcceptanceContext = {
+  queue: {
+    id: string;
+    specialty: string;
+    status: string;
+    fundingSource: string;
+    coverageStatus: string | null;
+    paymentRequired: boolean;
+    planCreditUsageId: string | null;
+  };
+  usage: {
+    id: string;
+    status: string;
+    externalSubscriptionScoreId: string | null;
+  } | null;
+};
+
 export type AcceptQueueEntryTransactionRecord = {
   queue_id: string;
   queue_status: string;
@@ -71,10 +88,15 @@ export type ErrorResponse = ApiErrorResponse;
 export type AcceptQueueEntryRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findProfessionalDutyContextByUserId(appUserId: string): Promise<ProfessionalDutyRecord | null>;
+  findPlanQueueAcceptanceContext(queueId: string): Promise<PlanQueueAcceptanceContext | null>;
+  confirmPlanCreditBeforeAcceptance(params: {
+    context: PlanQueueAcceptanceContext;
+  }): Promise<{ skipped: boolean; reason: 'already_used' | 'used_now' }>;
   acceptQueueEntry(params: {
     queueId: string;
     professionalAppUserId: string;
     professionalProfileId: string;
+    planFunded: boolean;
   }): Promise<AcceptQueueEntryTransactionRecord>;
 };
 

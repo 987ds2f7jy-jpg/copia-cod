@@ -194,7 +194,10 @@ async function listQueueWaitingBySpecialty(client: SupabaseClient, specialty: st
     .select('*')
     .eq('specialty', specialty)
     .eq('status', 'waiting')
-    .eq('payment_status', 'paid')
+    .or([
+      'payment_status.eq.paid',
+      'and(funding_source.eq.plan,payment_required.eq.false,coverage_status.in.(plan_pending_use,plan_use_failed),plan_credit_usage_id.not.is.null)',
+    ].join(','))
     .order('created_date', { ascending: true })
     .limit(limit);
 

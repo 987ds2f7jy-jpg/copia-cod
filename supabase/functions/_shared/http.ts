@@ -1,4 +1,5 @@
 import { AppError, isAppError, toAppError } from './errors.ts';
+import { logTechnicalEvent, sanitizeErrorCode } from './observability.ts';
 import type { ApiErrorResponse, ApiSuccess } from './types.ts';
 
 const DEFAULT_ALLOWED_HEADERS = [
@@ -94,18 +95,13 @@ export function errorResponse(
 ) {
   const appError = toAppError(error);
 
-  if (isAppError(error)) {
-    if (appError.status >= 500) {
-      console.error(`[${functionName}] request:failed`, {
-        requestId,
-        code: appError.code,
-        details: appError.details,
-      });
-    }
-  } else {
-    console.error(`[${functionName}] request:unhandled-error`, {
+  if (!isAppError(error) || appError.status >= 500) {
+    logTechnicalEvent('error', {
+      functionName,
       requestId,
-      error,
+      operation: isAppError(error) ? 'request.failed' : 'request.unhandled_error',
+      status: String(appError.status),
+      errorCode: sanitizeErrorCode(error),
     });
   }
 

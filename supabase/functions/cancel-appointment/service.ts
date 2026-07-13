@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import type {
   CancelAppointmentCommand,
   CancelAppointmentRepository,
@@ -112,11 +113,15 @@ export async function cancelAppointment({
     professionalIdentityIds,
   });
 
-  console.info('[cancel-appointment] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'cancel-appointment',
     requestId,
-    appointmentId: appointment.id,
-    actorAppUserId: appUser.id,
+    operation: 'appointment.cancel',
+    actorId: appUser.id,
     actorRole: appUser.role,
+    resourceType: 'appointment',
+    resourceId: appointment.id,
+    status: 'started',
   });
 
   const updatedAppointment = await repository.cancelAppointment({
@@ -124,10 +129,15 @@ export async function cancelAppointment({
     reason: input.reason,
   });
 
-  console.info('[cancel-appointment] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'cancel-appointment',
     requestId,
-    appointmentId: updatedAppointment.id,
-    actorAppUserId: appUser.id,
+    operation: 'appointment.cancel',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'appointment',
+    resourceId: updatedAppointment.id,
+    status: 'succeeded',
   });
 
   return {

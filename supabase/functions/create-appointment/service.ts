@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
   normalizePricingSpecialty,
@@ -11,6 +12,7 @@ import type {
   CreateAppointmentCommand,
   CreateAppointmentRepository,
   CreateAppointmentResult,
+  FundingSource,
   PlanCoverageVerification,
 } from './types.ts';
 
@@ -195,6 +197,7 @@ export async function createAppointment({
   let pricingProfessionalProfileId: string | null = null;
   let pricingSpecialty: string | null = null;
   let planCoverage: PlanCoverageVerification | null = null;
+  let effectiveFundingSource: FundingSource = 'self_pay';
 
   if (input.professionalProfileId) {
     if (input.fundingSource === 'plan') {
@@ -267,22 +270,12 @@ export async function createAppointment({
     status = 'SOLICITADO';
     serviceCode = SPECIALTY_REQUEST_SERVICE_CODE;
     pricingSpecialty = specialty;
-  }
-
-  if (input.fundingSource === 'plan') {
-    if (appointmentType !== 'ESPECIALIDADE' || professionalId) {
-      throw new AppError({
-        status: 422,
-        code: 'PLAN_FUNDING_NOT_ALLOWED_FOR_FLOW',
-        message: 'Plan coverage is only available for appointments by specialty.',
-      });
-    }
-
     planCoverage = await repository.verifyPlanCoverageForSpecialty({
       appUserId: appUser.id,
       fallbackExternalKey: appUser.email || authenticatedUser.email || '',
       specialtyCode: normalizePricingSpecialty(specialty),
     });
+    effectiveFundingSource = planCoverage ? 'plan' : 'self_pay';
   }
 
   const pricing = await repository.resolveServicePricing({
@@ -292,15 +285,14 @@ export async function createAppointment({
   });
   const price = pricing.grossPrice;
 
-  console.info('[create-appointment] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'create-appointment',
     requestId,
-    patientId: appUser.id,
-    professionalId,
-    appointmentType,
-    serviceCode,
-    fundingSource: input.fundingSource,
-    scheduledDatetime,
-    specialty: normalizePricingSpecialty(specialty),
+    operation: 'appointment.create',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'appointment',
+    status: 'started',
   });
 
   const appointment = await repository.createAppointment({
@@ -318,21 +310,19 @@ export async function createAppointment({
     price,
     pricing,
     symptoms: input.symptoms,
-    fundingSource: input.fundingSource,
+    fundingSource: effectiveFundingSource,
     planCoverage,
   });
 
-  console.info('[create-appointment] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'create-appointment',
     requestId,
-    appointmentId: appointment.id,
-    patientId: appointment.patient_id,
-    professionalId: appointment.professional_id,
+    operation: 'appointment.create',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'appointment',
+    resourceId: appointment.id,
     status: appointment.status,
-    serviceCode: appointment.service_code,
-    grossPrice: appointment.gross_price,
-    fundingSource: appointment.funding_source,
-    paymentRequired: appointment.payment_required,
-    planCreditUsageId: appointment.plan_credit_usage_id,
   });
 
   return {
@@ -350,7 +340,7 @@ export async function createAppointment({
       paymentStatus: appointment.payment_status || 'payment_pending',
       paymentRequired: Boolean(appointment.payment_required ?? true),
       currentPaymentChargeId: appointment.current_payment_charge_id || null,
-      fundingSource: appointment.funding_source || input.fundingSource,
+      fundingSource: appointment.funding_source || effectiveFundingSource,
       coverageStatus: appointment.coverage_status || null,
       planCreditUsageId: appointment.plan_credit_usage_id || null,
       planSubscriptionOrderId: appointment.plan_subscription_order_id || null,

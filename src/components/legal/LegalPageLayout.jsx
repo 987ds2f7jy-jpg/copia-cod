@@ -15,7 +15,9 @@ export default function LegalPageLayout({
   metaDescription,
   intro,
   version,
+  effectiveDate,
   lastUpdated,
+  contactChannel,
   sections = [],
   currentRoute,
   children,
@@ -80,11 +82,16 @@ export default function LegalPageLayout({
               {intro}
             </p>
           )}
-          {(version || lastUpdated) && (
-            <p className="mt-4 text-sm text-muted-foreground">
-              {version && <span>Versão {version}</span>}
-              {version && lastUpdated && <span aria-hidden="true"> · </span>}
-              {lastUpdated && <span>Última atualização: {lastUpdated}</span>}
+          {(version || effectiveDate || lastUpdated) && (
+            <dl className="mt-4 flex flex-wrap gap-x-5 gap-y-1 text-sm text-muted-foreground">
+              {version && <div><dt className="inline font-medium text-foreground">Versão:</dt> <dd className="inline">{version}</dd></div>}
+              {effectiveDate && <div><dt className="inline font-medium text-foreground">Vigência:</dt> <dd className="inline">{effectiveDate}</dd></div>}
+              {lastUpdated && <div><dt className="inline font-medium text-foreground">Última atualização:</dt> <dd className="inline">{lastUpdated}</dd></div>}
+            </dl>
+          )}
+          {contactChannel && (
+            <p className="mt-2 text-sm text-muted-foreground">
+              Dúvidas: <LegalEmail value={contactChannel} />
             </p>
           )}
         </header>

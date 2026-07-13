@@ -63,40 +63,22 @@ function createCancelAppointmentRepository(client: SupabaseClient): CancelAppoin
     },
 
     async cancelAppointment({ appointmentId, reason }): Promise<AppointmentRecord> {
-      const payload: {
-        status: string;
-        cancellation_reason?: string | null;
-      } = {
-        status: 'CANCELADO',
-      };
-
-      if (reason) {
-        payload.cancellation_reason = reason;
-      }
-
       const { data, error } = await client
-        .from('appointments')
-        .update(payload)
-        .eq('id', appointmentId)
-        .select(`
-          id,
-          patient_id,
-          professional_id,
-          status,
-          cancellation_reason,
-          professional_name,
-          specialty,
-          scheduled_datetime,
-          date,
-          time
-        `)
+        .rpc('cancel_appointment_with_plan_release', {
+          p_appointment_id: appointmentId,
+          p_reason: reason || '',
+        })
         .single();
 
       if (error) {
         throw new AppError({
-          status: 500,
-          code: 'APPOINTMENT_CANCEL_FAILED',
-          message: 'Unable to cancel appointment.',
+          status: error.message === 'APPOINTMENT_PLAN_CREDIT_CANNOT_BE_RELEASED' ? 409 : 500,
+          code: error.message === 'APPOINTMENT_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            ? 'APPOINTMENT_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            : 'APPOINTMENT_CANCEL_FAILED',
+          message: error.message === 'APPOINTMENT_PLAN_CREDIT_CANNOT_BE_RELEASED'
+            ? 'Plan credit confirmation is in progress and the appointment cannot be cancelled yet.'
+            : 'Unable to cancel appointment.',
           details: error.message,
         });
       }

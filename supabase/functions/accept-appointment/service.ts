@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import {
   APPOINTMENT_EXPIRED_ERROR,
   isSpecialtyAppointmentRequestExpired,
@@ -202,11 +203,15 @@ export async function acceptAppointment({
     });
   }
 
-  console.info('[accept-appointment] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'accept-appointment',
     requestId,
-    appointmentId,
-    appUserId: appUser.id,
-    profileId: professional.profileId,
+    operation: 'appointment.accept',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'appointment',
+    resourceId: appointmentId,
+    status: 'started',
   });
 
   const appointmentWindow = await repository.findAppointmentAcceptanceWindow(appointmentId);
@@ -268,12 +273,15 @@ export async function acceptAppointment({
         context: planContext,
       });
 
-      console.info('[accept-appointment] plan-credit:confirmed', {
+      logTechnicalEvent('info', {
+        functionName: 'accept-appointment',
         requestId,
-        appointmentId,
-        planCreditUsageId: planContext.usage?.id || planContext.appointment.planCreditUsageId,
-        skipped: planCreditResult.skipped,
-        reason: planCreditResult.reason,
+        operation: 'plan_credit.confirm',
+        actorId: appUser.id,
+        actorRole: appUser.role,
+        resourceType: 'appointment',
+        resourceId: appointmentId,
+        status: planCreditResult.reason,
       });
     }
   }
@@ -286,11 +294,15 @@ export async function acceptAppointment({
     });
   }
 
-  console.info('[accept-appointment] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'accept-appointment',
     requestId,
-    appointmentId: row.appointment_id,
-    consultaId: row.consulta_id,
-    professionalId: row.appointment_professional_id,
+    operation: 'appointment.accept',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'appointment',
+    resourceId: row.appointment_id,
+    status: 'succeeded',
   });
 
   return mapAcceptAppointmentResult(row);

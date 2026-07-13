@@ -116,6 +116,17 @@ function isQueuePaid(queueEntry) {
   return queueEntry?.paymentStatus === 'paid' || queueEntry?.payment_status === 'paid';
 }
 
+function isQueuePlanFunded(queueEntry) {
+  const paymentRequired = queueEntry?.paymentRequired ?? queueEntry?.payment_required ?? true;
+  const fundingSource = queueEntry?.fundingSource ?? queueEntry?.funding_source;
+  const planCreditUsageId = queueEntry?.planCreditUsageId ?? queueEntry?.plan_credit_usage_id;
+  return paymentRequired === false && fundingSource === 'plan' && Boolean(planCreditUsageId);
+}
+
+function isQueueReadyForWaiting(queueEntry) {
+  return isQueuePaid(queueEntry) || isQueuePlanFunded(queueEntry);
+}
+
 function ConsultaAgoraInner() {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
@@ -222,7 +233,7 @@ function ConsultaAgoraInner() {
 
       if (currentQueue) {
         setQueueEntry(currentQueue);
-        if (isQueuePaid(currentQueue)) {
+        if (isQueueReadyForWaiting(currentQueue)) {
           saveConsultaAgoraAutoResumeState(currentQueue.id);
           setShouldAutoResumeAfterQueue(true);
           setStep('queue');
@@ -273,14 +284,15 @@ function ConsultaAgoraInner() {
         return null;
       }
 
-      const filters = { status: 'waiting', payment_status: 'paid' };
+      const filters = { status: 'waiting' };
 
       if (selectedSpecialty) {
         filters.specialty = selectedSpecialty;
       }
 
       const queue = await entities.Queue.filter(filters);
-      return { count: queue.length, estimatedWait: queue.length * 10 };
+      const fundedQueue = queue.filter(isQueueReadyForWaiting);
+      return { count: fundedQueue.length, estimatedWait: fundedQueue.length * 10 };
     },
     enabled: Boolean(selectedSpecialty),
     refetchInterval: 30000,
@@ -315,7 +327,7 @@ function ConsultaAgoraInner() {
     },
     onSuccess: (nextQueueEntry) => {
       setQueueEntry(nextQueueEntry);
-      if (isQueuePaid(nextQueueEntry)) {
+      if (isQueueReadyForWaiting(nextQueueEntry)) {
         saveConsultaAgoraAutoResumeState(nextQueueEntry?.id);
         setShouldAutoResumeAfterQueue(true);
         setStep('queue');
@@ -562,7 +574,7 @@ function ConsultaAgoraInner() {
                     ) : (
                       <Users className="mr-2 h-5 w-5" />
                     )}
-                    Criar pagamento e entrar na fila
+                    {enterQueue.isPending ? 'Verificando cobertura...' : 'Entrar na fila'}
                   </Button>
                 </CardContent>
               </Card>
@@ -603,6 +615,15 @@ function ConsultaAgoraInner() {
                   </div>
 
                   <h2 className="mb-2 text-2xl font-bold text-foreground">Voce esta na fila</h2>
+                  {isQueuePlanFunded(queueEntry) && (
+                    <p className="mb-2 font-medium text-emerald-700 dark:text-emerald-300">
+                      {queueEntry.coverage_status === 'plan_used'
+                        ? 'Coberto pelo plano'
+                        : queueEntry.coverage_status === 'plan_reconciliation_required'
+                        ? 'Plano indisponivel temporariamente'
+                        : 'Credito em confirmacao'}
+                    </p>
+                  )}
                   <p className="mb-6 text-muted-foreground">
                     Posicao {queueEntry.position} - Tempo estimado: ~{queueEntry.estimated_wait_time || 10} min
                   </p>

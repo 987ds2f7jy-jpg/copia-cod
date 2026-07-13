@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
   AcceptQueueEntryCommand,
@@ -100,25 +101,75 @@ export async function acceptQueueEntry({
     });
   }
 
-  console.info('[accept-queue-entry] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'accept-queue-entry',
     requestId,
-    queueId,
-    appUserId: appUser.id,
-    profileId: professional.profileId,
-    specialty: normalizedSpecialty,
+    operation: 'queue.accept',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    resourceId: queueId,
+    status: 'started',
   });
+
+  const planContext = await repository.findPlanQueueAcceptanceContext(queueId);
+
+  if (planContext) {
+    if (planContext.queue.status !== 'waiting') {
+      throw new AppError({
+        status: 409,
+        code: 'QUEUE_NOT_WAITING',
+        message: 'Queue entry is no longer available for assignment.',
+      });
+    }
+
+    if (normalizePlantaoSpecialty(planContext.queue.specialty) !== normalizedSpecialty) {
+      throw new AppError({
+        status: 403,
+        code: 'QUEUE_SPECIALTY_MISMATCH',
+        message: 'Professional is not allowed to accept this queue entry.',
+      });
+    }
+
+    if (planContext.queue.paymentRequired || !planContext.queue.planCreditUsageId || !planContext.usage?.id) {
+      throw new AppError({
+        status: 409,
+        code: 'PLAN_QUEUE_CREDIT_USAGE_REQUIRED',
+        message: 'Plan-funded queue entries require a valid credit reservation.',
+        details: { queueId },
+      });
+    }
+
+    const creditResult = await repository.confirmPlanCreditBeforeAcceptance({ context: planContext });
+
+    logTechnicalEvent('info', {
+      functionName: 'accept-queue-entry',
+      requestId,
+      operation: 'plan_credit.confirm',
+      actorId: appUser.id,
+      actorRole: appUser.role,
+      resourceType: 'queue',
+      resourceId: queueId,
+      status: creditResult.reason,
+    });
+  }
 
   const row = await repository.acceptQueueEntry({
     queueId,
     professionalAppUserId: professional.appUserId,
     professionalProfileId: professional.profileId,
+    planFunded: Boolean(planContext),
   });
 
-  console.info('[accept-queue-entry] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'accept-queue-entry',
     requestId,
-    queueId: row.queue_id,
-    consultaId: row.consulta_id,
-    professionalId: row.consulta_professional_id,
+    operation: 'queue.accept',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    resourceId: row.queue_id,
+    status: 'succeeded',
   });
 
   return {

@@ -32,6 +32,11 @@
 import { test as rdTest, expect, AUTH_STATE } from '../support/fixtures';
 import { ROUTES } from '../support/constants';
 
+async function confirmLegalDeclarations(page) {
+  await page.getByRole('checkbox', { name: /li e aceito os termos de uso/i }).check();
+  await page.getByRole('checkbox', { name: /declaro que tive acesso ao aviso de privacidade/i }).check();
+}
+
 // ---------------------------------------------------------------------------
 // Cadastro de paciente — estrutura e validações
 // ---------------------------------------------------------------------------
@@ -48,6 +53,8 @@ rdTest.describe('register — paciente (estrutura)', () => {
     ).toBeVisible();
     await expect(page.getByText('Dados pessoais')).toBeVisible();
     await expect(page.locator('form').getByRole('button', { name: 'Criar conta' })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /li e aceito os termos de uso/i })).toBeVisible();
+    await expect(page.getByRole('checkbox', { name: /declaro que tive acesso ao aviso de privacidade/i })).toBeVisible();
   });
 
   rdTest('link "Entrar" navega para /Entrar', async ({ page }) => {
@@ -126,6 +133,7 @@ rdTest.describe('register — paciente (caminho feliz)', () => {
     // Select de sexo — Radix Select usa botão como trigger
     await page.getByRole('combobox').click();
     await page.getByRole('option', { name: 'Masculino' }).click();
+    await confirmLegalDeclarations(page);
 
     await page.locator('form').getByRole('button', { name: 'Criar conta' }).click();
 

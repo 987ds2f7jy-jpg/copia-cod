@@ -1,5 +1,10 @@
 import { AppError, isAppError } from '../_shared/errors.ts';
 import {
+  logTechnicalEvent,
+  recordAuditEvent,
+  sanitizeErrorCode,
+} from '../_shared/observability.ts';
+import {
   createRequestId,
   ensureMethod,
   errorResponse,
@@ -654,12 +659,13 @@ async function applyProviderStatus({
     })
     : null;
 
-  console.info('[payments] webhook:status-applied', {
-    paymentChargeId: charge.id,
-    ownerType: charge.owner_type,
-    ownerId: charge.owner_id,
+  logTechnicalEvent('info', {
+    functionName: FUNCTION_NAME,
+    requestId,
+    operation: 'webhook.status_applied',
+    resourceType: charge.owner_type,
+    resourceId: charge.owner_id,
     provider: providerStatus.provider,
-    rawStatus: providerStatus.rawStatus,
     status: nextStatus,
   });
 
@@ -768,11 +774,26 @@ export async function handlePaymentsWebhookRequest(req: Request) {
           processing_error: `${appError.code}: ${appError.message}`,
         });
 
-        console.error('[payments] webhook:non-retryable-error', {
+        await recordAuditEvent(client, {
+          actorRole: 'system',
+          action: 'payment_webhook.processing_failed',
+          resourceType: 'payment_webhook',
+          resourceId: event.row.id,
+          outcome: 'failed',
+          errorCode: appError.code,
           requestId,
-          webhookEventId: event.row.id,
-          code: appError.code,
-          details: appError.details,
+          metadata: { provider: provider.name, reason_code: appError.code },
+        });
+
+        logTechnicalEvent('error', {
+          functionName: FUNCTION_NAME,
+          requestId,
+          operation: 'webhook.processing_failed',
+          resourceType: 'payment_webhook',
+          resourceId: event.row.id,
+          provider: provider.name,
+          status: 'failed',
+          errorCode: appError.code,
         });
 
         return successResponse({
@@ -796,6 +817,22 @@ export async function handlePaymentsWebhookRequest(req: Request) {
       throw processingError;
     }
   } catch (error) {
+    if (isAppError(error) && /WEBHOOK|SIGNATURE/.test(error.code)) {
+      try {
+        const client = createServiceRoleClient();
+        await recordAuditEvent(client, {
+          actorRole: 'system',
+          action: 'payment_webhook.rejected',
+          resourceType: 'payment_webhook',
+          outcome: 'rejected',
+          errorCode: sanitizeErrorCode(error),
+          requestId,
+          metadata: { reason_code: sanitizeErrorCode(error) },
+        });
+      } catch {
+        // Preserve the original webhook rejection if audit storage is unavailable.
+      }
+    }
     return errorResponse(error, {
       requestId,
       functionName: FUNCTION_NAME,

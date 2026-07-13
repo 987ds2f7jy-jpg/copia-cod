@@ -1,6 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
 import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
+import { resolvePlanCoverage } from '../_shared/plans/coverage.ts';
 import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
 import {
   createServiceRoleClient,
@@ -73,6 +74,44 @@ type ExternalScoreResource = {
 
 const FIND_SCORE_PATH = '/subscription-score/find';
 const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
+const APPOINTMENT_SELECT = `
+  id,
+  patient_id,
+  patient_name,
+  patient_email,
+  professional_id,
+  professional_name,
+  specialty,
+  appointment_type,
+  scheduled_datetime,
+  date,
+  time,
+  status,
+  price,
+  service_code,
+  price_source,
+  gross_price,
+  platform_fee_percent,
+  platform_fee_amount,
+  professional_net_amount,
+  pricing_rule_id,
+  fee_rule_id,
+  payment_status,
+  payment_required,
+  current_payment_charge_id,
+  funding_source,
+  coverage_status,
+  plan_credit_usage_id,
+  plan_subscription_order_id,
+  external_subscription_score_id,
+  external_score_id,
+  external_plan_id,
+  external_specialization_id,
+  coverage_snapshot,
+  symptoms,
+  accepted_at,
+  consulta_id
+`;
 
 const SPECIALTY_PLAN_LOOKUPS: Record<string, SpecialtyPlanLookup> = {
   medicina_integrativa: { externalSpecializationId: 1, planIds: [3] },
@@ -378,52 +417,6 @@ async function verifyPlanCoverageForSpecialtyInternal({
   });
 }
 
-async function createPendingPlanCreditUsage({
-  client,
-  appointmentId,
-  patientId,
-  coverage,
-}: {
-  client: SupabaseClient;
-  appointmentId: string;
-  patientId: string;
-  coverage: PlanCoverageVerification;
-}) {
-  const { data, error } = await client
-    .from('plan_credit_usages')
-    .insert({
-      patient_id: patientId,
-      owner_type: 'appointment',
-      owner_id: appointmentId,
-      plan_subscription_order_id: coverage.planSubscriptionOrderId,
-      plans_service_subscription_id: normalizeString(coverage.externalSubscriptionId)
-        || coverage.plansServiceSubscriptionId,
-      external_subscription_score_id: coverage.externalSubscriptionScoreId,
-      external_score_id: normalizeString(coverage.externalScoreId) || null,
-      external_plan_id: coverage.externalPlanId,
-      external_specialization_id: coverage.externalSpecializationId,
-      specialty_code: coverage.specialtyCode,
-      status: 'pending_use',
-      request_snapshot: coverage.requestSnapshot,
-      response_snapshot: coverage.responseSnapshot,
-    })
-    .select('id, status')
-    .single();
-
-  if (error) {
-    throw new AppError({
-      status: error.code === '23505' ? 409 : 500,
-      code: error.code === '23505' ? 'PLAN_CREDIT_ALREADY_PENDING' : 'PLAN_CREDIT_USAGE_CREATE_FAILED',
-      message: error.code === '23505'
-        ? 'This plan credit is already pending use.'
-        : 'Unable to create plan credit usage audit.',
-      details: error.message,
-    });
-  }
-
-  return data as { id: string; status: string };
-}
-
 function buildCoverageSnapshot(coverage: PlanCoverageVerification | null) {
   if (!coverage) {
     return {};
@@ -569,24 +562,23 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
       return Number(count || 0) > 0;
     },
 
-    async verifyPlanCoverageForSpecialty(params): Promise<PlanCoverageVerification> {
-      return verifyPlanCoverageForSpecialtyInternal({
+    async verifyPlanCoverageForSpecialty(params): Promise<PlanCoverageVerification | null> {
+      return resolvePlanCoverage({
         client,
         appUserId: params.appUserId,
         fallbackExternalKey: params.fallbackExternalKey,
         specialtyCode: params.specialtyCode,
+        flow: 'appointment_specialty',
       });
     },
 
     async createAppointment(params): Promise<AppointmentRecord> {
       const isPlanFunded = params.fundingSource === 'plan';
       const paymentRequired = !isPlanFunded;
-      const appointmentId = isPlanFunded ? crypto.randomUUID() : null;
       const planCoverage = params.planCoverage;
-      let planCreditUsage: { id: string; status: string } | null = null;
 
       if (isPlanFunded) {
-        if (!appointmentId || !planCoverage) {
+        if (!planCoverage) {
           throw new AppError({
             status: 500,
             code: 'PLAN_COVERAGE_REQUIRED',
@@ -594,18 +586,68 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           });
         }
 
-        planCreditUsage = await createPendingPlanCreditUsage({
-          client,
-          appointmentId,
-          patientId: params.patientId,
-          coverage: planCoverage,
-        });
+        const { data: planAppointmentData, error: planAppointmentError } = await client
+          .rpc('create_plan_funded_appointment', {
+            p_patient_id: params.patientId,
+            p_patient_name: params.patientName,
+            p_patient_email: params.patientEmail,
+            p_specialty: params.specialty,
+            p_appointment_type: params.appointmentType,
+            p_scheduled_datetime: params.scheduledDatetime,
+            p_date: params.date,
+            p_time: params.time,
+            p_status: params.status,
+            p_price: params.price,
+            p_service_code: params.pricing.serviceCode,
+            p_price_source: params.pricing.priceSource,
+            p_gross_price: params.pricing.grossPrice,
+            p_fee_percent: params.pricing.platformFeePercent,
+            p_fee_amount: params.pricing.platformFeeAmount,
+            p_net_amount: params.pricing.professionalNetAmount,
+            p_pricing_rule_id: params.pricing.pricingRuleId,
+            p_fee_rule_id: params.pricing.feeRuleId,
+            p_symptoms: params.symptoms,
+            p_plan_subscription_order_id: planCoverage.planSubscriptionOrderId,
+            p_plans_service_subscription_id: normalizeString(planCoverage.externalSubscriptionId)
+              || planCoverage.plansServiceSubscriptionId,
+            p_external_subscription_score_id: planCoverage.externalSubscriptionScoreId,
+            p_external_score_id: normalizeString(planCoverage.externalScoreId) || null,
+            p_external_plan_id: planCoverage.externalPlanId,
+            p_external_specialization_id: planCoverage.externalSpecializationId,
+            p_specialty_code: planCoverage.specialtyCode,
+            p_request_snapshot: planCoverage.requestSnapshot,
+            p_response_snapshot: planCoverage.responseSnapshot,
+            p_coverage_snapshot: buildCoverageSnapshot(planCoverage),
+          })
+          .single();
+
+        if (planAppointmentError) {
+          throw new AppError({
+            status: planAppointmentError.code === '23505' ? 409 : 500,
+            code: planAppointmentError.code === '23505'
+              ? 'PLAN_CREDIT_ALREADY_RESERVED'
+              : 'PLAN_APPOINTMENT_CREATE_FAILED',
+            message: 'Unable to create the plan-funded appointment.',
+            details: planAppointmentError.message,
+          });
+        }
+
+        const planAppointment = planAppointmentData as AppointmentRow | null;
+
+        if (!planAppointment?.id) {
+          throw new AppError({
+            status: 500,
+            code: 'INVALID_PLAN_APPOINTMENT_RESPONSE',
+            message: 'Plan-funded appointment creation returned an invalid response.',
+          });
+        }
+
+        return planAppointment;
       }
 
       const { data, error } = await client
         .from('appointments')
         .insert({
-          ...(appointmentId ? { id: appointmentId } : {}),
           patient_id: params.patientId,
           patient_name: params.patientName,
           patient_email: params.patientEmail,
@@ -630,14 +672,14 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           payment_status: 'payment_pending',
           payment_required: paymentRequired,
           funding_source: params.fundingSource,
-          coverage_status: isPlanFunded ? 'plan_pending_use' : null,
-          plan_credit_usage_id: planCreditUsage?.id || null,
-          plan_subscription_order_id: planCoverage?.planSubscriptionOrderId || null,
-          external_subscription_score_id: planCoverage?.externalSubscriptionScoreId || null,
-          external_score_id: normalizeString(planCoverage?.externalScoreId) || null,
-          external_plan_id: planCoverage?.externalPlanId || null,
-          external_specialization_id: planCoverage?.externalSpecializationId || null,
-          coverage_snapshot: buildCoverageSnapshot(planCoverage),
+          coverage_status: null,
+          plan_credit_usage_id: null,
+          plan_subscription_order_id: null,
+          external_subscription_score_id: null,
+          external_score_id: null,
+          external_plan_id: null,
+          external_specialization_id: null,
+          coverage_snapshot: {},
           symptoms: params.symptoms,
         })
         .select(`
@@ -681,14 +723,37 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
         .single();
 
       if (error) {
-        if (planCreditUsage?.id) {
-          try {
-            await client
-              .from('plan_credit_usages')
-              .delete()
-              .eq('id', planCreditUsage.id);
-          } catch {
-            // Best-effort cleanup. The creation still fails below.
+        const isPatientSpecialtyRetry = error.code === '23505'
+          && String(error.message || '').includes('idx_appointments_active_patient_specialty_schedule_unique');
+
+        if (isPatientSpecialtyRetry) {
+          const { data: existingData, error: existingError } = await client
+            .from('appointments')
+            .select(APPOINTMENT_SELECT)
+            .eq('patient_id', params.patientId)
+            .eq('specialty', params.specialty)
+            .eq('scheduled_datetime', params.scheduledDatetime)
+            .eq('service_code', params.pricing.serviceCode)
+            .in('status', ['SOLICITADO', 'requested', 'pending', 'accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'])
+            .order('created_date', { ascending: false })
+            .limit(1)
+            .maybeSingle();
+
+          const existing = existingData as AppointmentRow | null;
+
+          if (!existingError && existing?.id) {
+            const existingPayment = await createPaymentCharge(client, {
+              ownerType: 'appointment',
+              ownerId: existing.id,
+              amount: Number(existing.gross_price),
+              currency: 'BRL',
+            });
+
+            return {
+              ...existing,
+              current_payment_charge_id: existingPayment.paymentChargeId,
+              payment: existingPayment,
+            };
           }
         }
 
@@ -713,28 +778,6 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
           code: 'INVALID_APPOINTMENT_RESPONSE',
           message: 'Appointment creation returned an invalid response.',
         });
-      }
-
-      if (planCreditUsage?.id && row.id) {
-        const { error: usageUpdateError } = await client
-          .from('plan_credit_usages')
-          .update({ appointment_id: row.id })
-          .eq('id', planCreditUsage.id);
-
-        if (usageUpdateError) {
-          console.warn('[create-appointment] plan-credit-usage:appointment-link-failed', {
-            appointmentId: row.id,
-            planCreditUsageId: planCreditUsage.id,
-            error: usageUpdateError.message,
-          });
-        }
-      }
-
-      if (!paymentRequired) {
-        return {
-          ...row,
-          payment: undefined,
-        };
       }
 
       const paymentCharge = await createPaymentCharge(client, {

@@ -30,12 +30,15 @@ type OwnerConfig = {
   table: string;
   ownerField: string;
   amountField: string;
+  coverageAware?: boolean;
 };
 
 type OwnerRow = {
   id: string;
   current_payment_charge_id: string | null;
   payment_status: string | null;
+  payment_required: boolean | null;
+  funding_source?: string | null;
   [key: string]: unknown;
 };
 
@@ -59,11 +62,13 @@ const OWNER_CONFIG: Record<PaymentOwnerType, OwnerConfig> = {
     table: 'appointments',
     ownerField: 'patient_id',
     amountField: 'gross_price',
+    coverageAware: true,
   },
   queue: {
     table: 'queues',
     ownerField: 'patient_id',
     amountField: 'quoted_gross_price',
+    coverageAware: true,
   },
   solicitacao_exame: {
     table: 'solicitacoes_exames',
@@ -127,9 +132,10 @@ async function loadOwner(
   patientId: string,
 ) {
   const config = OWNER_CONFIG[ownerType];
+  const coverageFields = config.coverageAware ? ', funding_source, coverage_status' : '';
   const { data, error } = await client
     .from(config.table)
-    .select(`id, ${config.ownerField}, ${config.amountField}, payment_status, current_payment_charge_id`)
+    .select(`id, ${config.ownerField}, ${config.amountField}, payment_status, payment_required, current_payment_charge_id${coverageFields}`)
     .eq('id', ownerId)
     .maybeSingle();
 
@@ -158,6 +164,15 @@ async function loadOwner(
       status: 403,
       code: 'PAYMENT_OWNER_FORBIDDEN',
       message: 'You are not allowed to access this payment owner.',
+      details: { ownerType, ownerId },
+    });
+  }
+
+  if (row.payment_required === false || (config.coverageAware && row.funding_source === 'plan')) {
+    throw new AppError({
+      status: 409,
+      code: 'PAYMENT_NOT_REQUIRED_FOR_COVERED_OWNER',
+      message: 'A one-off payment charge cannot be created for a plan-funded owner.',
       details: { ownerType, ownerId },
     });
   }

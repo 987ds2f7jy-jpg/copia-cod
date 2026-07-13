@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
   getFeeGroupForServiceCode,
@@ -31,7 +32,11 @@ function buildQueueResult(queueEntry: QueueRecord, reusedExisting: boolean): Joi
       serviceCode: queueEntry.service_code || '',
       quotedGrossPrice: Number(queueEntry.quoted_gross_price || 0),
       paymentStatus: queueEntry.payment_status || 'payment_pending',
+      paymentRequired: Boolean(queueEntry.payment_required ?? true),
       currentPaymentChargeId: queueEntry.current_payment_charge_id || null,
+      fundingSource: queueEntry.funding_source || 'self_pay',
+      coverageStatus: queueEntry.coverage_status || null,
+      planCreditUsageId: queueEntry.plan_credit_usage_id || null,
     },
     payment: queueEntry.payment || null,
     reusedExisting,
@@ -202,13 +207,22 @@ export async function joinQueue({
   const position = waitingCount + 1;
   const estimatedWaitTime = position * 10;
   pricing = pricing || await repository.resolveServicePricing({ serviceCode });
+  const planCoverage = input.solicitacaoExameId
+    ? null
+    : await repository.resolvePlanCoverage({
+      appUserId: appUser.id,
+      fallbackExternalKey: appUser.email || authenticatedUser.email || '',
+      specialtyCode: normalizedSpecialty,
+    });
 
-  console.info('[join-queue] request:start', {
+  logTechnicalEvent('info', {
+    functionName: 'join-queue',
     requestId,
-    patientId: appUser.id,
-    specialty: normalizedSpecialty,
-    serviceCode,
-    position,
+    operation: 'queue.join',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    status: 'started',
   });
 
   const queueEntry = await repository.createQueueEntry({
@@ -223,15 +237,18 @@ export async function joinQueue({
     solicitacaoExameId: input.solicitacaoExameId,
     pricing,
     linkedPaidPayment,
+    planCoverage,
   });
 
-  console.info('[join-queue] request:success', {
+  logTechnicalEvent('info', {
+    functionName: 'join-queue',
     requestId,
-    queueId: queueEntry.id,
-    patientId: queueEntry.patient_id,
-    position: queueEntry.position,
-    serviceCode: queueEntry.service_code,
-    quotedGrossPrice: queueEntry.quoted_gross_price,
+    operation: 'queue.join',
+    actorId: appUser.id,
+    actorRole: appUser.role,
+    resourceType: 'queue',
+    resourceId: queueEntry.id,
+    status: queueEntry.status,
   });
 
   return buildQueueResult(queueEntry, false);

@@ -18,6 +18,7 @@ export type CoverageStatus =
   | 'plan_pending_use'
   | 'plan_used'
   | 'plan_use_failed'
+  | 'plan_reconciliation_required'
   | 'plan_canceled'
   | null;
 
@@ -146,7 +147,7 @@ export type CreateAppointmentRepository = {
     appUserId: string;
     fallbackExternalKey: string;
     specialtyCode: string;
-  }): Promise<PlanCoverageVerification>;
+  }): Promise<PlanCoverageVerification | null>;
   createAppointment(params: {
     patientId: string;
     patientName: string;

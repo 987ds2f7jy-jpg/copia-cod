@@ -1,5 +1,6 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import { AppError } from '../_shared/errors.ts';
+import { SIGNUP_LEGAL_EVENTS, getLegalDocument } from '../_shared/legal-documents.ts';
 import {
   createServiceRoleClient,
   getRequiredEnv,
@@ -173,6 +174,21 @@ function createBootstrapAppUserRepository(client: SupabaseClient): BootstrapAppU
       }
     },
 
+    async deleteAppUser(appUserId) {
+      const { error } = await client
+        .from('app_users')
+        .delete()
+        .eq('id', appUserId);
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'APP_USER_DELETE_FAILED',
+          message: 'Unable to rollback application user.',
+        });
+      }
+    },
+
     async createAppUser(payload) {
       const { data, error } = await client
         .from('app_users')
@@ -238,6 +254,50 @@ function createBootstrapAppUserRepository(client: SupabaseClient): BootstrapAppU
       }
 
       return mapAppUserRow(data as AppUserRow);
+    },
+
+    async recordSignupLegalEvents({ userId, role }) {
+      const source = role === 'professional' ? 'signup_professional' : 'signup_patient';
+      const rows = SIGNUP_LEGAL_EVENTS.map(({ documentKey, eventType }) => {
+        const document = getLegalDocument(documentKey);
+
+        if (!document) {
+          throw new AppError({
+            status: 500,
+            code: 'LEGAL_DOCUMENT_CONFIG_INVALID',
+            message: 'Legal document configuration is invalid.',
+          });
+        }
+
+        return {
+          user_id: userId,
+          document_key: document.key,
+          document_version: document.version,
+          event_type: eventType,
+          source,
+          locale: 'pt-BR',
+        };
+      });
+      const { error } = await client
+        .from('legal_user_events')
+        .upsert(rows, {
+          onConflict: 'user_id,document_key,document_version,event_type',
+          ignoreDuplicates: true,
+        });
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'LEGAL_EVENT_RECORD_FAILED',
+          message: 'Unable to record required legal events.',
+        });
+      }
+
+      return rows.map((row) => ({
+        documentKey: row.document_key,
+        documentVersion: row.document_version,
+        eventType: row.event_type,
+      }));
     },
 
     async signInWithPassword({ email, password }) {

@@ -52,11 +52,26 @@ describe('plan credit consumption on professional acceptance', () => {
 
   it('updates local audit and appointment coverage status after use result', () => {
     const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
+    const migration = read('supabase/migrations/20260712190000_harden_plan_coverage_credit_integrity.sql');
 
-    expect(acceptRepository).toContain("status: 'used'");
-    expect(acceptRepository).toContain("coverage_status: 'plan_used'");
+    expect(acceptRepository).toContain("rpc('finalize_plan_credit_usage'");
+    expect(migration).toContain("SET status = 'used'");
+    expect(migration).toContain("SET coverage_status = 'plan_used'");
     expect(acceptRepository).toContain("status: 'use_failed'");
     expect(acceptRepository).toContain("coverage_status: 'plan_use_failed'");
+  });
+
+  it('claims a pending usage atomically before contacting plans-service', () => {
+    const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
+    const migration = read('supabase/migrations/20260712190000_harden_plan_coverage_credit_integrity.sql');
+
+    expect(acceptRepository).toContain(".update({ status: 'consuming'");
+    expect(acceptRepository).toContain(".in('status', ['pending_use', 'use_failed'])");
+    expect(acceptRepository.indexOf("status: 'consuming'")).toBeLessThan(
+      acceptRepository.indexOf('postUseScoreToPlansService(requestPayload)'),
+    );
+    expect(migration).toContain('idx_plan_credit_usages_active_owner_unique');
+    expect(migration).toContain('idx_plan_credit_usages_open_external_score_unique');
   });
 
   it('preserves self-pay path by only loading plan context when funding_source is plan', () => {
