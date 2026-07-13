@@ -17,7 +17,9 @@ export type AppUserRecord = {
   profileComplete: boolean;
 };
 
-export type DeactivateAccountInput = Record<string, never>;
+export type DeactivateAccountInput = {
+  confirmation: 'DEACTIVATE_MY_ACCOUNT';
+};
 
 export type DeactivateAccountResult = {
   deactivated: boolean;
@@ -29,7 +31,10 @@ export type ErrorResponse = ApiErrorResponse;
 
 export type DeactivateAccountRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
+  hasActiveCareRelationship(appUser: AppUserRecord): Promise<boolean>;
   deactivateAppUser(appUserId: string): Promise<AppUserRecord>;
+  disableProfessionalDuty(appUserId: string): Promise<void>;
+  writeAudit(input: { appUser: AppUserRecord; requestId: string }): Promise<void>;
   revokeAccessToken(accessToken: string): Promise<void>;
 };
 
@@ -37,5 +42,6 @@ export type DeactivateAccountCommand = {
   requestId: string;
   authenticatedUser: AuthenticatedUser;
   accessToken: string;
+  input: DeactivateAccountInput;
   repository: DeactivateAccountRepository;
 };

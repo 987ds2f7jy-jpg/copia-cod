@@ -10,6 +10,8 @@ import type { CorsOptions } from '../_shared/http.ts';
 import { AppError } from '../_shared/errors.ts';
 import { createSessionAccountServiceClient } from '../_shared/sessionAccount.ts';
 import { requireConsultationAccess } from '../_shared/teleconsultaAccess.ts';
+import { requireTranscriptionConsent } from '../_shared/consultation-consent.ts';
+import { recordAuditEvent } from '../_shared/observability.ts';
 
 const FUNCTION_NAME = 'groq-completion';
 const CORS: CorsOptions = {
@@ -87,15 +89,27 @@ async function handleGroqCompletionRequest(req: Request) {
   try {
     const input = parseInput(await readJsonBody<unknown>(req));
     const client = createSessionAccountServiceClient();
-    const { appUser } = await requireConsultationAccess({
+    const { appUser, consultation } = await requireConsultationAccess({
       req,
       consultationId: input.consultationId,
       client,
       allowedRoles: ['professional'],
     });
+    if (String(consultation.status || '').toLowerCase() !== 'em_atendimento') {
+      throw new AppError({
+        status: 409,
+        code: 'CONSULTATION_NOT_ACTIVE',
+        message: 'AI assistance is available only during an active consultation.',
+      });
+    }
+    await requireTranscriptionConsent(client, {
+      consultationId: input.consultationId,
+      patientUserId: consultation.paciente_id,
+      requireAiNotice: true,
+    });
     const groqApiKey = getGroqApiKey();
 
-    const prompt = `Voce e um medico brasileiro experiente. Organize a transcricao da consulta no formato JSON exatamente com estes campos:
+    const prompt = `Organize exclusivamente as informacoes presentes na transcricao em um rascunho de apoio ao profissional, sem inferir fatos ausentes, sem emitir decisao clinica final e sem comunicar diagnostico ao paciente. Retorne JSON exatamente com estes campos:
 
 {
   "motivo_da_consulta": "...",
@@ -125,15 +139,12 @@ Responda APENAS com o JSON valido, sem nenhum texto adicional.`;
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-
       throw new AppError({
         status: 502,
         code: 'GROQ_UPSTREAM_ERROR',
         message: 'Erro ao chamar a API do Groq.',
         details: {
           providerStatus: response.status,
-          providerBody: errorText,
         },
       });
     }
@@ -153,6 +164,17 @@ Responda APENAS com o JSON valido, sem nenhum texto adicional.`;
       requestId,
       appUserId: appUser.id,
       consultationId: input.consultationId,
+    });
+
+    await recordAuditEvent(client, {
+      actorUserId: appUser.id,
+      actorRole: 'professional',
+      action: 'ai_assistance_draft_generated',
+      resourceType: 'consulta',
+      resourceId: input.consultationId,
+      outcome: 'succeeded',
+      requestId,
+      metadata: { provider: 'groq' },
     });
 
     return successResponse({

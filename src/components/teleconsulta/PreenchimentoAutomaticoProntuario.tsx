@@ -36,6 +36,8 @@ type AudioProcessingRefs = {
 interface PreenchimentoAutomaticoProntuarioProps {
   consultationId: string;
   disabled?: boolean;
+  transcriptionAllowed?: boolean;
+  aiAssistanceAllowed?: boolean;
   onApply: (data: ProntuarioAutomaticoFields) => void;
 }
 
@@ -211,6 +213,8 @@ function sendAudioChunk(connection: DeepgramConnectionLike | null, chunk: ArrayB
 export default function PreenchimentoAutomaticoProntuario({
   consultationId,
   disabled = false,
+  transcriptionAllowed = false,
+  aiAssistanceAllowed = false,
   onApply,
 }: PreenchimentoAutomaticoProntuarioProps) {
   const [isListening, setIsListening] = useState(false);
@@ -314,7 +318,7 @@ export default function PreenchimentoAutomaticoProntuario({
   };
 
   const startListening = async () => {
-    if (disabled || isListening || isProcessing) {
+    if (disabled || !transcriptionAllowed || !aiAssistanceAllowed || isListening || isProcessing) {
       return;
     }
 
@@ -328,17 +332,17 @@ export default function PreenchimentoAutomaticoProntuario({
       setIsPanelOpen(true);
       setIsListening(true);
 
+      const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
+      const stream = await getConsultaMediaStream();
+      mediaStreamRef.current = stream;
+
       const tokenData = await requestDeepgramToken({
         consultationId,
       });
 
-      if (!tokenData?.key) {
-        throw new Error('Nao foi possivel obter o token do Deepgram.');
+      if (!tokenData?.accessToken) {
+        throw new Error('Nao foi possivel obter o token temporario do Deepgram.');
       }
-
-      const { createClient, LiveTranscriptionEvents } = await import('@deepgram/sdk');
-      const stream = await getConsultaMediaStream();
-      mediaStreamRef.current = stream;
 
       const audioContext = new window.AudioContext();
       await audioContext.resume();
@@ -353,7 +357,7 @@ export default function PreenchimentoAutomaticoProntuario({
       audioProcessingRef.current.processorNode = processorNode;
       audioProcessingRef.current.gainNode = gainNode;
 
-      const deepgramClient = createClient(tokenData.key);
+      const deepgramClient = createClient({ accessToken: tokenData.accessToken });
       const listenOptions = {
         model: 'nova-3',
         language: 'pt',
@@ -528,12 +532,30 @@ export default function PreenchimentoAutomaticoProntuario({
     }
   };
 
+  useEffect(() => {
+    if ((transcriptionAllowed && aiAssistanceAllowed) || !isListening) {
+      return;
+    }
+
+    setIsListening(false);
+    setIsPanelOpen(false);
+    closeDeepgramConnection(deepgramConnectionRef.current);
+    deepgramConnectionRef.current = null;
+    stopMediaCapture(mediaStreamRef.current);
+    mediaStreamRef.current = null;
+    void stopAudioProcessing(audioProcessingRef.current);
+    transcriptFullRef.current = '';
+    setTranscriptFull('');
+    setInterimTranscript('');
+    setErrorMessage('A autorização foi revogada. A captura foi interrompida sem gerar novo rascunho.');
+  }, [aiAssistanceAllowed, isListening, transcriptionAllowed]);
+
   return (
     <div className="space-y-2">
       <Button
         type="button"
         onClick={() => void (isListening ? stopListening() : startListening())}
-        disabled={disabled || isProcessing}
+        disabled={disabled || !transcriptionAllowed || !aiAssistanceAllowed || isProcessing}
         className={`h-10 w-full text-xs ${
           isListening ? 'bg-red-600 hover:bg-red-700' : 'bg-emerald-600 hover:bg-emerald-700'
         }`}
@@ -551,7 +573,11 @@ export default function PreenchimentoAutomaticoProntuario({
       </Button>
 
       <p className="text-[11px] text-gray-400">
-        A IA apenas sugere o preenchimento. O medico revisa e salva o prontuario manualmente.
+        {!transcriptionAllowed
+          ? 'Aguardando autorização do paciente. A consulta continua sem transcrição.'
+          : !aiAssistanceAllowed
+            ? 'Aguardando ciência do aviso de assistência por IA.'
+            : 'O áudio é processado em fluxo e não é gravado pelo app. A IA gera apenas um rascunho; o profissional revisa e salva manualmente.'}
       </p>
 
       {errorMessage && <p className="text-[11px] text-red-300">{errorMessage}</p>}

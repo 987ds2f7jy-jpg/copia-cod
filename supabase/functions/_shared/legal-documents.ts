@@ -32,10 +32,52 @@ export const LEGAL_DOCUMENTS = {
     allowedEvent: null,
     audiences: ['public'],
   },
+  telemedicine_consent: {
+    key: 'telemedicine_consent',
+    title: 'Autorização para atendimento por telemedicina',
+    version: '1.0.0',
+    effectiveDate: '2026-07-12',
+    lastUpdated: '2026-07-12',
+    route: null,
+    presentation: 'consultation_entry',
+    purpose: 'Autorizar atendimento remoto e a transmissão necessária de imagem, áudio e dados para uma consulta específica.',
+    requiresAcceptance: true,
+    allowedEvent: null,
+    allowedEvents: ['granted'],
+    audiences: ['patient'],
+  },
+  consultation_transcription_consent: {
+    key: 'consultation_transcription_consent',
+    title: 'Transcrição para apoio ao atendimento',
+    version: '1.0.0',
+    effectiveDate: '2026-07-12',
+    lastUpdated: '2026-07-12',
+    route: null,
+    presentation: 'consultation_entry_and_session',
+    purpose: 'Autorizar o processamento temporário do áudio para gerar texto de apoio ao profissional.',
+    requiresAcceptance: false,
+    allowedEvent: null,
+    allowedEvents: ['granted', 'declined', 'revoked'],
+    audiences: ['patient'],
+  },
+  ai_assistance_notice: {
+    key: 'ai_assistance_notice',
+    title: 'Aviso de assistência por inteligência artificial',
+    version: '1.0.0',
+    effectiveDate: '2026-07-12',
+    lastUpdated: '2026-07-12',
+    route: null,
+    presentation: 'consultation_entry_and_session',
+    purpose: 'Informar o uso de IA para organizar um rascunho que deve ser revisado pelo profissional.',
+    requiresAcceptance: false,
+    allowedEvent: null,
+    allowedEvents: ['acknowledged'],
+    audiences: ['patient'],
+  },
 } as const;
 
 export type LegalDocumentKey = keyof typeof LEGAL_DOCUMENTS;
-export type LegalEventType = 'accepted' | 'acknowledged' | 'revoked';
+export type LegalEventType = 'accepted' | 'acknowledged' | 'granted' | 'declined' | 'revoked';
 
 export const SIGNUP_LEGAL_EVENTS = [
   {

@@ -4,6 +4,7 @@ import type {
   ConsultationRow,
   ProfessionalIdentityRow,
 } from '../_shared/teleconsulta.ts';
+import type { ConsultationConsentState } from '../_shared/consultation-consent.ts';
 
 export type StartConsultaSessionInput = {
   consultationId: string;
@@ -62,6 +63,10 @@ export type StartConsultaSessionRepository = {
     queueId: string;
     status: string;
   }): Promise<QueueLinkRecord>;
+  requireTelemedicineConsent(params: {
+    consultationId: string;
+    patientUserId: string;
+  }): Promise<ConsultationConsentState>;
 };
 
 export type StartConsultaSessionCommand = {

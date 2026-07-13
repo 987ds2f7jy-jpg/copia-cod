@@ -28,6 +28,7 @@ import {
   AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
 import ThemeModeSetting from '@/components/theme/ThemeModeSetting';
+import PrivacyRightsPanel from '@/components/privacy/PrivacyRightsPanel';
 
 function PerfilInner() {
   const { user, updateUser, deactivateAccount } = useAuth();
@@ -84,7 +85,8 @@ function PerfilInner() {
 
   const handleSubmit = (event) => {
     event.preventDefault();
-    updateProfile.mutate(formData);
+    const { cpf: _cpf, ...editableData } = formData;
+    updateProfile.mutate(editableData);
   };
 
   const handleDeactivateAccount = async () => {
@@ -144,10 +146,13 @@ function PerfilInner() {
                   <Input
                     id="cpf"
                     value={formData.cpf}
-                    onChange={(event) => handleChange('cpf', event.target.value)}
-                    placeholder="000.000.000-00"
+                    readOnly
+                    aria-describedby="cpf-review-help"
                     className="mt-1"
                   />
+                  <p id="cpf-review-help" className="mt-1 text-xs text-muted-foreground">
+                    Para corrigir CPF, envie uma solicitacao de correcao abaixo.
+                  </p>
                 </div>
               </div>
 
@@ -230,6 +235,8 @@ function PerfilInner() {
             <div className="mt-8">
               <ThemeModeSetting />
             </div>
+
+            <PrivacyRightsPanel />
 
             <div className="mt-8 border-t border-border pt-6">
               <h3 className="mb-3 text-sm font-medium text-muted-foreground">Zona de cuidado</h3>

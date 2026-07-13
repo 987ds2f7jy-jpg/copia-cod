@@ -11,6 +11,23 @@ import type {
   UpsertProfessionalBankingDataRepository,
 } from './types.ts';
 
+const BANKING_PROJECTION = `
+  id,
+  professional_id,
+  tipo_pessoa,
+  nome_titular,
+  cpf_cnpj,
+  tipo_recebimento,
+  tipo_chave_pix,
+  chave_pix,
+  banco,
+  agencia,
+  conta,
+  digito_conta,
+  tipo_conta,
+  razao_social
+`;
+
 async function findProfessionalProfileIdByAppUserId(client: SupabaseClient, appUserId: string) {
   const { data, error } = await client
     .from('professional_profiles')
@@ -35,7 +52,7 @@ async function findProfessionalProfileIdByAppUserId(client: SupabaseClient, appU
 async function findExistingBankingData(client: SupabaseClient, professionalId: string) {
   const { data, error } = await client
     .from('professional_banking_data')
-    .select('*')
+    .select(BANKING_PROJECTION)
     .eq('professional_id', professionalId)
     .order('created_date', { ascending: false })
     .limit(1)
@@ -60,7 +77,7 @@ async function insertBankingData(client: SupabaseClient, professionalId: string,
       ...record,
       professional_id: professionalId,
     })
-    .select('*')
+    .select(BANKING_PROJECTION)
     .single();
 
   if (error) {
@@ -75,32 +92,11 @@ async function insertBankingData(client: SupabaseClient, professionalId: string,
   return data as ProfessionalBankingDataRecord;
 }
 
-async function updateBankingData(client: SupabaseClient, bankingDataId: string, record: Record<string, unknown>) {
-  const { data, error } = await client
-    .from('professional_banking_data')
-    .update(record)
-    .eq('id', bankingDataId)
-    .select('*')
-    .single();
-
-  if (error) {
-    throw new AppError({
-      status: 500,
-      code: 'BANKING_UPDATE_FAILED',
-      message: 'Unable to update banking data.',
-      details: error.message,
-    });
-  }
-
-  return data as ProfessionalBankingDataRecord;
-}
-
 function createUpsertProfessionalBankingDataRepository(client: SupabaseClient): UpsertProfessionalBankingDataRepository {
   return {
     findProfessionalProfileIdByAppUserId: (appUserId) => findProfessionalProfileIdByAppUserId(client, appUserId),
     findExistingBankingData: (professionalId) => findExistingBankingData(client, professionalId),
     insertBankingData: ({ professionalId, record }) => insertBankingData(client, professionalId, record),
-    updateBankingData: ({ bankingDataId, record }) => updateBankingData(client, bankingDataId, record),
   };
 }
 

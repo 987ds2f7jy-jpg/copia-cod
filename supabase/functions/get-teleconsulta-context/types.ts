@@ -7,6 +7,7 @@ import type {
   ProfessionalIdentityRow,
   ProntuarioRow,
 } from '../_shared/teleconsulta.ts';
+import type { ConsultationConsentState } from '../_shared/consultation-consent.ts';
 
 export type TeleconsultaPaymentContext = {
   ownerType: 'appointment' | 'queue' | 'solicitacao_exame';
@@ -59,6 +60,7 @@ export type TeleconsultaContextResult = {
   patientSummary: ReturnType<typeof import('../_shared/teleconsulta.ts').mapPatientSummaryRecord> | null;
   patientSummaries: Array<ReturnType<typeof import('../_shared/teleconsulta.ts').mapPatientSummaryRecord>>;
   payment: TeleconsultaPaymentContext | null;
+  consents: ConsultationConsentState | null;
 };
 
 export type GetTeleconsultaContextSuccessResponse = ApiSuccess<TeleconsultaContextResult>;
@@ -93,6 +95,10 @@ export type GetTeleconsultaContextRepository = {
   findPatientById(patientId: string): Promise<PatientSummaryRow | null>;
   listPatientsByIds(patientIds: string[]): Promise<PatientSummaryRow[]>;
   listLatestProntuariosByPatientIds(patientIds: string[]): Promise<ProntuarioRow[]>;
+  loadConsultationConsentState(params: {
+    consultationId: string;
+    patientUserId: string;
+  }): Promise<ConsultationConsentState>;
 };
 
 export type GetTeleconsultaContextCommand = {

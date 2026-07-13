@@ -47,8 +47,18 @@ export async function upsertProfessionalBankingData({
   };
 
   const existing = await repository.findExistingBankingData(professionalId);
+  if (existing?.id) {
+    const changed = Object.entries(record).some(([key, value]) => String(existing[key as keyof typeof existing] ?? '') !== String(value ?? ''));
+    if (changed) {
+      throw new AppError({
+        status: 409,
+        code: 'BANKING_DATA_CORRECTION_REVIEW_REQUIRED',
+        message: 'Existing banking data correction requires a privacy rights request and administrative review.',
+      });
+    }
+  }
   const bankingData = existing?.id
-    ? await repository.updateBankingData({ bankingDataId: existing.id, record })
+    ? existing
     : await repository.insertBankingData({ professionalId, record });
 
   console.info('[upsert-professional-banking-data] request:success', {

@@ -63,4 +63,5 @@ export const legalRoutes = {
   ajuda: LEGAL_DOCUMENTS.help_center.route,
   termos: LEGAL_DOCUMENTS.terms_of_use.route,
   privacidade: LEGAL_DOCUMENTS.privacy_notice.route,
+  cookies: '/cookies-e-armazenamento',
 } as const;

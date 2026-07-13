@@ -16,6 +16,7 @@ import type {
   QueueLinkRecord,
   StartConsultaSessionRepository,
 } from './types.ts';
+import { requireTelemedicineConsent } from '../_shared/consultation-consent.ts';
 
 type ProfessionalRow = {
   id: string;
@@ -26,6 +27,10 @@ type ProfessionalRow = {
 
 function createStartConsultaSessionRepository(client: SupabaseClient): StartConsultaSessionRepository {
   return {
+    async requireTelemedicineConsent(params) {
+      return requireTelemedicineConsent(client, params);
+    },
+
     async findAppUserByAuthUserId(authUserId: string) {
       return findAppUserByAuthUserId(client, authUserId);
     },

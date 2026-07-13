@@ -387,6 +387,7 @@ function LayoutInner({ children, currentPageName }) {
                 <li><Link to="/ajuda" className="hover:text-white">Central de Ajuda</Link></li>
                 <li><Link to="/termos-de-uso" className="hover:text-white">Termos de Uso</Link></li>
                 <li><Link to="/privacidade" className="hover:text-white">Privacidade</Link></li>
+                <li><Link to="/cookies-e-armazenamento" className="hover:text-white">Cookies e armazenamento</Link></li>
               </ul>
             </div>
           </div>
@@ -402,6 +403,7 @@ function LayoutInner({ children, currentPageName }) {
             <li><Link to={legalRoutes.ajuda} className="hover:text-foreground">Central de Ajuda</Link></li>
             <li><Link to={legalRoutes.termos} className="hover:text-foreground">Termos de Uso</Link></li>
             <li><Link to={legalRoutes.privacidade} className="hover:text-foreground">Privacidade</Link></li>
+            <li><Link to={legalRoutes.cookies} className="hover:text-foreground">Cookies e armazenamento</Link></li>
           </ul>
         </nav>
       </footer>

@@ -5,6 +5,7 @@ import {
   requireConsultationAccess,
   type ConsultationRecord,
 } from '../_shared/teleconsultaAccess.ts';
+import { requireTelemedicineConsent } from '../_shared/consultation-consent.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -179,6 +180,20 @@ Deno.serve(async (req) => {
 
     if (['finalizada', 'cancelada'].includes(consulta.status)) {
       return jsonResponse({ error: 'Consulta indisponivel para videochamada.' }, 409);
+    }
+
+    await requireTelemedicineConsent(adminClient, {
+      consultationId: consulta.id,
+      patientUserId: consulta.paciente_id,
+    });
+
+    if (participantRole === 'patient' && String(consulta.status || '').toLowerCase() !== 'em_atendimento') {
+      return jsonResponse({
+        error: {
+          code: 'CONSULTATION_NOT_ACTIVE',
+          message: 'A sala ainda nao foi iniciada pelo profissional.',
+        },
+      }, 409);
     }
 
     const normalizedRequestedRole = requestedRole === 'host'

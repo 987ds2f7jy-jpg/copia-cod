@@ -10,6 +10,7 @@ import PageNotFound from './lib/PageNotFound';
 import { AuthProvider } from '@/components/AuthContext';
 import ProtectedRoute from '@/components/ProtectedRoute';
 import AppLoadingScreen from '@/components/AppLoadingScreen';
+import { BrowserPrivacyProvider } from '@/components/privacy/BrowserPrivacyProvider';
 
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
 const FinanceiroProfissional = lazy(() => import('./pages/FinanceiroProfissional'));
@@ -59,9 +60,10 @@ function App() {
       <QueryClientProvider client={queryClientInstance}>
         <AuthProvider>
           <Router>
-            <NavigationTracker />
-            <Suspense fallback={<AppLoadingScreen />}>
-              <Routes>
+            <BrowserPrivacyProvider>
+              <NavigationTracker />
+              <Suspense fallback={<AppLoadingScreen />}>
+                <Routes>
                 <Route path="/" element={
                   <LayoutWrapper currentPageName={mainPageKey}>
                     <MainPage />
@@ -108,8 +110,9 @@ function App() {
                   }
                 />
                 <Route path="*" element={<PageNotFound />} />
-              </Routes>
-            </Suspense>
+                </Routes>
+              </Suspense>
+            </BrowserPrivacyProvider>
           </Router>
           <Toaster />
         </AuthProvider>

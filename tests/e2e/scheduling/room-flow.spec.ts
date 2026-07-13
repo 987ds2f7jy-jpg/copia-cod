@@ -185,6 +185,7 @@ rdTest.describe('room-flow — estados da sala (paciente)', () => {
     // Paciente vê mensagem aguardando profissional (Teleconsulta.jsx linha ~534)
     await expect(
       page.getByText(/aguardando o profissional iniciar a sala/i)
+        .or(page.getByRole('heading', { name: 'Preparação para a teleconsulta' }))
     ).toBeVisible({ timeout: 15_000 });
   });
 

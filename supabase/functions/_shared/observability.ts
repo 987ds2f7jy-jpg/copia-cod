@@ -43,6 +43,13 @@ const AUDIT_METADATA_KEYS = new Set([
   'payment_charge_id',
   'plan_credit_usage_id',
   'owner_type',
+  'consent_key',
+  'decision',
+  'document_version',
+  'request_type',
+  'request_status',
+  'decision_code',
+  'export_format',
 ]);
 
 function normalizeString(value: unknown, maxLength = 160) {

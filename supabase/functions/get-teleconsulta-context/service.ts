@@ -46,11 +46,13 @@ function buildParticipantContext({
   role,
   professionalProfileId,
   consultationStatus,
+  telemedicineGranted,
 }: {
   appUserId: string;
   role: 'patient' | 'professional';
   professionalProfileId: string | null;
   consultationStatus: string;
+  telemedicineGranted: boolean;
 }): TeleconsultaParticipantContext {
   const closed = isConsultaClosed(consultationStatus);
 
@@ -59,7 +61,7 @@ function buildParticipantContext({
     role,
     isParticipant: true,
     professionalProfileId,
-    canStartSession: role === 'professional' && !closed,
+    canStartSession: role === 'professional' && !closed && telemedicineGranted,
     canFinishSession: role === 'professional' && !closed,
     canUpsertProntuario: role === 'professional' && !closed,
     canSubmitEvaluation: role === 'patient' && consultationStatus === 'finalizada',
@@ -167,6 +169,7 @@ export async function getTeleconsultaContext({
         latestProntuario: latestProntuariosByPatient.get(patient.id) || null,
       })),
       payment: null,
+      consents: null,
     };
   }
 
@@ -201,6 +204,7 @@ export async function getTeleconsultaContext({
         : null,
       patientSummaries: [],
       payment: null,
+      consents: null,
     };
   }
 
@@ -273,7 +277,7 @@ export async function getTeleconsultaContext({
     });
   }
 
-  const [currentProntuario, recentProntuarios, patient, currentEvaluation] = await Promise.all([
+  const [currentProntuario, recentProntuarios, patient, currentEvaluation, consents] = await Promise.all([
     repository.findProntuarioByConsultationId(consultation.id),
     repository.listPatientProntuarios({
       patientId: consultation.paciente_id,
@@ -287,6 +291,10 @@ export async function getTeleconsultaContext({
         patientId: appUser.id,
       })
       : Promise.resolve(null),
+    repository.loadConsultationConsentState({
+      consultationId: consultation.id,
+      patientUserId: consultation.paciente_id,
+    }),
   ]);
 
   return {
@@ -304,6 +312,7 @@ export async function getTeleconsultaContext({
       role: participantRole,
       professionalProfileId: professionalIdentity?.profileId || null,
       consultationStatus: expiredForResume ? 'finalizada' : (consultation.status || ''),
+      telemedicineGranted: consents.telemedicine.granted,
     }),
     currentProntuario: currentProntuario ? mapProntuarioRecord(currentProntuario) : null,
     recentProntuarios: recentProntuarios.map(mapProntuarioRecord),
@@ -318,5 +327,6 @@ export async function getTeleconsultaContext({
     payment: mapPaymentContext(
       paymentOwner?.id ? mapAppointmentPaymentGuardSnapshot(paymentOwner) : null,
     ),
+    consents,
   };
 }

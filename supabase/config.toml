@@ -18,6 +18,24 @@ verify_jwt = false
 [functions.record-legal-event]
 verify_jwt = false
 
+[functions.record-consultation-consent]
+verify_jwt = false
+
+[functions.create-privacy-rights-request]
+verify_jwt = false
+
+[functions.get-my-privacy-rights-requests]
+verify_jwt = false
+
+[functions.get-admin-privacy-rights-queue]
+verify_jwt = false
+
+[functions.review-privacy-rights-request]
+verify_jwt = false
+
+[functions.generate-my-privacy-data-export]
+verify_jwt = false
+
 [functions.check-plan-coverage]
 verify_jwt = false
 

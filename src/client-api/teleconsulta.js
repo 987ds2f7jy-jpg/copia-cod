@@ -158,6 +158,33 @@ function normalizeParticipant(participant) {
   };
 }
 
+function normalizeConsentItem(item) {
+  if (!item) return null;
+  return {
+    key: item.key || '',
+    title: item.title || '',
+    version: item.version || '',
+    effectiveDate: item.effectiveDate || '',
+    required: Boolean(item.required),
+    decision: item.decision || null,
+    eventVersion: item.eventVersion || null,
+    occurredAt: item.occurredAt || null,
+    isCurrentVersion: Boolean(item.isCurrentVersion),
+    granted: Boolean(item.granted),
+  };
+}
+
+function normalizeConsultationConsents(consents) {
+  if (!consents) return null;
+  return {
+    telemedicine: normalizeConsentItem(consents.telemedicine),
+    transcription: normalizeConsentItem(consents.transcription),
+    aiAssistance: normalizeConsentItem(consents.aiAssistance),
+    transcriptionAllowed: Boolean(consents.transcriptionAllowed),
+    aiAssistanceAllowed: Boolean(consents.aiAssistanceAllowed),
+  };
+}
+
 function normalizeTeleconsultaContext(result) {
   return {
     consultation: normalizeConsultation(result?.consultation),
@@ -171,6 +198,7 @@ function normalizeTeleconsultaContext(result) {
     patientSummaries: Array.isArray(result?.patientSummaries)
       ? result.patientSummaries.map(normalizePatientSummary).filter(Boolean)
       : [],
+    consents: normalizeConsultationConsents(result?.consents),
   };
 }
 
@@ -398,6 +426,23 @@ export async function requestDeepgramToken({ consultationId }) {
   });
 }
 
+export async function recordConsultationConsentRequest({
+  consultationId,
+  consentKey,
+  decision,
+  idempotencyKey,
+}) {
+  return invokeEdgeFunction('record-consultation-consent', {
+    body: {
+      consultationId,
+      consentKey,
+      decision,
+      idempotencyKey,
+    },
+    fallbackMessage: 'Nao foi possivel registrar sua decisao para esta consulta.',
+  });
+}
+
 const teleconsultaApi = {
   getMyActiveConsultationRequest,
   getTeleconsultaContextRequest,
@@ -408,6 +453,7 @@ const teleconsultaApi = {
   requestZoomToken,
   requestGroqCompletion,
   requestDeepgramToken,
+  recordConsultationConsentRequest,
 };
 
 export default teleconsultaApi;

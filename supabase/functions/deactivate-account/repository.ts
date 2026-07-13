@@ -9,6 +9,7 @@ import type {
   AppUserRecord,
   DeactivateAccountRepository,
 } from './types.ts';
+import { insertAuditEvent } from '../_shared/observability.ts';
 
 type AppUserRow = {
   id: string;
@@ -68,11 +69,49 @@ function createDeactivateAccountRepository(client: SupabaseClient): DeactivateAc
       return row?.id ? mapAppUserRow(row) : null;
     },
 
+    async hasActiveCareRelationship(appUser) {
+      const activeAppointmentStatuses = ['SOLICITADO', 'requested', 'pending', 'CONFIRMADO', 'accepted', 'confirmed', 'in_progress', 'em_atendimento'];
+      const activeConsultationStatuses = ['aguardando', 'em_atendimento'];
+      const activeQueueStatuses = ['waiting', 'in_progress', 'em_atendimento'];
+
+      if (appUser.role === 'patient') {
+        const [appointments, consultations, queues] = await Promise.all([
+          client.from('appointments').select('id', { count: 'exact', head: true }).eq('patient_id', appUser.id).in('status', activeAppointmentStatuses),
+          client.from('consultas').select('id', { count: 'exact', head: true }).eq('paciente_id', appUser.id).in('status', activeConsultationStatuses),
+          client.from('queues').select('id', { count: 'exact', head: true }).eq('patient_id', appUser.id).in('status', activeQueueStatuses),
+        ]);
+        const failed = [appointments, consultations, queues].find((result) => result.error);
+        if (failed?.error) throw new AppError({ status: 500, code: 'ACCOUNT_RELATIONSHIP_CHECK_FAILED', message: 'Unable to validate active care relationships.' });
+        return [appointments, consultations, queues].some((result) => (result.count || 0) > 0);
+      }
+
+      if (appUser.role === 'professional') {
+        const { data: profiles, error: profileError } = await client.from('professional_profiles').select('id').eq('user_id', appUser.id);
+        const { data: publicProfiles, error: publicProfileError } = await client.from('professional_public_profiles').select('id').eq('user_id', appUser.id);
+        if (profileError || publicProfileError) throw new AppError({ status: 500, code: 'ACCOUNT_RELATIONSHIP_CHECK_FAILED', message: 'Unable to validate professional relationships.' });
+        const professionalIds = [...(profiles || []), ...(publicProfiles || [])].map((profile) => String(profile.id));
+        const consultationQuery = client.from('consultas').select('id', { count: 'exact', head: true }).eq('profissional_user_id', appUser.id).in('status', activeConsultationStatuses);
+        const appointmentQuery = professionalIds.length > 0
+          ? client.from('appointments').select('id', { count: 'exact', head: true }).in('professional_id', professionalIds).in('status', activeAppointmentStatuses)
+          : Promise.resolve({ count: 0, error: null });
+        const queueQuery = professionalIds.length > 0
+          ? client.from('queues').select('id', { count: 'exact', head: true }).in('assigned_professional_id', professionalIds).in('status', activeQueueStatuses)
+          : Promise.resolve({ count: 0, error: null });
+        const [appointments, consultations, queues] = await Promise.all([appointmentQuery, consultationQuery, queueQuery]);
+        if (appointments.error || consultations.error || queues.error) throw new AppError({ status: 500, code: 'ACCOUNT_RELATIONSHIP_CHECK_FAILED', message: 'Unable to validate professional relationships.' });
+        return [appointments, consultations, queues].some((result) => (result.count || 0) > 0);
+      }
+
+      return false;
+    },
+
     async deactivateAppUser(appUserId) {
       const { data, error } = await client
         .from('app_users')
         .update({
           is_active: false,
+          deactivated_at: new Date().toISOString(),
+          deactivation_reason_code: 'user_requested',
         })
         .eq('id', appUserId)
         .select('id, auth_user_id, full_name, email, role, is_active, phone, cpf, birth_date, sex, address, city, state, profile_complete')
@@ -88,6 +127,26 @@ function createDeactivateAccountRepository(client: SupabaseClient): DeactivateAc
       }
 
       return mapAppUserRow(data as AppUserRow);
+    },
+
+    async disableProfessionalDuty(appUserId) {
+      const { error } = await client.from('professional_profiles').update({ is_on_duty: false }).eq('user_id', appUserId);
+      if (error) throw new AppError({ status: 500, code: 'PROFESSIONAL_DUTY_DISABLE_FAILED', message: 'Unable to disable professional duty before account deactivation.' });
+      const { error: publicError } = await client.from('professional_public_profiles').update({ is_on_duty: false }).eq('user_id', appUserId);
+      if (publicError) throw new AppError({ status: 500, code: 'PROFESSIONAL_DUTY_DISABLE_FAILED', message: 'Unable to disable professional duty before account deactivation.' });
+    },
+
+    async writeAudit({ appUser, requestId }) {
+      await insertAuditEvent(client, {
+        actorUserId: appUser.id,
+        actorRole: appUser.role as 'patient' | 'professional' | 'admin',
+        action: 'account.deactivated',
+        resourceType: 'app_user',
+        resourceId: appUser.id,
+        outcome: 'succeeded',
+        requestId,
+        metadata: { reason_code: 'user_requested' },
+      });
     },
 
     async revokeAccessToken(accessToken) {

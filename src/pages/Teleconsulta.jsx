@@ -21,6 +21,7 @@ import { useAuth } from '@/components/AuthContext';
 import {
   finishConsultaRequest,
   getTeleconsultaContextRequest,
+  recordConsultationConsentRequest,
   startConsultaSessionRequest,
 } from '@/client-api/teleconsulta';
 import { Button } from '@/components/ui/button';
@@ -35,6 +36,7 @@ import ZoomChatPanel from '@/components/teleconsulta/ZoomChatPanel';
 import ZoomVideoStage from '@/components/teleconsulta/ZoomVideoStage';
 import { buildZoomDisplayName } from '@/lib/zoom';
 import { useZoomSession } from '@/hooks/useZoomSession';
+import ConsultationConsentGate, { TranscriptionConsentControl } from '@/components/teleconsulta/ConsultationConsentGate';
 
 function getDashboardPath(role) {
   return role === 'professional' ? '/DashboardProfissional' : '/DashboardPaciente';
@@ -99,6 +101,7 @@ function TeleconsultaInner({ consultationId }) {
   const participant = teleconsultaQuery.data?.participant || null;
   const currentProntuario = teleconsultaQuery.data?.currentProntuario || null;
   const currentEvaluation = teleconsultaQuery.data?.currentEvaluation || null;
+  const consents = teleconsultaQuery.data?.consents || null;
   const isProntuarioReady = Boolean(
     String(currentProntuario?.motivoConsulta || currentProntuario?.motivo_consulta || '').trim() &&
     String(currentProntuario?.recomendacoes || '').trim(),
@@ -123,6 +126,17 @@ function TeleconsultaInner({ consultationId }) {
 
   const refreshContext = async () => {
     await queryClient.invalidateQueries({ queryKey: ['teleconsulta-context', consultationId] });
+  };
+
+  const recordConsentDecision = async ({ consentKey, decision, idempotencyKey }) => {
+    const result = await recordConsultationConsentRequest({
+      consultationId,
+      consentKey,
+      decision,
+      idempotencyKey,
+    });
+    await refreshContext();
+    return result;
   };
 
   const refreshActiveConsultation = async () => {
@@ -320,7 +334,8 @@ function TeleconsultaInner({ consultationId }) {
     consulta.status !== 'cancelada' &&
     !isLeavingSession &&
     !startConsulta.isPending &&
-    !needsSessionInitialization
+    !needsSessionInitialization &&
+    consents?.telemedicine?.granted
   );
 
   useEffect(() => {
@@ -469,6 +484,23 @@ function TeleconsultaInner({ consultationId }) {
     );
   }
 
+  const transcriptionDecisionRecorded = ['granted', 'declined', 'revoked']
+    .includes(consents?.transcription?.decision);
+  const consentSetupComplete = Boolean(
+    consents?.telemedicine?.granted
+    && transcriptionDecisionRecorded
+    && (consents?.transcription?.decision !== 'granted' || consents?.aiAssistanceAllowed),
+  );
+
+  if (isPaciente && !['finalizada', 'cancelada'].includes(consulta.status) && !consentSetupComplete) {
+    return (
+      <ConsultationConsentGate
+        consents={consents}
+        onRecordDecision={recordConsentDecision}
+      />
+    );
+  }
+
   const nomeOutro = isProfissional ? consulta.patientName : consulta.professionalName;
   const tipoLabels = {
     padrao: 'Por Especialidade',
@@ -521,6 +553,19 @@ function TeleconsultaInner({ consultationId }) {
 
         <div className="relative flex flex-1 flex-col overflow-hidden lg:flex-row">
           <div className="relative z-0 flex min-h-[360px] min-w-0 flex-1 flex-col gap-3 overflow-hidden p-4 pb-5 lg:min-h-0">
+            {isProfissional && !consents?.telemedicine?.granted && (
+              <div className="rounded-xl border border-sky-500/30 bg-sky-50 px-4 py-3 text-sm text-sky-800 dark:border-sky-500/20 dark:bg-sky-500/10 dark:text-sky-100">
+                Aguardando o paciente autorizar a telemedicina para iniciar a sessão assistencial.
+              </div>
+            )}
+
+            {isPaciente && consentSetupComplete && (
+              <TranscriptionConsentControl
+                consents={consents}
+                onRecordDecision={recordConsentDecision}
+              />
+            )}
+
             {(needsSessionInitialization || startConsulta.isPending) && (
               <div className="rounded-xl border border-amber-500/30 bg-amber-50 px-4 py-3 text-sm text-amber-800 dark:border-amber-500/20 dark:bg-amber-500/10 dark:text-amber-100">
                 {startConsulta.isPending
@@ -657,7 +702,9 @@ function TeleconsultaInner({ consultationId }) {
                       {prontuarioMode === 'completo' && (
                         <PreenchimentoAutomaticoProntuario
                           consultationId={consulta.id}
-                          disabled={!Boolean(participant?.canUpsertProntuario)}
+                          disabled={!participant?.canUpsertProntuario}
+                          transcriptionAllowed={Boolean(consents?.transcriptionAllowed)}
+                          aiAssistanceAllowed={Boolean(consents?.aiAssistanceAllowed)}
                           onApply={queueProntuarioAutoFill}
                         />
                       )}

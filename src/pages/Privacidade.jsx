@@ -444,18 +444,9 @@ export default function Privacidade() {
       </LegalSection>
 
       <LegalSection id="cookies" title="14. Cookies e tecnologias semelhantes">
-        <p>O site poderá utilizar cookies necessários ao funcionamento, segurança, autenticação e preferências.</p>
-        <p>Cookies de análise, funcionalidade adicional ou publicidade somente deverão ser utilizados de acordo com a configuração efetiva do site e a base jurídica aplicável.</p>
-        <p>As categorias previstas são:</p>
-        <BulletList items={[
-          'necessários;',
-          'funcionais;',
-          'análise;',
-          'publicidade;',
-          'terceiros.',
-        ]} />
-        <p>Quando cookies não necessários forem utilizados, a Plataforma deverá disponibilizar mecanismo adequado de escolha e gerenciamento.</p>
-        <p>Neste momento, a implementação técnica do banner e do centro de preferências será realizada em fase separada após auditoria dos cookies efetivamente existentes.</p>
+        <p>O código ativo do site não define cookie próprio. O navegador utiliza armazenamento local necessário para sessão e continuidade dos fluxos, além da preferência funcional de tema.</p>
+        <p>O Mapbox GL JS é uma tecnologia opcional usada para mapas. Seu carregamento e o armazenamento técnico associado permanecem bloqueados até a escolha do usuário.</p>
+        <p>Não há ferramenta de analytics ou marketing ativa nesta versão. Consulte o inventário e altere sua escolha em <Link className="text-primary hover:underline" to={legalRoutes.cookies}>Cookies e armazenamento</Link>.</p>
       </LegalSection>
 
       <LegalSection id="seguranca" title="15. Segurança da informação">

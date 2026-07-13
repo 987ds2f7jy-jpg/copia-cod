@@ -15,6 +15,7 @@ import type {
 } from '../_shared/teleconsulta.ts';
 import type { GetTeleconsultaContextRepository } from './types.ts';
 import type { AppointmentPaymentRecord } from './types.ts';
+import { loadConsultationConsentState } from '../_shared/consultation-consent.ts';
 
 type ProfessionalRow = {
   id: string;
@@ -37,6 +38,10 @@ function collectPatientIds(
 
 function createGetTeleconsultaContextRepository(client: SupabaseClient): GetTeleconsultaContextRepository {
   return {
+    async loadConsultationConsentState(params) {
+      return loadConsultationConsentState(client, params);
+    },
+
     async findAppUserByAuthUserId(authUserId: string) {
       return findAppUserByAuthUserId(client, authUserId);
     },

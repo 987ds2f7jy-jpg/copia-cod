@@ -4,6 +4,7 @@ const AdminAprovacao = lazy(() => import('./pages/AdminAprovacao'));
 const Ajuda = lazy(() => import('./pages/Ajuda'));
 const TermosDeUso = lazy(() => import('./pages/TermosDeUso'));
 const Privacidade = lazy(() => import('./pages/Privacidade'));
+const CookiesArmazenamento = lazy(() => import('./pages/CookiesArmazenamento'));
 const AgendamentoPerfil = lazy(() => import('./pages/AgendamentoPerfil'));
 const AgendamentoEspecialidade = lazy(() => import('./pages/AgendamentoEspecialidade'));
 const AtenderServicoExtra = lazy(() => import('./pages/AtenderServicoExtra'));
@@ -57,6 +58,7 @@ export const PAGES = {
     "ajuda": Ajuda,
     "termos-de-uso": TermosDeUso,
     "privacidade": Privacidade,
+    "cookies-e-armazenamento": CookiesArmazenamento,
 }
 
 export const pagesConfig = {

@@ -17,17 +17,18 @@ export function parseUpdateMyProfileInput(body: unknown): UpdateMyProfileInput {
   const record = body as Record<string, unknown>;
   const input: UpdateMyProfileInput = {};
 
-  if (Object.prototype.hasOwnProperty.call(record, 'fullName')
+  if (Object.prototype.hasOwnProperty.call(record, 'cpf')
+    || Object.prototype.hasOwnProperty.call(record, 'fullName')
     || Object.prototype.hasOwnProperty.call(record, 'full_name')) {
-    input.fullName = normalizeOptionalString(record.fullName ?? record.full_name);
+    throw new AppError({
+      status: 409,
+      code: 'PROFILE_IDENTITY_CORRECTION_REVIEW_REQUIRED',
+      message: 'Identity data correction requires a privacy rights request.',
+    });
   }
 
   if (Object.prototype.hasOwnProperty.call(record, 'phone')) {
     input.phone = normalizeOptionalString(record.phone);
-  }
-
-  if (Object.prototype.hasOwnProperty.call(record, 'cpf')) {
-    input.cpf = normalizeOptionalString(record.cpf);
   }
 
   if (Object.prototype.hasOwnProperty.call(record, 'birthDate')

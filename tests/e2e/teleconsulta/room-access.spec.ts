@@ -168,6 +168,7 @@ rdTest.describe('teleconsulta — paciente (estados)', () => {
     // Paciente vê mensagem de aguardar o profissional
     await expect(
       page.getByText(/aguardando o profissional iniciar a sala/i)
+        .or(page.getByRole('heading', { name: 'Preparação para a teleconsulta' }))
     ).toBeVisible({ timeout: 15_000 });
   });
 

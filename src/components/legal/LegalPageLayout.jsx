@@ -60,6 +60,7 @@ export default function LegalPageLayout({
     { label: 'Central de Ajuda', to: legalRoutes.ajuda },
     { label: 'Termos de Uso', to: legalRoutes.termos },
     { label: 'Privacidade', to: legalRoutes.privacidade },
+    { label: 'Cookies e armazenamento', to: legalRoutes.cookies },
   ];
 
   return (

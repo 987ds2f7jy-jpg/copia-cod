@@ -41,10 +41,6 @@ export type UpsertProfessionalBankingDataRepository = {
     professionalId: string;
     record: Record<string, unknown>;
   }): Promise<ProfessionalBankingDataRecord>;
-  updateBankingData(params: {
-    bankingDataId: string;
-    record: Record<string, unknown>;
-  }): Promise<ProfessionalBankingDataRecord>;
 };
 
 export type UpsertProfessionalBankingDataCommand = {

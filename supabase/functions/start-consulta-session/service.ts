@@ -89,6 +89,11 @@ export async function startConsultaSession({
     });
   }
 
+  await repository.requireTelemedicineConsent({
+    consultationId: consultation.id,
+    patientUserId: consultation.paciente_id,
+  });
+
   const [appointment, queue] = await Promise.all([
     repository.findAppointmentByConsultationId(consultation.id),
     repository.findQueueEntryByConsultation(consultation),

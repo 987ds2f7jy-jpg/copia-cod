@@ -10,6 +10,7 @@ import type { CorsOptions } from '../_shared/http.ts';
 import { AppError } from '../_shared/errors.ts';
 import { createSessionAccountServiceClient } from '../_shared/sessionAccount.ts';
 import { requireConsultationAccess } from '../_shared/teleconsultaAccess.ts';
+import { requireTranscriptionConsent } from '../_shared/consultation-consent.ts';
 
 const FUNCTION_NAME = 'deepgram-token';
 const CORS: CorsOptions = {
@@ -74,28 +75,56 @@ async function handleDeepgramTokenRequest(req: Request) {
   try {
     const consultationId = normalizeConsultationId(await readJsonBody<unknown>(req));
     const client = createSessionAccountServiceClient();
-    const { appUser } = await requireConsultationAccess({
+    const { appUser, consultation } = await requireConsultationAccess({
       req,
       consultationId,
       client,
       allowedRoles: ['professional'],
     });
 
-    const deepgramApiKey = getDeepgramApiKey();
-    const validateResponse = await fetch('https://api.deepgram.com/v1/projects', {
-      headers: {
-        Authorization: `Token ${deepgramApiKey}`,
-      },
+    if (String(consultation.status || '').toLowerCase() !== 'em_atendimento') {
+      throw new AppError({
+        status: 409,
+        code: 'CONSULTATION_NOT_ACTIVE',
+        message: 'Transcription is available only during an active consultation.',
+      });
+    }
+
+    await requireTranscriptionConsent(client, {
+      consultationId,
+      patientUserId: consultation.paciente_id,
     });
 
-    if (!validateResponse.ok) {
+    const deepgramApiKey = getDeepgramApiKey();
+    const grantResponse = await fetch('https://api.deepgram.com/v1/auth/grant', {
+      method: 'POST',
+      headers: {
+        Authorization: `Token ${deepgramApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({ ttl_seconds: 30 }),
+    });
+
+    if (!grantResponse.ok) {
       throw new AppError({
         status: 502,
-        code: 'DEEPGRAM_KEY_INVALID',
-        message: 'Invalid Deepgram API key.',
+        code: 'DEEPGRAM_TOKEN_GRANT_FAILED',
+        message: 'Unable to obtain a temporary Deepgram token.',
         details: {
-          providerStatus: validateResponse.status,
+          providerStatus: grantResponse.status,
         },
+      });
+    }
+
+    const grant = await grantResponse.json().catch(() => null);
+    const accessToken = String(grant?.access_token || '').trim();
+    const expiresIn = Number(grant?.expires_in || 0);
+
+    if (!accessToken || !Number.isFinite(expiresIn) || expiresIn <= 0) {
+      throw new AppError({
+        status: 502,
+        code: 'DEEPGRAM_TOKEN_GRANT_INVALID',
+        message: 'Deepgram returned an invalid temporary token.',
       });
     }
 
@@ -106,7 +135,8 @@ async function handleDeepgramTokenRequest(req: Request) {
     });
 
     return successResponse({
-      key: deepgramApiKey,
+      accessToken,
+      expiresIn,
     }, requestId, {
       status: 200,
       cors: CORS,

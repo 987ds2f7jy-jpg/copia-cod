@@ -38,7 +38,7 @@ export async function handleDeactivateAccountRequest(req: Request) {
 
   try {
     const body = await readJsonBody<unknown>(req);
-    parseDeactivateAccountInput(body);
+    const input = parseDeactivateAccountInput(body);
     const runtime = createDeactivateAccountRuntime();
     const accessToken = getBearerToken(req);
     const authenticatedUser = await requireAuthenticatedUser(req, runtime.authUserLookup);
@@ -46,6 +46,7 @@ export async function handleDeactivateAccountRequest(req: Request) {
       requestId,
       authenticatedUser,
       accessToken,
+      input,
       repository: runtime.repository,
     });
 
