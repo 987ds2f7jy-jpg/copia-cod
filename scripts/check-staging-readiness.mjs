@@ -9,7 +9,7 @@ import { fileURLToPath } from 'node:url';
 
 const REQUIRED_FRONTEND_VARIABLES = [
   'VITE_APP_ENV',
-  'VITE_SUPABASE_URL',
+  'VITE_BACKEND_FUNCTIONS_URL',
   'VITE_SUPABASE_ANON_KEY',
   'VITE_SITE_URL',
   'VITE_MAPBOX_TOKEN',
@@ -214,7 +214,7 @@ export function evaluateStagingReadiness(input, { root = process.cwd() } = {}) {
     if (!env[name]) errors.push(diagnostic('MISSING_PROVIDER_SECRET', name, 'Secret obrigatorio para o provider selecionado.'));
   });
 
-  const urlNames = ['VITE_SUPABASE_URL', 'SUPABASE_URL', 'VITE_SITE_URL', 'APP_BASE_URL', 'PLANS_SERVICE_BASE_URL'];
+  const urlNames = ['VITE_BACKEND_FUNCTIONS_URL', 'SUPABASE_URL', 'VITE_SITE_URL', 'APP_BASE_URL', 'PLANS_SERVICE_BASE_URL'];
   const parsedUrls = {};
   urlNames.forEach((name) => {
     if (!env[name]) return;
@@ -265,7 +265,6 @@ export function evaluateStagingReadiness(input, { root = process.cwd() } = {}) {
   }
 
   if (env.PLANS_SERVICE_URL) warnings.push(diagnostic('DEPRECATED_ALIAS', 'PLANS_SERVICE_URL', 'Use PLANS_SERVICE_BASE_URL.'));
-  if (env.VITE_BACKEND_FUNCTIONS_URL) warnings.push(diagnostic('DEPRECATED_ALIAS', 'VITE_BACKEND_FUNCTIONS_URL', 'Use VITE_SUPABASE_URL.'));
   if (env.VITE_BACKEND_PUBLISHABLE_KEY || env.VITE_SUPABASE_PUBLISHABLE_KEY) {
     warnings.push(diagnostic('DEPRECATED_ALIAS', 'VITE_SUPABASE_ANON_KEY', 'Use somente o nome canonico VITE_SUPABASE_ANON_KEY.'));
   }

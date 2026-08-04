@@ -17,7 +17,7 @@ const temporaryDirectories: string[] = [];
 function createValidEnvironment(): Record<string, string> {
   return {
     VITE_APP_ENV: 'staging',
-    VITE_SUPABASE_URL: 'https://staging-project.supabase.co',
+    VITE_BACKEND_FUNCTIONS_URL: 'https://staging-project.supabase.co/functions/v1',
     VITE_SUPABASE_ANON_KEY: 'public-anon-value',
     VITE_SITE_URL: 'https://staging.rapido.example',
     VITE_MAPBOX_TOKEN: 'public-mapbox-value',
@@ -197,7 +197,7 @@ describe('staging source hygiene', () => {
     const deployScript = readFileSync(join(root, 'scripts/deploy-staging-functions.ps1'), 'utf8');
     expect(`${packageJson}\n${viteConfig}`).not.toMatch(/lovable|base44/i);
     expect(viteConfig).not.toMatch(/envPrefix:\s*["']VITE_["']/);
-    expect(viteConfig).toContain('"VITE_SUPABASE_URL"');
+    expect(viteConfig).toContain('"VITE_BACKEND_FUNCTIONS_URL"');
     expect(viteConfig).toContain('"VITE_ENABLE_PAYMENT_SIMULATION"');
     expect(clientSource).not.toMatch(/plans-service|PLANS_SERVICE_INTERNAL_API_KEY/i);
     expect(deployScript).not.toMatch(/"simulate-payment-paid"\s*,/);

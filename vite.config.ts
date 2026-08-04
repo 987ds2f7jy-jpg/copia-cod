@@ -4,7 +4,6 @@ import path from "path";
 
 const publicEnvPrefixes = [
   "VITE_APP_ENV",
-  "VITE_SUPABASE_URL",
   "VITE_SUPABASE_ANON_KEY",
   "VITE_SUPABASE_PUBLISHABLE_KEY",
   "VITE_BACKEND_FUNCTIONS_URL",

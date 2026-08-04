@@ -5,7 +5,7 @@
 - Frontend estatico Vite/React, build em `dist/` com `npm run build`.
 - Gerenciador canonico: npm com `package-lock.json`.
 - Backend em Supabase Edge Functions, Postgres, Storage e Auth.
-- React chama Edge Functions em `${VITE_SUPABASE_URL}/functions/v1`.
+- React chama Edge Functions usando VITE_BACKEND_FUNCTIONS_URL, com /functions/v1 acrescentado somente quando ausente.
 - Planos, pagamentos, Zoom, Deepgram e Groq sao server-side.
 - Mapbox e publico no frontend, com token exclusivo de staging e restrito por dominio quando o servico permitir.
 - Hosting ainda indefinido: `(DEFINIR PROVEDOR DE HOSPEDAGEM)` e `(DEFINIR DOMINIO DE STAGING)`.
@@ -37,13 +37,13 @@ npm run check:staging -- --frontend .env.staging --secrets .env.staging.secrets 
 | Variavel | Finalidade |
 | --- | --- |
 | `VITE_APP_ENV` | Ambiente explicito do bundle |
-| `VITE_SUPABASE_URL` | URL publica do Supabase de staging |
+| VITE_BACKEND_FUNCTIONS_URL | URL publica das Supabase Edge Functions de staging |
 | `VITE_SUPABASE_ANON_KEY` | Chave publica anon/publishable |
 | `VITE_SITE_URL` | Origem HTTPS canonica do frontend |
 | `VITE_MAPBOX_TOKEN` | Token publico Mapbox de staging, restrito por dominio |
 | `VITE_ENABLE_PAYMENT_SIMULATION` | Obrigatoriamente `false` |
 
-`VITE_BACKEND_FUNCTIONS_URL`, `VITE_BACKEND_PUBLISHABLE_KEY` e `VITE_SUPABASE_PUBLISHABLE_KEY` sao aliases legados. Nao use no staging.
+
 
 ## Server-side e Supabase Secrets
 
