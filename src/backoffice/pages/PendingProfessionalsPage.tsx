@@ -14,6 +14,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { getPendingProfessionals, reviewPendingProfessional } from '../api/pendingProfessionals';
+import { useBackofficeAuth } from '../hooks/useBackofficeAuth';
 import type { PendingProfessional } from '../types';
 
 function formatDate(value: string) {
@@ -23,6 +24,7 @@ function formatDate(value: string) {
 
 export function PendingProfessionalsPage() {
   const queryClient = useQueryClient();
+  const { logout } = useBackofficeAuth();
   const [review, setReview] = useState<{ professional: PendingProfessional; action: 'approve' | 'reject' } | null>(null);
   const query = useQuery({ queryKey: ['backoffice', 'pending-professionals'], queryFn: getPendingProfessionals });
   const mutation = useMutation({
@@ -31,6 +33,10 @@ export function PendingProfessionalsPage() {
       setReview(null);
       queryClient.invalidateQueries({ queryKey: ['backoffice', 'pending-professionals'] });
       queryClient.invalidateQueries({ queryKey: ['professionals'] });
+    },
+    onError: (error) => {
+      const status = Number((error as { status?: number })?.status || 0);
+      if (status === 401 || status === 403) logout();
     },
   });
 
@@ -69,7 +75,7 @@ export function PendingProfessionalsPage() {
                     <td className="px-4 py-4">{professional.register_number}/{professional.register_state}</td>
                     <td className="px-4 py-4">{professional.phone || 'não informado'}</td>
                     <td className="px-4 py-4">{formatDate(professional.created_date)}</td>
-                    <td className="px-4 py-4"><div className="flex gap-2"><Button size="sm" onClick={() => setReview({ professional, action: 'approve' })}><Check /> Aprovar</Button><Button size="sm" variant="destructive" onClick={() => setReview({ professional, action: 'reject' })}><X /> Reprovar</Button></div></td>
+                    <td className="px-4 py-4"><div className="flex gap-2"><Button size="sm" disabled={mutation.isPending} onClick={() => setReview({ professional, action: 'approve' })}><Check /> Aprovar</Button><Button size="sm" variant="destructive" disabled={mutation.isPending} onClick={() => setReview({ professional, action: 'reject' })}><X /> Reprovar</Button></div></td>
                   </tr>
                 ))}
               </tbody>
