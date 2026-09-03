@@ -16,7 +16,13 @@ export async function handleBackofficeReviewProfessionalRequest(req: Request) {
   try {
     const input = parseBackofficeReviewProfessionalInput(await readJsonBody(req));
     const runtime = createBackofficeReviewProfessionalRuntime();
-    const result = await reviewBackofficeProfessional({ req, client: runtime.client, repository: runtime.repository, input });
+    const result = await reviewBackofficeProfessional({
+      req,
+      client: runtime.client,
+      repository: runtime.repository,
+      input,
+      requestId,
+    });
     return successResponse(result, requestId, { cors: CORS });
   } catch (error) {
     return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: CORS });

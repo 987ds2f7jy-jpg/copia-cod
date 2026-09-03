@@ -374,6 +374,12 @@ A migration `20260903090000_fix_backoffice_professional_review_rpc.sql` recria a
 
 Não editar a migration original já aplicada para essa correção; migrations corretivas devem sempre ser novas.
 
+### Observabilidade de falhas na revisão
+
+Cada tentativa aprovada na autenticação gera logs correlacionados por `requestId`: `request:start` (etapa `authorized`), `rpc:failed` ou `rpc:empty_result` (etapa `rpc.review_backoffice_professional`) e `request:succeeded` (etapa `completed`). Em falha da RPC, o log do servidor inclui ID do admin, perfil, ação, nome e parâmetros não sensíveis da RPC, além de `message`, `code`, `details`, `hint`, stack quando disponível e o objeto de erro bruto do Supabase.
+
+O campo textual `reason` não é escrito nos logs; apenas `p_reason_provided` é registrado. A resposta HTTP continua segura: falhas inesperadas retornam somente `PROFESSIONAL_PROFILE_REVIEW_FAILED`, a mensagem genérica e o `requestId`. Erros de domínio preservam a semântica: inexistente retorna `404 PROFESSIONAL_PROFILE_NOT_FOUND`; um perfil que não está mais pendente retorna `409 PROFESSIONAL_PROFILE_NOT_PENDING`.
+
 ### Por que sincronizar o perfil público?
 
 O projeto possui dois perfis profissionais:
