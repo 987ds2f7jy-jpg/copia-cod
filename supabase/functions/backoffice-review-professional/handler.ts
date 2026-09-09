@@ -1,0 +1,30 @@
+import { BACKOFFICE_CORS, handleBackofficePreflight } from '../_shared/backofficeCors.ts';
+import { createRequestId, ensureMethod, errorResponse, readJsonBody, successResponse } from '../_shared/http.ts';
+import { createBackofficeReviewProfessionalRuntime } from './repository.ts';
+import { reviewBackofficeProfessional } from './service.ts';
+import { parseBackofficeReviewProfessionalInput } from './validation.ts';
+
+const FUNCTION_NAME = 'backoffice-review-professional';
+const CORS = BACKOFFICE_CORS;
+
+export async function handleBackofficeReviewProfessionalRequest(req: Request) {
+  const preflight = handleBackofficePreflight(req);
+  if (preflight) return preflight;
+  const requestId = createRequestId();
+  const methodError = ensureMethod(req, { allowedMethods: ['POST'], functionName: FUNCTION_NAME, requestId, cors: CORS });
+  if (methodError) return methodError;
+  try {
+    const input = parseBackofficeReviewProfessionalInput(await readJsonBody(req));
+    const runtime = createBackofficeReviewProfessionalRuntime();
+    const result = await reviewBackofficeProfessional({
+      req,
+      client: runtime.client,
+      repository: runtime.repository,
+      input,
+      requestId,
+    });
+    return successResponse(result, requestId, { cors: CORS });
+  } catch (error) {
+    return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: CORS });
+  }
+}

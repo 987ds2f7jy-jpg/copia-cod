@@ -12,6 +12,21 @@ verify_jwt = false
 [functions.answer-question]
 verify_jwt = false
 
+[functions.backoffice-login]
+verify_jwt = false
+
+[functions.backoffice-me]
+verify_jwt = false
+
+[functions.backoffice-pending-professionals]
+verify_jwt = false
+
+[functions.backoffice-review-professional]
+verify_jwt = false
+
+[functions.backoffice-analytics-summary]
+verify_jwt = false
+
 [functions.bootstrap-app-user]
 verify_jwt = false
 

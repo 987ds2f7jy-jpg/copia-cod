@@ -15,6 +15,7 @@ import { BrowserPrivacyProvider } from '@/components/privacy/BrowserPrivacyProvi
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
 const FinanceiroProfissional = lazy(() => import('./pages/FinanceiroProfissional'));
 const PagamentoRetorno = lazy(() => import('./pages/PagamentoRetorno'));
+const BackofficeRoutes = lazy(() => import('./backoffice/BackofficeRoutes'));
 
 const { Pages, Layout, mainPage } = pagesConfig;
 
@@ -64,6 +65,7 @@ function App() {
               <NavigationTracker />
               <Suspense fallback={<AppLoadingScreen />}>
                 <Routes>
+                <Route path="/admin/*" element={<BackofficeRoutes />} />
                 <Route path="/" element={
                   <LayoutWrapper currentPageName={mainPageKey}>
                     <MainPage />
