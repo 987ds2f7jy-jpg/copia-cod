@@ -27,6 +27,18 @@ verify_jwt = false
 [functions.backoffice-analytics-summary]
 verify_jwt = false
 
+[functions.notifications-list]
+verify_jwt = false
+
+[functions.notifications-unread-count]
+verify_jwt = false
+
+[functions.notifications-mark-read]
+verify_jwt = false
+
+[functions.notifications-mark-all-read]
+verify_jwt = false
+
 [functions.bootstrap-app-user]
 verify_jwt = false
 

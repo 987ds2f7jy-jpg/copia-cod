@@ -12,12 +12,15 @@ import {
 import { 
   Menu, X, User, Calendar, LogOut, Stethoscope, 
   Home, Search, Clock, MessageSquare, Settings,
-  ArrowLeft, Shield, Video, Sparkles, FileText, CreditCard
+  ArrowLeft, Shield, Video, Sparkles, FileText, CreditCard, Bell
 } from 'lucide-react';
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
 import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
 import { legalRoutes } from '@/config/legal';
+import { NotificationBell } from '@/notifications/components/NotificationBell';
+import { NotificationAvatarBadge } from '@/notifications/components/NotificationAvatarBadge';
+import { useUnreadNotificationsCount } from '@/notifications/hooks/useUnreadNotificationsCount';
 
 function BrandMark({ className = 'h-8 w-8' }) {
   return (
@@ -88,6 +91,8 @@ function LayoutInner({ children, currentPageName }) {
   const navigate = useNavigate();
   const location = useLocation();
   const { user, logout } = useAuth();
+  const canUseNotifications = user?.role === 'patient' || user?.role === 'professional';
+  const { data: unreadNotifications = 0 } = useUnreadNotificationsCount(canUseNotifications);
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
 
@@ -205,6 +210,8 @@ function LayoutInner({ children, currentPageName }) {
             {/* User Actions */}
             <div className="flex items-center gap-2">
               {user ? (
+                <>
+                {canUseNotifications && <NotificationBell />}
                 <DropdownMenu>
                   <DropdownMenuTrigger asChild>
                     <Button
@@ -212,9 +219,11 @@ function LayoutInner({ children, currentPageName }) {
                       className="flex items-center gap-2 px-2"
                       aria-label="Menu do usuário"
                     >
-                      <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
-                        <User className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
-                      </div>
+                      <NotificationAvatarBadge unreadCount={unreadNotifications}>
+                        <div className="w-8 h-8 rounded-full bg-emerald-100 flex items-center justify-center">
+                          <User className="w-4 h-4 text-emerald-600 dark:text-emerald-300" />
+                        </div>
+                      </NotificationAvatarBadge>
                       <span className="hidden sm:inline text-sm font-medium">
                         {user.full_name?.split(' ')[0] || 'Usuário'}
                       </span>
@@ -230,6 +239,14 @@ function LayoutInner({ children, currentPageName }) {
                       )}
                     </div>
                     <DropdownMenuSeparator />
+                    {canUseNotifications && (
+                      <DropdownMenuItem asChild>
+                        <Link to="/Notifications" className="flex items-center gap-2">
+                          <Bell className="w-4 h-4" />
+                          Notificações
+                        </Link>
+                      </DropdownMenuItem>
+                    )}
                     <DropdownMenuItem asChild>
                       <Link to={createPageUrl('DashboardPaciente')} className="flex items-center gap-2">
                         <Calendar className="w-4 h-4" />
@@ -287,6 +304,7 @@ function LayoutInner({ children, currentPageName }) {
                     </DropdownMenuItem>
                   </DropdownMenuContent>
                 </DropdownMenu>
+                </>
               ) : (
                 <div className="flex items-center gap-2">
                   <Link to={createPageUrl('Entrar')}>

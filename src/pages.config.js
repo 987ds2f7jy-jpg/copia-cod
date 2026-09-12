@@ -28,6 +28,7 @@ const RecuperarSenha = lazy(() => import('./pages/RecuperarSenha'));
 const SolicitacaoExames = lazy(() => import('./pages/SolicitacaoExames'));
 const RenovacaoReceitas = lazy(() => import('./pages/RenovacaoReceitas'));
 const Teleconsulta = lazy(() => import('./pages/Teleconsulta'));
+const NotificationsPage = lazy(() => import('./notifications/pages/NotificationsPage'));
 const __Layout = lazy(() => import('./Layout.jsx'));
 
 export const PAGES = {
@@ -55,6 +56,7 @@ export const PAGES = {
     "SolicitacaoExames": SolicitacaoExames,
     "RenovacaoReceitas": RenovacaoReceitas,
     "Teleconsulta": Teleconsulta,
+    "Notifications": NotificationsPage,
     "ajuda": Ajuda,
     "termos-de-uso": TermosDeUso,
     "privacidade": Privacidade,
