@@ -73,7 +73,7 @@ function getUpcomingAppointments(appointments) {
     .slice(0, 5);
 }
 
-export default function UpcomingAppointments({ appointments, onStart }) {
+export default function UpcomingAppointments({ appointments, onStart, error = null, onRetry }) {
   const navigate = useNavigate();
   const upcoming = getUpcomingAppointments(appointments);
 
@@ -98,7 +98,16 @@ export default function UpcomingAppointments({ appointments, onStart }) {
         </CardTitle>
       </CardHeader>
       <CardContent className="p-0">
-        {upcoming.length === 0 ? (
+        {error ? (
+          <div className="px-6 pb-6 text-center space-y-3">
+            <p className="text-sm text-muted-foreground">Não foi possível carregar as próximas consultas.</p>
+            {onRetry && (
+              <Button type="button" size="sm" variant="outline" onClick={onRetry}>
+                Tentar novamente
+              </Button>
+            )}
+          </div>
+        ) : upcoming.length === 0 ? (
           <div className="px-6 pb-6 text-center">
             <p className="text-sm text-muted-foreground">Nenhuma consulta agendada</p>
           </div>

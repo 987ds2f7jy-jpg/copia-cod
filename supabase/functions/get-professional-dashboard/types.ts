@@ -11,6 +11,7 @@ export type GetProfessionalDashboardResult = {
   availabilitySlots: Record<string, unknown>[];
   appointments: Record<string, unknown>[];
   upcomingAppointments: Record<string, unknown>[];
+  upcomingAppointmentsError: { code: string; message: string } | null;
   queueAll: Record<string, unknown>[];
   queueWaiting: Record<string, unknown>[];
   pendingQuestions: Record<string, unknown>[];

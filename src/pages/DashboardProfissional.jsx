@@ -117,7 +117,12 @@ function DashboardProfissionalInner() {
   });
 
   // Load professional profile — via React Query for proper loading/error states
-  const { data: professional, isLoading: loadingProfessional, isError: profError } = useQuery({
+  const {
+    data: professional,
+    isLoading: loadingProfessional,
+    isError: profError,
+    refetch: retryProfessional,
+  } = useQuery({
     queryKey: ['myProfessionalProfile', user?.id],
     queryFn: async () => {
       const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
@@ -151,14 +156,23 @@ function DashboardProfissionalInner() {
     enabled: !!professional?.id,
   });
 
-  const { data: upcomingAppointments = [] } = useQuery({
+  const {
+    data: upcomingAppointmentsResult = { appointments: [], error: null },
+    refetch: retryUpcomingAppointments,
+  } = useQuery({
     queryKey: ['profUpcomingAppointments', professional?.id],
     queryFn: async () => {
       const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
-      return result?.upcomingAppointments || [];
+      return {
+        appointments: result?.upcomingAppointments || [],
+        error: result?.upcomingAppointmentsError || null,
+      };
     },
     enabled: !!professional?.id,
   });
+
+  const upcomingAppointments = upcomingAppointmentsResult.appointments;
+  const upcomingAppointmentsError = upcomingAppointmentsResult.error;
 
   // Queue filtered by normalized specialty
   const { data: queuePatients = [] } = useQuery({
@@ -400,7 +414,20 @@ function DashboardProfissionalInner() {
     );
   }
 
-  if (profError || professional === null) {
+  if (profError) {
+    return (
+      <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
+        <AlertCircle className="w-12 h-12 text-destructive/70" />
+        <h2 className="text-xl font-semibold text-foreground">Não foi possível carregar seu dashboard</h2>
+        <p className="text-muted-foreground max-w-sm">Seu cadastro não foi alterado. Tente carregar novamente.</p>
+        <Button type="button" variant="outline" onClick={() => retryProfessional()}>
+          Tentar novamente
+        </Button>
+      </div>
+    );
+  }
+
+  if (professional === null) {
     return (
       <div className="min-h-screen bg-background flex flex-col items-center justify-center gap-4 px-4 text-center">
         <Stethoscope className="w-12 h-12 text-muted-foreground/50" />
@@ -591,6 +618,8 @@ function DashboardProfissionalInner() {
           />
           <UpcomingAppointments
             appointments={upcomingAppointments}
+            error={upcomingAppointmentsError}
+            onRetry={() => retryUpcomingAppointments()}
             onStart={(a) => {
               if (a.consulta_id) {
                 navigate(`/consulta/${a.consulta_id}`);

@@ -1,5 +1,5 @@
-import { describe, expect, it } from 'vitest';
-import { render, screen } from '@testing-library/react';
+import { describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { MemoryRouter } from 'react-router-dom';
 import UpcomingAppointments from '@/components/dashboard/UpcomingAppointments';
 
@@ -95,5 +95,20 @@ describe('upcoming appointment eligibility', () => {
 
     expect(screen.getByText('Consulta elegível')).toBeInTheDocument();
     expect(screen.queryByText('Pendente 0')).not.toBeInTheDocument();
+  });
+
+  it('shows a recoverable section error instead of pretending there are no appointments', () => {
+    const onRetry = vi.fn();
+
+    render(
+      <MemoryRouter>
+        <UpcomingAppointments appointments={[]} error={{ code: 'UPCOMING_APPOINTMENTS_LOOKUP_FAILED' }} onRetry={onRetry} />
+      </MemoryRouter>,
+    );
+
+    expect(screen.getByText('Não foi possível carregar as próximas consultas.')).toBeInTheDocument();
+    expect(screen.queryByText('Nenhuma consulta agendada')).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: 'Tentar novamente' }));
+    expect(onRetry).toHaveBeenCalledOnce();
   });
 });

@@ -1,4 +1,4 @@
-import { AppError } from '../_shared/errors.ts';
+import { AppError, toAppError } from '../_shared/errors.ts';
 import { getScheduledAppointmentDeadline } from '../_shared/scheduled-consultation-deadline.ts';
 import type {
   GetProfessionalDashboardCommand,
@@ -14,6 +14,17 @@ function withEntryEligibility(appointment: Record<string, unknown>) {
   return {
     ...appointment,
     entry_eligibility: getScheduledAppointmentDeadline(appointment),
+  };
+}
+
+function toUpcomingAppointmentsError(error: unknown) {
+  const normalized = toAppError(error);
+
+  return {
+    code: normalized.code,
+    // Do not return database/provider details to the dashboard. The section can
+    // be retried independently while the professional profile remains usable.
+    message: 'Unable to load upcoming appointments.',
   };
 }
 
@@ -71,12 +82,23 @@ export async function getProfessionalDashboard({
   const visibleProfessionalIds = professionalIds.length > 0 ? professionalIds : [professionalId];
   const publicProfile = await repository.findPublicProfileByProfessionalId(professionalId);
 
-  const [availabilitySlots, appointments, upcomingCandidates, queueAll] = await Promise.all([
+  const upcomingCandidatesResult = repository.listUpcomingAppointmentCandidates(visibleProfessionalIds)
+    .then((appointments) => ({ appointments, error: null }))
+    .catch((error) => ({ appointments: [], error: toUpcomingAppointmentsError(error) }));
+
+  const [availabilitySlots, appointments, queueAll, upcomingCandidates] = await Promise.all([
     repository.listAvailabilitySlots(professionalId),
     repository.listAppointments(visibleProfessionalIds, appointmentsLimit),
-    repository.listUpcomingAppointmentCandidates(visibleProfessionalIds),
     repository.listQueueAll(professionalId, 100),
+    upcomingCandidatesResult,
   ]);
+
+  if (upcomingCandidates.error) {
+    console.warn('[get-professional-dashboard] upcoming_appointments:unavailable', {
+      requestId,
+      code: upcomingCandidates.error.code,
+    });
+  }
 
   const specialty = normalizePlantaoSpecialty(professional.specialty);
   const queueWaiting = includeQueue && specialty
@@ -107,9 +129,10 @@ export async function getProfessionalDashboard({
     publicProfile,
     availabilitySlots,
     appointments: appointments.map(withEntryEligibility),
-    upcomingAppointments: upcomingCandidates
+    upcomingAppointments: upcomingCandidates.appointments
       .map(withEntryEligibility)
       .filter((appointment) => !Boolean((appointment.entry_eligibility as { effectivelyExpired?: boolean } | undefined)?.effectivelyExpired)),
+    upcomingAppointmentsError: upcomingCandidates.error,
     queueAll,
     queueWaiting,
     pendingQuestions,
