@@ -168,6 +168,32 @@ async function listAppointments(client: SupabaseClient, professionalIds: string[
   return (data as Record<string, unknown>[] | null) || [];
 }
 
+async function listUpcomingAppointmentCandidates(client: SupabaseClient, professionalIds: string[]) {
+  if (professionalIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await client
+    .from('appointments')
+    .select('*')
+    .in('professional_id', professionalIds)
+    .in('status', ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'])
+    .or('payment_status.eq.paid,payment_required.eq.false')
+    .order('scheduled_datetime', { ascending: true, nullsFirst: false })
+    .order('date', { ascending: true, nullsFirst: false });
+
+  if (error) {
+    throw new AppError({
+      status: 500,
+      code: 'UPCOMING_APPOINTMENTS_LOOKUP_FAILED',
+      message: 'Unable to load upcoming appointment candidates.',
+      details: error.message,
+    });
+  }
+
+  return (data as Record<string, unknown>[] | null) || [];
+}
+
 async function listQueueAll(client: SupabaseClient, professionalId: string, limit: number) {
   const { data, error } = await client
     .from('queues')
@@ -310,6 +336,7 @@ function createGetProfessionalDashboardRepository(client: SupabaseClient): GetPr
     findPublicProfileByProfessionalId: (professionalId) => findPublicProfileByProfessionalId(client, professionalId),
     listAvailabilitySlots: (professionalId) => listAvailabilitySlots(client, professionalId),
     listAppointments: (professionalIds, limit) => listAppointments(client, professionalIds, limit),
+    listUpcomingAppointmentCandidates: (professionalIds) => listUpcomingAppointmentCandidates(client, professionalIds),
     listQueueAll: (professionalId, limit) => listQueueAll(client, professionalId, limit),
     listQueueWaitingBySpecialty: ({ specialty, limit }) => listQueueWaitingBySpecialty(client, specialty, limit),
     listPendingQuestions: ({ specialty, limit }) => listPendingQuestions(client, specialty, limit),

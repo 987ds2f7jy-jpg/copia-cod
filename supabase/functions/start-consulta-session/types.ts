@@ -46,10 +46,8 @@ export type StartConsultaSessionRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findConsultationById(consultationId: string): Promise<ConsultationRow | null>;
   findProfessionalIdentityByAppUserId(appUserId: string): Promise<ProfessionalIdentityRow | null>;
-  updateConsultationSession(params: {
+  startConsultationSessionAtomically(params: {
     consultationId: string;
-    status: string;
-    startedAt: string;
     roomId: string;
     roomToken: string;
   }): Promise<ConsultationLifecycleRecord>;

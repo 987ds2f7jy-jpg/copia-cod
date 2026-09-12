@@ -174,7 +174,7 @@ Deno.serve(async (req) => {
       client: adminClient,
     });
 
-    if (['finalizada', 'cancelada'].includes(consulta.status)) {
+    if (['finalizada', 'cancelada', 'nao_realizada'].includes(consulta.status)) {
       return jsonResponse({ error: 'Consulta indisponivel para videochamada.' }, 409);
     }
 

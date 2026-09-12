@@ -79,11 +79,11 @@ export async function finishConsulta({
     });
   }
 
-  if (consultation.status === 'cancelada') {
+  if (consultation.status === 'cancelada' || consultation.status === 'nao_realizada') {
     throw new AppError({
       status: 409,
-      code: 'CONSULTATION_CANCELLED',
-      message: 'Cancelled consultations cannot be finished.',
+      code: 'CONSULTATION_ALREADY_CLOSED',
+      message: 'Closed consultations cannot be finished.',
     });
   }
 

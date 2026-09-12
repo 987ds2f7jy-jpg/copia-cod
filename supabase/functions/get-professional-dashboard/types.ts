@@ -10,6 +10,7 @@ export type GetProfessionalDashboardResult = {
   publicProfile: Record<string, unknown> | null;
   availabilitySlots: Record<string, unknown>[];
   appointments: Record<string, unknown>[];
+  upcomingAppointments: Record<string, unknown>[];
   queueAll: Record<string, unknown>[];
   queueWaiting: Record<string, unknown>[];
   pendingQuestions: Record<string, unknown>[];
@@ -23,6 +24,7 @@ export type GetProfessionalDashboardRepository = {
   findPublicProfileByProfessionalId(professionalId: string): Promise<Record<string, unknown> | null>;
   listAvailabilitySlots(professionalId: string): Promise<Record<string, unknown>[]>;
   listAppointments(professionalIds: string[], limit: number): Promise<Record<string, unknown>[]>;
+  listUpcomingAppointmentCandidates(professionalIds: string[]): Promise<Record<string, unknown>[]>;
   listQueueAll(professionalId: string, limit: number): Promise<Record<string, unknown>[]>;
   listQueueWaitingBySpecialty(params: { specialty: string; limit: number }): Promise<Record<string, unknown>[]>;
   listPendingQuestions(params: { specialty: string; limit: number }): Promise<Record<string, unknown>[]>;

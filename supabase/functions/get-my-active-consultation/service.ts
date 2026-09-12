@@ -4,6 +4,10 @@ import {
   mapConsultationRecord,
   resolveConsultaParticipantRole,
 } from '../_shared/teleconsulta.ts';
+import {
+  getScheduledConsultationDeadline,
+  isNeverStartedScheduledConsultationExpired,
+} from '../_shared/scheduled-consultation-deadline.ts';
 import type {
   ActiveConsultationRow,
   GetMyActiveConsultationCommand,
@@ -25,6 +29,7 @@ function buildEmptyResult(): GetMyActiveConsultationResult {
     roomReady: false,
     needsProfessionalStart: false,
     counterpartName: null,
+    entryEligibility: null,
   };
 }
 
@@ -128,7 +133,9 @@ export async function getMyActiveConsultation({
     }));
   }
 
-  const validConsultations = activeConsultations.filter((row) => !isConsultaExpiredForResume(row));
+  const validConsultations = activeConsultations.filter((row) => (
+    !isConsultaExpiredForResume(row) && !isNeverStartedScheduledConsultationExpired(row)
+  ));
 
   const consultation = pickBestActiveConsultation(validConsultations);
 
@@ -157,6 +164,7 @@ export async function getMyActiveConsultation({
   }
 
   const roomReady = hasRoomReady(consultation);
+  const entryEligibility = getScheduledConsultationDeadline(consultation);
 
   return {
     hasActiveConsultation: true,
@@ -168,5 +176,6 @@ export async function getMyActiveConsultation({
     counterpartName: participantRole === 'professional'
       ? (consultation.paciente_nome || null)
       : (consultation.profissional_nome || null),
+    entryEligibility,
   };
 }

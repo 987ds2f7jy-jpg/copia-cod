@@ -105,42 +105,36 @@ function createStartConsultaSessionRepository(client: SupabaseClient): StartCons
       };
     },
 
-    async updateConsultationSession(params): Promise<ConsultationLifecycleRecord> {
-      const { data, error } = await client
-        .from('consultas')
-        .update({
-          status: params.status,
-          inicio_at: params.startedAt,
-          sala_id: params.roomId,
-          token_sala: params.roomToken,
-        })
-        .eq('id', params.consultationId)
-        .select(`
-          id,
-          paciente_id,
-          paciente_nome,
-          paciente_email,
-          profissional_id,
-          profissional_user_id,
-          profissional_nome,
-          especialidade,
-          tipo_consulta,
-          status,
-          datetime,
-          descricao_sintomas,
-          inicio_at,
-          fim_at,
-          sala_id,
-          token_sala,
-          preco
-        `)
-        .single();
+    async startConsultationSessionAtomically(params): Promise<ConsultationLifecycleRecord> {
+      const { data, error } = await client.rpc('start_scheduled_consulta_session', {
+        p_consultation_id: params.consultationId,
+        p_room_id: params.roomId,
+        p_room_token: params.roomToken,
+      }).single();
 
       if (error) {
+        const databaseCode = String(error.message || '').trim();
+        const code = [
+          'CONSULTATION_NOT_FOUND',
+          'CONSULTATION_ALREADY_CLOSED',
+          'CONSULTATION_SCHEDULE_INVALID',
+          'CONSULTATION_START_TOO_EARLY',
+          'CONSULTATION_START_DEADLINE_ELAPSED',
+          'CONSULTATION_APPOINTMENT_LINK_AMBIGUOUS',
+          'CONSULTATION_START_STATE_CONFLICT',
+        ].find((candidate) => databaseCode.includes(candidate));
+        const messageByCode: Record<string, string> = {
+          CONSULTATION_START_DEADLINE_ELAPSED: 'Não é mais possível iniciar esta consulta: o prazo de entrada foi encerrado.',
+          CONSULTATION_START_TOO_EARLY: 'A sessão só pode ser iniciada no horário agendado.',
+          CONSULTATION_SCHEDULE_INVALID: 'O horário agendado desta consulta precisa ser revisado antes do início.',
+          CONSULTATION_ALREADY_CLOSED: 'Esta consulta já está encerrada.',
+          CONSULTATION_APPOINTMENT_LINK_AMBIGUOUS: 'O vínculo desta consulta precisa ser revisado antes do início.',
+        };
+
         throw new AppError({
-          status: 500,
-          code: 'CONSULTATION_START_UPDATE_FAILED',
-          message: 'Unable to update consultation session state.',
+          status: code ? 409 : 500,
+          code: code || 'CONSULTATION_START_UPDATE_FAILED',
+          message: code ? (messageByCode[code] || 'Não foi possível iniciar esta consulta.') : 'Unable to update consultation session state.',
           details: error.message,
         });
       }

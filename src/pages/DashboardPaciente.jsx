@@ -126,6 +126,7 @@ function DashboardPacienteInner() {
       CANCELADO: 'bg-red-100 text-red-700 dark:bg-red-950/50 dark:text-red-300',
       CONCLUIDO: 'bg-muted text-muted-foreground',
       EXPIRADO: 'bg-muted text-muted-foreground',
+      nao_realizada: 'bg-muted text-muted-foreground',
       accepted: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
       pending: 'bg-amber-100 text-amber-700 dark:bg-amber-950/50 dark:text-amber-300',
       confirmed: 'bg-emerald-100 text-emerald-700 dark:bg-emerald-950/50 dark:text-emerald-300',
@@ -140,6 +141,7 @@ function DashboardPacienteInner() {
       CANCELADO: 'Cancelada',
       CONCLUIDO: 'Concluída',
       EXPIRADO: 'Expirada',
+      nao_realizada: 'Não realizada — prazo de entrada encerrado',
       pending: 'Pendente',
       confirmed: 'Confirmada',
       in_progress: 'Em andamento',
@@ -166,15 +168,10 @@ function DashboardPacienteInner() {
   };
 
   const canEnterConsult = (appt) => {
-    const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(appt.status);
-    if (!isActive) return false;
-    const dtStr = appt.scheduled_datetime || appt.datetime;
-    if (!dtStr) return true; // sem horário: permitir entrar
-    const now = new Date();
-    const dt = new Date(dtStr);
-    const from = new Date(dt.getTime() - 5 * 60 * 1000);
-    const to = new Date(dt.getTime() + 30 * 60 * 1000);
-    return now >= from && now <= to;
+    const active = activeConsultation?.consultation;
+    if (!appt.consulta_id || active?.id !== appt.consulta_id) return false;
+    if (['em_atendimento', 'in_progress'].includes(active.status)) return true;
+    return Boolean(activeConsultation?.entryEligibility?.canStart);
   };
 
   const handleEnterConsult = (appointment) => {
@@ -234,7 +231,7 @@ function DashboardPacienteInner() {
               <p className="mt-1 text-xs text-red-600">Motivo: {appointment.cancellation_reason}</p>
             )}
 
-            {showActions && !['cancelled', 'CANCELADO', 'CONCLUIDO', 'EXPIRADO', 'completed'].includes(appointment.status) && (
+            {showActions && !['cancelled', 'CANCELADO', 'CONCLUIDO', 'EXPIRADO', 'completed', 'nao_realizada'].includes(appointment.status) && (
               <div className="flex gap-2 mt-4">
                 {(['SOLICITADO', 'accepted', 'CONFIRMADO', 'confirmed', 'pending', 'em_atendimento', 'in_progress'].includes(appointment.status)) && (
                   <>

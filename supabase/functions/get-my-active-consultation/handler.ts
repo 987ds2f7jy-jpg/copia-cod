@@ -23,6 +23,7 @@ function buildEmptyActiveConsultationResult() {
     roomReady: false,
     needsProfessionalStart: false,
     counterpartName: null,
+    entryEligibility: null,
   };
 }
 

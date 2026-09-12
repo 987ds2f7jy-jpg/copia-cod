@@ -211,6 +211,22 @@ export function buildEmptyActiveConsultation() {
     roomReady: false,
     needsProfessionalStart: false,
     counterpartName: null,
+    entryEligibility: null,
+  };
+}
+
+function normalizeEntryEligibility(eligibility) {
+  if (!eligibility || typeof eligibility !== 'object') {
+    return null;
+  }
+
+  return {
+    state: String(eligibility.state || '').trim(),
+    scheduledAt: String(eligibility.scheduledAt || '').trim() || null,
+    deadlineAt: String(eligibility.deadlineAt || '').trim() || null,
+    serverNow: String(eligibility.serverNow || '').trim() || null,
+    canStart: Boolean(eligibility.canStart),
+    effectivelyExpired: Boolean(eligibility.effectivelyExpired),
   };
 }
 
@@ -235,6 +251,7 @@ function normalizeActiveConsultation(result) {
     roomReady: Boolean(result?.roomReady),
     needsProfessionalStart: Boolean(result?.needsProfessionalStart),
     counterpartName: String(result?.counterpartName ?? '').trim() || null,
+    entryEligibility: normalizeEntryEligibility(result?.entryEligibility),
   };
 }
 

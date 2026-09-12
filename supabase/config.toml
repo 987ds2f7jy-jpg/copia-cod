@@ -90,6 +90,9 @@ verify_jwt = false
 [functions.finish-consulta]
 verify_jwt = false
 
+[functions.expire-overdue-scheduled-consultations]
+verify_jwt = false
+
 [functions.finish-solicitacao-exame-atendimento]
 verify_jwt = false
 

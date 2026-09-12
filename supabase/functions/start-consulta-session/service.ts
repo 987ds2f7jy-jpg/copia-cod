@@ -9,14 +9,49 @@ import {
   mapConsultationRecord,
   resolveConsultaParticipantRole,
 } from '../_shared/teleconsulta.ts';
+import {
+  getScheduledConsultationDeadline,
+} from '../_shared/scheduled-consultation-deadline.ts';
 import type {
   StartConsultaSessionCommand,
   StartConsultaSessionRepository,
   StartConsultaSessionResult,
 } from './types.ts';
 
-const APPOINTMENT_FINAL_STATUSES = new Set(['completed', 'cancelled', 'CANCELADO', 'CONCLUIDO']);
 const QUEUE_FINAL_STATUSES = new Set(['completed', 'cancelled']);
+
+function assertScheduledConsultationStartWindow(consultation: {
+  tipo_consulta?: string | null;
+  datetime?: string | null;
+  status?: string | null;
+  inicio_at?: string | null;
+}) {
+  const deadline = getScheduledConsultationDeadline(consultation);
+
+  if (deadline.state === 'before_start') {
+    throw new AppError({
+      status: 409,
+      code: 'CONSULTATION_START_TOO_EARLY',
+      message: 'A sessão só pode ser iniciada no horário agendado.',
+    });
+  }
+
+  if (deadline.state === 'deadline_elapsed') {
+    throw new AppError({
+      status: 409,
+      code: 'CONSULTATION_START_DEADLINE_ELAPSED',
+      message: 'Não é mais possível iniciar esta consulta: o prazo de entrada foi encerrado.',
+    });
+  }
+
+  if (deadline.state === 'invalid_schedule') {
+    throw new AppError({
+      status: 409,
+      code: 'CONSULTATION_SCHEDULE_INVALID',
+      message: 'O horário agendado desta consulta precisa ser revisado antes do início.',
+    });
+  }
+}
 
 export async function startConsultaSession({
   requestId,
@@ -89,6 +124,8 @@ export async function startConsultaSession({
     });
   }
 
+  assertScheduledConsultationStartWindow(consultation);
+
   await repository.requireTelemedicineConsent({
     consultationId: consultation.id,
     patientUserId: consultation.paciente_id,
@@ -105,7 +142,6 @@ export async function startConsultaSession({
     fallbackGrossPrice: consultation.preco,
   });
 
-  const startedAt = consultation.inicio_at || new Date().toISOString();
   const roomPayload = buildConsultaRoomPayload(consultation);
   const requiresConsultationUpdate =
     consultation.status !== 'em_atendimento' ||
@@ -121,20 +157,18 @@ export async function startConsultaSession({
   });
 
   const updatedConsultation = requiresConsultationUpdate
-    ? await repository.updateConsultationSession({
+    ? await repository.startConsultationSessionAtomically({
       consultationId: consultation.id,
-      status: 'em_atendimento',
-      startedAt,
       roomId: roomPayload.roomId,
       roomToken: roomPayload.roomToken,
     })
     : consultation;
 
-  const nextAppointment = appointment?.id && !APPOINTMENT_FINAL_STATUSES.has(String(appointment.status || ''))
-    ? await repository.updateAppointmentStatus({
-      appointmentId: appointment.id,
-      status: 'in_progress',
-    })
+  // The transactional RPC updates the linked scheduled appointment together
+  // with the consultation. Re-read it for the response rather than applying a
+  // second non-atomic update in this process.
+  const nextAppointment = requiresConsultationUpdate
+    ? await repository.findAppointmentByConsultationId(consultation.id)
     : appointment;
 
   const nextQueue = queue?.id && !QUEUE_FINAL_STATUSES.has(String(queue.status || ''))

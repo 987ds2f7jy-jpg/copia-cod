@@ -88,9 +88,9 @@ function createStartRepository(consentResult: Promise<unknown>) {
       professional_net_amount: 0,
     }),
     findQueueEntryByConsultation: vi.fn().mockResolvedValue(null),
-    updateConsultationSession: vi.fn().mockImplementation(async (params) => ({
+    startConsultationSessionAtomically: vi.fn().mockImplementation(async (params) => ({
       ...consultation,
-      status: params.status,
+      status: 'em_atendimento',
       inicio_at: params.startedAt,
       sala_id: params.roomId,
       token_sala: params.roomToken,
@@ -144,6 +144,8 @@ describe('consultation-scoped consent state', () => {
 
 describe('server-side session and provider gates', () => {
   it('does not start a consultation without patient telemedicine authorization', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T21:01:00.000Z'));
     const repository = createStartRepository(Promise.reject(Object.assign(new Error('required'), {
       status: 409,
       code: 'TELEMEDICINE_CONSENT_REQUIRED',
@@ -154,10 +156,13 @@ describe('server-side session and provider gates', () => {
       authenticatedUser: { authUserId: 'auth-professional' },
       repository,
     })).rejects.toMatchObject({ code: 'TELEMEDICINE_CONSENT_REQUIRED' });
-    expect(repository.updateConsultationSession).not.toHaveBeenCalled();
+    expect(repository.startConsultationSessionAtomically).not.toHaveBeenCalled();
+    vi.useRealTimers();
   });
 
   it('starts normally after valid authorization', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-07-12T21:01:00.000Z'));
     const repository = createStartRepository(Promise.resolve({ telemedicine: { granted: true } }));
     const result = await startConsultaSession({
       requestId: 'req-consented',
@@ -166,7 +171,8 @@ describe('server-side session and provider gates', () => {
       repository,
     });
     expect(result.consultation.status).toBe('em_atendimento');
-    expect(repository.updateConsultationSession).toHaveBeenCalledTimes(1);
+    expect(repository.startConsultationSessionAtomically).toHaveBeenCalledTimes(1);
+    vi.useRealTimers();
   });
 
   it('gates Zoom, Deepgram and Groq without trusting the React decision', () => {

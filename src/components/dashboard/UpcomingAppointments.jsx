@@ -22,9 +22,17 @@ const STATUS_MAP = {
 // Tipos que aparecem em "Próximas" — plantão NUNCA aparece aqui
 const VALID_TYPES = ['padrao', 'prioritario', 'especialidade', 'standard', 'priority', 'PERFIL', 'ESPECIALIDADE', 'IMEDIATO', undefined, null];
 
+// Solicitações aguardam decisão em "Solicitações de Agendamento". Este card
+// recebe somente atendimentos que já passaram pelo aceite profissional.
+const UPCOMING_STATUSES = ['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento'];
+
 function canStart(a) {
   const isActive = ['accepted', 'CONFIRMADO', 'confirmed', 'em_atendimento', 'in_progress'].includes(a.status);
   if (!isActive) return false;
+  if (a.entry_eligibility) {
+    return Boolean(a.entry_eligibility.canStart) && !a.entry_eligibility.effectivelyExpired;
+  }
+
   const dtStr = a.scheduled_datetime || a.datetime;
   if (!dtStr) return isActive; // sem datetime: mostrar se ativo
   const now = new Date();
@@ -50,14 +58,12 @@ const TIPO_LABELS = {
   PERFIL: 'Direto', ESPECIALIDADE: 'Especialidade', IMEDIATO: 'Imediata',
 };
 
-export default function UpcomingAppointments({ appointments, onStart }) {
-  const navigate = useNavigate();
-  const ACTIVE = ['pending', 'accepted', 'confirmed', 'in_progress', 'SOLICITADO', 'CONFIRMADO', 'aguardando', 'em_atendimento'];
-
-  const upcoming = [...appointments]
+function getUpcomingAppointments(appointments) {
+  return [...(appointments || [])]
     .filter(a =>
-      ACTIVE.includes(a.status) &&
-      VALID_TYPES.includes(a.appointment_type || a.tipo_consulta)
+      UPCOMING_STATUSES.includes(a.status) &&
+      VALID_TYPES.includes(a.appointment_type || a.tipo_consulta) &&
+      !a.entry_eligibility?.effectivelyExpired
     )
     .sort((a, b) => {
       const da = a.scheduled_datetime || a.datetime || (a.date + (a.time || ''));
@@ -65,6 +71,11 @@ export default function UpcomingAppointments({ appointments, onStart }) {
       return (da || '').localeCompare(db || '');
     })
     .slice(0, 5);
+}
+
+export default function UpcomingAppointments({ appointments, onStart }) {
+  const navigate = useNavigate();
+  const upcoming = getUpcomingAppointments(appointments);
 
   const handleStart = (a) => {
     // Se tem consulta_id (nova entidade), navega para /consulta/:id
@@ -72,7 +83,9 @@ export default function UpcomingAppointments({ appointments, onStart }) {
       navigate(`/consulta/${a.consulta_id}`);
     } else {
       // Appointment antigo: chamar callback do pai
-      onStart && onStart(a);
+      if (onStart) {
+        onStart(a);
+      }
     }
   };
 

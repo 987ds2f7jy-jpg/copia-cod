@@ -1,4 +1,5 @@
 import { AppError } from '../_shared/errors.ts';
+import { getScheduledAppointmentDeadline } from '../_shared/scheduled-consultation-deadline.ts';
 import type {
   GetProfessionalDashboardCommand,
   GetProfessionalDashboardRepository,
@@ -8,6 +9,13 @@ import type {
 const SPECIALTY_ALIASES: Record<string, string> = {
   psicologia_clinica: 'psicologia',
 };
+
+function withEntryEligibility(appointment: Record<string, unknown>) {
+  return {
+    ...appointment,
+    entry_eligibility: getScheduledAppointmentDeadline(appointment),
+  };
+}
 
 function normalizeSpecialty(value: unknown) {
   return String(value ?? '')
@@ -63,9 +71,10 @@ export async function getProfessionalDashboard({
   const visibleProfessionalIds = professionalIds.length > 0 ? professionalIds : [professionalId];
   const publicProfile = await repository.findPublicProfileByProfessionalId(professionalId);
 
-  const [availabilitySlots, appointments, queueAll] = await Promise.all([
+  const [availabilitySlots, appointments, upcomingCandidates, queueAll] = await Promise.all([
     repository.listAvailabilitySlots(professionalId),
     repository.listAppointments(visibleProfessionalIds, appointmentsLimit),
+    repository.listUpcomingAppointmentCandidates(visibleProfessionalIds),
     repository.listQueueAll(professionalId, 100),
   ]);
 
@@ -97,7 +106,10 @@ export async function getProfessionalDashboard({
     professional,
     publicProfile,
     availabilitySlots,
-    appointments,
+    appointments: appointments.map(withEntryEligibility),
+    upcomingAppointments: upcomingCandidates
+      .map(withEntryEligibility)
+      .filter((appointment) => !Boolean((appointment.entry_eligibility as { effectivelyExpired?: boolean } | undefined)?.effectivelyExpired)),
     queueAll,
     queueWaiting,
     pendingQuestions,

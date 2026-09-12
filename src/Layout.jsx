@@ -17,6 +17,10 @@ import {
 import PageTransition from '@/components/PageTransition';
 import { useAuth } from '@/components/AuthContext';
 import { useMyActiveConsultation } from '@/hooks/useMyActiveConsultation';
+import {
+  formatConsultationCountdown,
+  useConsultationEntryState,
+} from '@/hooks/useConsultationEntryState';
 import { legalRoutes } from '@/config/legal';
 
 function BrandMark({ className = 'h-8 w-8' }) {
@@ -43,19 +47,37 @@ const BOTTOM_NAV = [
 ];
 
 function ActiveConsultationBanner({ activeConsultation, onResume }) {
+  const entryState = useConsultationEntryState(activeConsultation);
   const consultationStatus = String(activeConsultation?.consultation?.status || '').trim();
   const consultationType = String(activeConsultation?.consultation?.consultationType || '').trim();
   const counterpartName = activeConsultation?.counterpartName || 'o outro participante';
   const counterpartLabel = activeConsultation?.participantRole === 'professional'
     ? counterpartName
     : `Dr(a). ${counterpartName}`;
-  const title = consultationStatus === 'em_atendimento'
+  if (entryState.kind === 'hidden') {
+    return null;
+  }
+
+  const isCountdown = entryState.kind === 'countdown';
+  const isReady = entryState.kind === 'ready';
+  const actionLabel = activeConsultation?.participantRole === 'professional'
+    ? 'Iniciar consulta'
+    : 'Entrar na consulta';
+  const title = isCountdown
+    ? `Sua consulta começa em ${formatConsultationCountdown(entryState.remainingMs)}`
+    : isReady
+      ? 'Sua consulta pode começar agora.'
+      : consultationStatus === 'em_atendimento'
     ? 'Voce tem uma consulta em andamento.'
     : 'Voce tem uma consulta aguardando retorno.';
 
   let description = `A consulta com ${counterpartLabel} continua disponivel para retomada.`;
 
-  if (consultationStatus === 'aguardando' && consultationType === 'plantao') {
+  if (isCountdown) {
+    description = 'A entrada será liberada no horário agendado.';
+  } else if (isReady) {
+    description = 'Use a entrada segura para continuar o fluxo da teleconsulta.';
+  } else if (consultationStatus === 'aguardando' && consultationType === 'plantao') {
     description = `O atendimento imediato com ${counterpartLabel} ainda esta reservado para voce.`;
   } else if (activeConsultation?.needsProfessionalStart) {
     description = `A consulta com ${counterpartLabel} ainda aguarda a abertura da sala segura pelo profissional.`;
@@ -73,11 +95,12 @@ function ActiveConsultationBanner({ activeConsultation, onResume }) {
 
         <Button
           size="sm"
-          className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700"
-          onClick={onResume}
+          disabled={isCountdown}
+          className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          onClick={isReady || entryState.kind === 'resume' ? onResume : undefined}
         >
           <Video className="h-4 w-4" />
-          Retomar consulta
+          {entryState.kind === 'resume' ? 'Retomar consulta' : actionLabel}
         </Button>
       </div>
     </div>
@@ -118,23 +141,11 @@ function LayoutInner({ children, currentPageName }) {
     return <>{children}</>;
   }
 
-  const storedActiveConsultationId = typeof window !== 'undefined'
-    ? window.sessionStorage.getItem('rd_last_active_consultation')
-    : null;
   const activeConsultationPath = activeConsultation?.resumeUrl ||
     (activeConsultation?.consultation?.id ? `/consulta/${activeConsultation.consultation.id}` : null);
-  const activeConsultationStatus = String(activeConsultation?.consultation?.status || '').trim();
-  const activeConsultationType = String(activeConsultation?.consultation?.consultationType || '').trim();
   const canResumeConsultation = Boolean(
     activeConsultationPath &&
-    !location.pathname.startsWith('/consulta/') &&
-    (
-      activeConsultationStatus === 'em_atendimento' ||
-      activeConsultationStatus === 'in_progress' ||
-      activeConsultation?.roomReady ||
-      (activeConsultationStatus === 'aguardando' && activeConsultationType === 'plantao') ||
-      storedActiveConsultationId === activeConsultation?.consultation?.id
-    )
+    !location.pathname.startsWith('/consulta/')
   );
 
   return (

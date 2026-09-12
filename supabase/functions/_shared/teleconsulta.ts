@@ -119,7 +119,7 @@ export function resolveConsultaParticipantRole({
 }
 
 export function isConsultaClosed(status: string | null | undefined) {
-  return status === 'finalizada' || status === 'cancelada';
+  return status === 'finalizada' || status === 'cancelada' || status === 'nao_realizada';
 }
 
 export function calculateDurationMinutes(startedAt?: string | null, finishedAt?: string | null) {

@@ -151,6 +151,15 @@ function DashboardProfissionalInner() {
     enabled: !!professional?.id,
   });
 
+  const { data: upcomingAppointments = [] } = useQuery({
+    queryKey: ['profUpcomingAppointments', professional?.id],
+    queryFn: async () => {
+      const result = await getProfessionalDashboardRequest({ appointmentsLimit: 1, includeQueue: false, includeQuestions: false, includeReviews: false });
+      return result?.upcomingAppointments || [];
+    },
+    enabled: !!professional?.id,
+  });
+
   // Queue filtered by normalized specialty
   const { data: queuePatients = [] } = useQuery({
     queryKey: ['queueWaiting', professional?.id, professional?.specialty],
@@ -581,7 +590,7 @@ function DashboardProfissionalInner() {
             accepting={acceptQueuePatient.isPending}
           />
           <UpcomingAppointments
-            appointments={appointments}
+            appointments={upcomingAppointments}
             onStart={(a) => {
               if (a.consulta_id) {
                 navigate(`/consulta/${a.consulta_id}`);

@@ -1,5 +1,6 @@
 import type { AppUser } from '../_shared/professional.ts';
 import type { ConsultationRow, ProfessionalIdentityRow } from '../_shared/teleconsulta.ts';
+import type { ScheduledConsultationDeadline } from '../_shared/scheduled-consultation-deadline.ts';
 
 export type ActiveConsultationRow = ConsultationRow & {
   created_date: string | null;
@@ -28,6 +29,7 @@ export type GetMyActiveConsultationResult = {
   roomReady: boolean;
   needsProfessionalStart: boolean;
   counterpartName: string | null;
+  entryEligibility: ScheduledConsultationDeadline | null;
 };
 
 export type GetMyActiveConsultationCommand = {

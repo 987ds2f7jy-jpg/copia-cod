@@ -59,6 +59,10 @@ function renderConsultationStatus(status) {
     return 'Cancelada';
   }
 
+  if (status === 'nao_realizada') {
+    return 'Não realizada — prazo de entrada encerrado';
+  }
+
   return status || 'Consulta';
 }
 
@@ -73,6 +77,7 @@ function TeleconsultaInner({ consultationId }) {
   const [activeSidebarTab, setActiveSidebarTab] = useState('chat');
   const [pendingProntuarioAutoFill, setPendingProntuarioAutoFill] = useState(null);
   const [prontuarioMode, setProntuarioMode] = useState('simples');
+  const [sessionStartDeadlineElapsed, setSessionStartDeadlineElapsed] = useState(false);
 
   const autoJoinAttemptRef = useRef(false);
   const autoStartAttemptRef = useRef(false);
@@ -89,7 +94,7 @@ function TeleconsultaInner({ consultationId }) {
     refetchInterval: (query) => {
       const status = query.state.data?.consultation?.status;
 
-      if (isLeavingSession || ['finalizada', 'cancelada'].includes(status)) {
+      if (isLeavingSession || ['finalizada', 'cancelada', 'nao_realizada'].includes(status)) {
         return false;
       }
 
@@ -166,8 +171,12 @@ function TeleconsultaInner({ consultationId }) {
     onSuccess: async () => {
       await refreshContext();
     },
-    onError: (error) => {
+    onError: async (error) => {
       autoStartAttemptRef.current = false;
+      if (error?.code === 'CONSULTATION_START_DEADLINE_ELAPSED') {
+        setSessionStartDeadlineElapsed(true);
+        await Promise.all([refreshActiveConsultation(), refreshDashboardQueries()]);
+      }
       toast({
         title: 'Falha ao preparar a consulta',
         description: error?.message || 'Nao foi possivel iniciar a sessao da teleconsulta.',
@@ -214,6 +223,7 @@ function TeleconsultaInner({ consultationId }) {
     setActiveSidebarTab('chat');
     setPendingProntuarioAutoFill(null);
     setProntuarioMode('simples');
+    setSessionStartDeadlineElapsed(false);
   }, [consultationId]);
 
   const queueProntuarioAutoFill = (fields) => {
@@ -248,7 +258,7 @@ function TeleconsultaInner({ consultationId }) {
     const previousStatus = lastConsultaStatusRef.current;
     lastConsultaStatusRef.current = consulta.status;
 
-    if (!['finalizada', 'cancelada'].includes(consulta.status)) {
+    if (!['finalizada', 'cancelada', 'nao_realizada'].includes(consulta.status)) {
       return;
     }
 
@@ -267,13 +277,15 @@ function TeleconsultaInner({ consultationId }) {
 
     if (previousStatus && previousStatus !== consulta.status) {
       toast({
-        title: consulta.status === 'finalizada' ? 'Consulta encerrada.' : 'Consulta cancelada.',
+      title: consulta.status === 'nao_realizada'
+        ? 'Consulta não realizada — prazo de entrada encerrado.'
+        : consulta.status === 'finalizada' ? 'Consulta encerrada.' : 'Consulta cancelada.',
       });
     }
   }, [consulta?.status, currentEvaluation, isPaciente, zoomSession.leave]);
 
   useEffect(() => {
-    if (!['finalizada', 'cancelada'].includes(consulta?.status)) {
+    if (!['finalizada', 'cancelada', 'nao_realizada'].includes(consulta?.status)) {
       return;
     }
 
@@ -285,16 +297,20 @@ function TeleconsultaInner({ consultationId }) {
       return;
     }
 
-    if (['finalizada', 'cancelada'].includes(consulta.status)) {
+    const canPersistResumeHint = ['em_atendimento', 'in_progress'].includes(consulta.status) || (
+      consulta.status === 'aguardando' && consulta.consultationType === 'plantao'
+    );
+
+    if (!canPersistResumeHint) {
       window.sessionStorage.removeItem('rd_last_active_consultation');
       return;
     }
 
     window.sessionStorage.setItem('rd_last_active_consultation', consulta.id);
-  }, [consulta?.id, consulta?.status, isParticipant]);
+  }, [consulta?.consultationType, consulta?.id, consulta?.status, isParticipant]);
 
   useEffect(() => {
-    if (!user?.id || !['finalizada', 'cancelada'].includes(consulta?.status)) {
+    if (!user?.id || !['finalizada', 'cancelada', 'nao_realizada'].includes(consulta?.status)) {
       return;
     }
 
@@ -314,6 +330,8 @@ function TeleconsultaInner({ consultationId }) {
     participant?.canStartSession &&
     consulta.status !== 'finalizada' &&
     consulta.status !== 'cancelada' &&
+    consulta.status !== 'nao_realizada' &&
+    !sessionStartDeadlineElapsed &&
     !isZoomRoomReady
   );
 
@@ -332,6 +350,7 @@ function TeleconsultaInner({ consultationId }) {
     isZoomRoomReady &&
     consulta.status !== 'finalizada' &&
     consulta.status !== 'cancelada' &&
+    consulta.status !== 'nao_realizada' &&
     !isLeavingSession &&
     !startConsulta.isPending &&
     !needsSessionInitialization &&
@@ -378,7 +397,7 @@ function TeleconsultaInner({ consultationId }) {
       if (
         isProfissional &&
         participant?.canFinishSession &&
-        !['finalizada', 'cancelada'].includes(consulta.status)
+        !['finalizada', 'cancelada', 'nao_realizada'].includes(consulta.status)
       ) {
         if (!isProntuarioReady) {
           setActiveSidebarTab('prontuario');
@@ -484,6 +503,17 @@ function TeleconsultaInner({ consultationId }) {
     );
   }
 
+  if (consulta.status === 'nao_realizada' || sessionStartDeadlineElapsed) {
+    return (
+      <div className="flex min-h-screen flex-col items-center justify-center gap-4 bg-background px-4 text-center text-foreground dark:bg-gray-900 dark:text-white">
+        <AlertCircle className="h-12 w-12 text-amber-500" />
+        <h2 className="text-xl font-bold">Consulta não realizada</h2>
+        <p className="max-w-md text-muted-foreground dark:text-gray-300">O prazo de entrada desta consulta foi encerrado. Nenhuma responsabilidade é atribuída automaticamente às partes.</p>
+        <Button onClick={() => navigate(getDashboardPath(participant?.role))} className="bg-emerald-600 hover:bg-emerald-700">Voltar ao início</Button>
+      </div>
+    );
+  }
+
   const transcriptionDecisionRecorded = ['granted', 'declined', 'revoked']
     .includes(consents?.transcription?.decision);
   const consentSetupComplete = Boolean(
@@ -492,7 +522,7 @@ function TeleconsultaInner({ consultationId }) {
     && (consents?.transcription?.decision !== 'granted' || consents?.aiAssistanceAllowed),
   );
 
-  if (isPaciente && !['finalizada', 'cancelada'].includes(consulta.status) && !consentSetupComplete) {
+  if (isPaciente && !['finalizada', 'cancelada', 'nao_realizada'].includes(consulta.status) && !consentSetupComplete) {
     return (
       <ConsultationConsentGate
         consents={consents}

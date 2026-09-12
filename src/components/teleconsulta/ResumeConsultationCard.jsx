@@ -2,6 +2,10 @@ import React from 'react';
 import { ArrowRight, Clock3, Video } from 'lucide-react';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import {
+  formatConsultationCountdown,
+  useConsultationEntryState,
+} from '@/hooks/useConsultationEntryState';
 
 function buildResumeCopy(activeConsultation) {
   const status = String(activeConsultation?.consultation?.status || '').trim();
@@ -50,11 +54,57 @@ export default function ResumeConsultationCard({
   onResume,
   className = '',
 }) {
+  const entryState = useConsultationEntryState(activeConsultation);
+
   if (!activeConsultation?.hasActiveConsultation || !activeConsultation?.consultation?.id) {
     return null;
   }
 
+  if (entryState.kind === 'hidden') {
+    return null;
+  }
+
   const copy = buildResumeCopy(activeConsultation);
+  const isCountdown = entryState.kind === 'countdown';
+  const isReady = entryState.kind === 'ready';
+  const actionLabel = activeConsultation.participantRole === 'professional'
+    ? 'Iniciar consulta'
+    : 'Entrar na consulta';
+
+  if (isCountdown || isReady) {
+    const countdown = formatConsultationCountdown(entryState.remainingMs);
+
+    return (
+      <Card className={`border-blue-200 bg-blue-50/90 shadow-sm dark:border-blue-900/60 dark:bg-blue-950/30 ${className}`.trim()}>
+        <CardContent className="flex flex-col gap-4 p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className="min-w-0">
+            <div className="mb-2 inline-flex items-center gap-2 rounded-full bg-white/80 px-3 py-1 text-xs font-medium text-blue-700 dark:bg-blue-900/60 dark:text-blue-200">
+              <Clock3 className="h-3.5 w-3.5" />
+              Consulta agendada
+            </div>
+            <h3 className="text-base font-semibold text-blue-950 dark:text-blue-100">
+              {isCountdown ? `Sua consulta começa em ${countdown}` : 'Sua consulta pode começar agora'}
+            </h3>
+            <p className="mt-1 text-sm text-blue-800 dark:text-blue-200">
+              {isCountdown
+                ? 'A entrada será liberada no horário agendado.'
+                : 'Use a entrada segura para continuar o fluxo da teleconsulta.'}
+            </p>
+          </div>
+
+          <Button
+            disabled={isCountdown}
+            onClick={isReady ? onResume : undefined}
+            className="shrink-0 bg-emerald-600 text-white hover:bg-emerald-700 disabled:cursor-not-allowed disabled:opacity-60"
+          >
+            <Video className="mr-2 h-4 w-4" />
+            {actionLabel}
+            <ArrowRight className="ml-2 h-4 w-4" />
+          </Button>
+        </CardContent>
+      </Card>
+    );
+  }
 
   return (
     <Card className={`border-emerald-200 bg-emerald-50/90 shadow-sm dark:border-emerald-900/60 dark:bg-emerald-950/30 ${className}`.trim()}>

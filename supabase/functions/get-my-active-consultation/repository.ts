@@ -48,8 +48,7 @@ function createBaseActiveConsultationQuery(client: SupabaseClient) {
     .in('status', ACTIVE_CONSULTATION_STATUSES)
     .order('inicio_at', { ascending: false, nullsFirst: false })
     .order('datetime', { ascending: false, nullsFirst: false })
-    .order('created_date', { ascending: false, nullsFirst: false })
-    .limit(10);
+    .order('created_date', { ascending: false, nullsFirst: false });
 }
 
 async function runActiveConsultationQuery(query: ReturnType<typeof createBaseActiveConsultationQuery>) {
