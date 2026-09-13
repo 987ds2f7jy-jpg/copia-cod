@@ -21,6 +21,140 @@ function futureDate(days = 4) {
   ].join('-');
 }
 
+function priorityDate() {
+  const value = new Date();
+  value.setDate(value.getDate() + 1);
+  return [
+    value.getFullYear(),
+    String(value.getMonth() + 1).padStart(2, '0'),
+    String(value.getDate()).padStart(2, '0'),
+  ].join('-');
+}
+
+function makeCreatedAppointment(params: Record<string, unknown>) {
+  return {
+    id: '30000000-0000-4000-8000-000000000001',
+    patient_id: params.patientId,
+    patient_name: params.patientName,
+    patient_email: params.patientEmail,
+    professional_id: params.professionalId,
+    professional_name: params.professionalName,
+    specialty: params.specialty,
+    appointment_type: params.appointmentType,
+    scheduled_datetime: params.scheduledDatetime,
+    date: params.date,
+    time: params.time,
+    status: params.status,
+    price: params.price,
+    payment_status: 'payment_pending',
+    payment_required: true,
+    current_payment_charge_id: '40000000-0000-4000-8000-000000000001',
+    funding_source: 'self_pay',
+    coverage_status: null,
+    plan_credit_usage_id: null,
+    plan_subscription_order_id: null,
+    external_subscription_score_id: null,
+    external_score_id: null,
+    external_plan_id: null,
+    external_specialization_id: null,
+    symptoms: params.symptoms,
+    accepted_at: null,
+    consulta_id: null,
+    service_code: params.appointmentType === 'priority' ? 'profile_priority' : 'profile_standard',
+    price_source: 'professional_profile',
+    gross_price: params.price,
+    platform_fee_percent: 0.1,
+    platform_fee_amount: 12,
+    professional_net_amount: 108,
+    pricing_rule_id: null,
+    fee_rule_id: null,
+    coverage_snapshot: {},
+  };
+}
+
+function makeProfileCreateRepository({
+  priorityEnabled = true,
+  slots = [],
+  availableHours = [],
+  hasConflict = false,
+}: {
+  priorityEnabled?: boolean;
+  slots?: { weekday: number; timeSlot: string }[];
+  availableHours?: string[];
+  hasConflict?: boolean;
+} = {}) {
+  const createRecord = vi.fn(async (params) => makeCreatedAppointment(params));
+  const listAvailabilitySlots = vi.fn().mockResolvedValue(slots);
+
+  return {
+    createRecord,
+    repository: {
+      findAppUserByAuthUserId: vi.fn().mockResolvedValue({
+        id: '10000000-0000-4000-8000-000000000001',
+        authUserId: 'auth-patient',
+        fullName: 'Paciente Teste',
+        email: 'patient@example.invalid',
+        role: 'patient',
+        isActive: true,
+      }),
+      findProfessionalTargetById: vi.fn().mockResolvedValue({
+        profileId: professionalProfileId,
+        appUserId: '10000000-0000-4000-8000-000000000002',
+        fullName: 'Profissional Teste',
+        specialty: 'Clinico Geral',
+        status: 'approved',
+        priceStandard: 120,
+        pricePriority: 180,
+        priorityEnabled,
+        availableHours,
+        source: 'professional_profiles',
+      }),
+      resolveServicePricing: vi.fn().mockResolvedValue({
+        serviceCode: priorityEnabled ? 'profile_priority' : 'profile_standard',
+        priceSource: 'professional_profile',
+        grossPrice: 120,
+        platformFeePercent: 0.1,
+        platformFeeAmount: 12,
+        professionalNetAmount: 108,
+        pricingRuleId: null,
+        feeRuleId: null,
+      }),
+      listAvailabilitySlots,
+      hasActiveAppointmentConflict: vi.fn().mockResolvedValue(hasConflict),
+      verifyPlanCoverageForSpecialty: vi.fn(),
+      createAppointment: createRecord,
+    } as unknown as CreateAppointmentRepository,
+    listAvailabilitySlots,
+  };
+}
+
+function createProfileCommand({
+  date = futureDate(),
+  time = '08:00',
+  priority = false,
+  repository,
+}: {
+  date?: string;
+  time?: string;
+  priority?: boolean;
+  repository: CreateAppointmentRepository;
+}) {
+  return createAppointment({
+    requestId: 'request-create',
+    input: {
+      professionalProfileId,
+      specialty: '',
+      date,
+      time,
+      symptoms: '',
+      priority,
+      fundingSource: 'self_pay',
+    },
+    authenticatedUser: { authUserId: 'auth-patient', email: 'patient@example.invalid' },
+    repository,
+  });
+}
+
 function appointmentWindow(overrides: Partial<AppointmentAcceptanceWindowRecord> = {}): AppointmentAcceptanceWindowRecord {
   return {
     id: '30000000-0000-4000-8000-000000000001',
@@ -110,6 +244,7 @@ describe('profile appointment integrity', () => {
         status: 'approved',
         priceStandard: 120,
         pricePriority: 180,
+        priorityEnabled: true,
         availableHours: [],
         source: 'professional_profiles',
       }),
@@ -153,6 +288,105 @@ describe('profile appointment integrity', () => {
     expect(result.appointment.status).toBe('SOLICITADO');
     expect(result.appointment.professionalId).toBe(professionalProfileId);
     expect((result.appointment as Record<string, unknown>).consultaId).toBeUndefined();
+  });
+
+  it('keeps normal availability mandatory for PERFIL appointments', async () => {
+    const date = futureDate();
+    const weekday = new Date(`${date}T12:00:00`).getDay();
+    const { repository, createRecord } = makeProfileCreateRepository({
+      slots: [{ weekday, timeSlot: '08:20' }],
+    });
+
+    await expect(createProfileCommand({ repository, date, time: '08:00' })).rejects.toMatchObject({
+      status: 422,
+      code: 'AVAILABILITY_SLOT_NOT_AVAILABLE',
+    });
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('creates a priority request outside normal availability without loading normal slots', async () => {
+    const date = priorityDate();
+    const weekday = new Date(`${date}T12:00:00`).getDay();
+    const { repository, createRecord, listAvailabilitySlots } = makeProfileCreateRepository({
+      slots: [{ weekday, timeSlot: '08:00' }],
+      availableHours: ['08:00'],
+    });
+
+    const result = await createProfileCommand({
+      repository,
+      date,
+      time: '12:00',
+      priority: true,
+    });
+
+    expect(listAvailabilitySlots).not.toHaveBeenCalled();
+    expect(createRecord).toHaveBeenCalledWith(expect.objectContaining({
+      appointmentType: 'priority',
+      pricing: expect.objectContaining({ serviceCode: 'profile_priority' }),
+      scheduledDatetime: `${date}T12:00:00`,
+      status: 'SOLICITADO',
+    }));
+    expect(result.appointment.appointmentType).toBe('priority');
+    expect(result.appointment.scheduledDatetime).toBe(`${date}T12:00:00`);
+  });
+
+  it('rejects a direct priority payload when the professional has not enabled priority appointments', async () => {
+    const { repository, createRecord, listAvailabilitySlots } = makeProfileCreateRepository({
+      priorityEnabled: false,
+    });
+
+    await expect(createProfileCommand({
+      repository,
+      date: priorityDate(),
+      time: '12:00',
+      priority: true,
+    })).rejects.toMatchObject({
+      status: 422,
+      code: 'PRIORITY_APPOINTMENTS_DISABLED',
+    });
+    expect(listAvailabilitySlots).not.toHaveBeenCalled();
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('keeps actual occupied times protected for priority requests', async () => {
+    const { repository, createRecord } = makeProfileCreateRepository({ hasConflict: true });
+
+    await expect(createProfileCommand({
+      repository,
+      date: priorityDate(),
+      time: '12:00',
+      priority: true,
+    })).rejects.toMatchObject({
+      status: 409,
+      code: 'APPOINTMENT_SCHEDULE_CONFLICT',
+    });
+    expect(createRecord).not.toHaveBeenCalled();
+  });
+
+  it('keeps a priority request pending until the selected professional accepts it', async () => {
+    const priorityTransaction = {
+      ...transactionResult,
+      appointment_scheduled_datetime: `${priorityDate()}T12:00:00`,
+      consulta_tipo: 'prioritario',
+      consulta_datetime: `${priorityDate()}T12:00:00`,
+    };
+    const acceptTransaction = vi.fn().mockResolvedValue(priorityTransaction);
+    const repository = makeAcceptRepository({
+      window: appointmentWindow({
+        appointmentType: 'priority',
+        scheduledDatetime: `${priorityDate()}T12:00:00`,
+        date: priorityDate(),
+        time: '12:00',
+      }),
+      acceptTransaction,
+    });
+
+    const result = await runAccept(repository);
+
+    expect(acceptTransaction).toHaveBeenCalledOnce();
+    expect(result.appointment.status).toBe('accepted');
+    expect(result.consulta.tipoConsulta).toBe('prioritario');
+    expect(result.consulta.datetime).toBe(`${priorityDate()}T12:00:00`);
   });
 
   it('blocks acceptance before payment confirmation', async () => {
@@ -215,6 +449,7 @@ describe('profile appointment integrity', () => {
     expect(migration).toContain("pc.status = 'paid'");
     expect(transaction).toContain('FOR UPDATE');
     expect(transaction).toContain('pg_advisory_xact_lock');
+    expect(transaction).toContain("'APPOINTMENT_SCHEDULE_CONFLICT'");
     expect(transaction.match(/INSERT INTO public\.consultas/g)).toHaveLength(1);
   });
 

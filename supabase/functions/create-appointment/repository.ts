@@ -34,6 +34,7 @@ type ProfessionalRow = {
   status: string | null;
   price_standard: number | null;
   price_priority: number | null;
+  prioritario_ativo: boolean | null;
   available_hours: string[] | null;
 };
 
@@ -444,7 +445,7 @@ async function loadProfessionalTarget(
 ): Promise<ProfessionalTargetRecord | null> {
   const { data, error } = await client
     .from('professional_profiles')
-    .select('id, user_id, full_name, specialty, status, price_standard, price_priority, available_hours')
+    .select('id, user_id, full_name, specialty, status, price_standard, price_priority, prioritario_ativo, available_hours')
     .eq('id', profileId)
     .maybeSingle();
 
@@ -471,6 +472,7 @@ async function loadProfessionalTarget(
     status: row.status || '',
     priceStandard: Number(row.price_standard || 0),
     pricePriority: Number(row.price_priority || 0),
+    priorityEnabled: Boolean(row.prioritario_ativo),
     availableHours: Array.isArray(row.available_hours) ? row.available_hours.filter(Boolean) : [],
     source: 'professional_profiles',
   };

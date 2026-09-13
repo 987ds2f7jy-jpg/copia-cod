@@ -226,14 +226,24 @@ export async function createAppointment({
       });
     }
 
-    const weekday = normalizeWeekday(input.date);
-    const availabilitySlots = await repository.listAvailabilitySlots(professional.profileId);
-    assertTargetAvailability({
-      weekday,
-      time: input.time,
-      availabilitySlots,
-      availableHours: professional.availableHours,
-    });
+    if (input.priority) {
+      if (!professional.priorityEnabled) {
+        throw new AppError({
+          status: 422,
+          code: 'PRIORITY_APPOINTMENTS_DISABLED',
+          message: 'Priority appointments are not enabled for this professional.',
+        });
+      }
+    } else {
+      const weekday = normalizeWeekday(input.date);
+      const availabilitySlots = await repository.listAvailabilitySlots(professional.profileId);
+      assertTargetAvailability({
+        weekday,
+        time: input.time,
+        availabilitySlots,
+        availableHours: professional.availableHours,
+      });
+    }
 
     const hasConflict = await repository.hasActiveAppointmentConflict({
       professionalId: professional.profileId,

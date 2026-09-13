@@ -55,6 +55,7 @@ export type ProfessionalTargetRecord = {
   status: string;
   priceStandard: number;
   pricePriority: number;
+  priorityEnabled: boolean;
   availableHours: string[];
   source: 'professional_profiles';
 };

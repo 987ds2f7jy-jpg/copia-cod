@@ -5,6 +5,7 @@ import {
   errorResponse,
   handlePreflight,
   readJsonBody,
+  resolveRequestCorsOptions,
   successResponse,
 } from '../_shared/http.ts';
 import type { CorsOptions } from '../_shared/http.ts';
@@ -16,7 +17,8 @@ const FUNCTION_NAME = 'get-professional-dashboard';
 const CORS: CorsOptions = { allowedMethods: ['POST'] };
 
 export async function handleGetProfessionalDashboardRequest(req: Request) {
-  const preflightResponse = handlePreflight(req, CORS);
+  const requestCors = resolveRequestCorsOptions(req, CORS);
+  const preflightResponse = handlePreflight(req, requestCors);
   if (preflightResponse) return preflightResponse;
 
   const requestId = createRequestId();
@@ -24,7 +26,7 @@ export async function handleGetProfessionalDashboardRequest(req: Request) {
     allowedMethods: ['POST'],
     functionName: FUNCTION_NAME,
     requestId,
-    cors: CORS,
+    cors: requestCors,
   });
   if (methodErrorResponse) return methodErrorResponse;
 
@@ -42,9 +44,9 @@ export async function handleGetProfessionalDashboardRequest(req: Request) {
       repository: runtime.repository,
     });
 
-    return successResponse(result, requestId, { status: 200, cors: CORS });
+    return successResponse(result, requestId, { status: 200, cors: requestCors });
   } catch (error) {
-    return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: CORS });
+    return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: requestCors });
   }
 }
 

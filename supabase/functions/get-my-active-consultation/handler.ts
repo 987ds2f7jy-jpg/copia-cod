@@ -5,6 +5,7 @@ import {
   ensureMethod,
   errorResponse,
   handlePreflight,
+  resolveRequestCorsOptions,
   successResponse,
 } from '../_shared/http.ts';
 import type { CorsOptions } from '../_shared/http.ts';
@@ -28,7 +29,8 @@ function buildEmptyActiveConsultationResult() {
 }
 
 export async function handleGetMyActiveConsultationRequest(req: Request) {
-  const preflightResponse = handlePreflight(req, CORS);
+  const requestCors = resolveRequestCorsOptions(req, CORS);
+  const preflightResponse = handlePreflight(req, requestCors);
   if (preflightResponse) return preflightResponse;
 
   const requestId = createRequestId();
@@ -36,7 +38,7 @@ export async function handleGetMyActiveConsultationRequest(req: Request) {
     allowedMethods: ['POST'],
     functionName: FUNCTION_NAME,
     requestId,
-    cors: CORS,
+    cors: requestCors,
   });
   if (methodErrorResponse) return methodErrorResponse;
 
@@ -50,7 +52,7 @@ export async function handleGetMyActiveConsultationRequest(req: Request) {
       repository: runtime.repository,
     });
 
-    return successResponse(result, requestId, { status: 200, cors: CORS });
+    return successResponse(result, requestId, { status: 200, cors: requestCors });
   } catch (error) {
     if (
       (isAppError(error) && [
@@ -62,10 +64,10 @@ export async function handleGetMyActiveConsultationRequest(req: Request) {
     ) {
       return successResponse(buildEmptyActiveConsultationResult(), requestId, {
         status: 200,
-        cors: CORS,
+        cors: requestCors,
       });
     }
 
-    return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: CORS });
+    return errorResponse(error, { requestId, functionName: FUNCTION_NAME, cors: requestCors });
   }
 }

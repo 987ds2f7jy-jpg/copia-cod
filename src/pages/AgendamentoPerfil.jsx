@@ -12,6 +12,7 @@ import { Badge } from "@/components/ui/badge";
 import { Textarea } from "@/components/ui/textarea";
 import { Calendar } from "@/components/ui/calendar";
 import { Label } from "@/components/ui/label";
+import { Input } from "@/components/ui/input";
 import {
   ArrowLeft, ArrowRight, CheckCircle, Stethoscope,
   Star, Loader2, Clock, AlertCircle, Zap, Calendar as CalendarDaysIcon
@@ -71,27 +72,6 @@ function AgendamentoPerfilInner() {
     enabled: !!privateProfileId,
   });
 
-  const prioritySlots = useMemo(() => {
-    if (!selectedDate) return [];
-    const now = new Date();
-    const dateStr = format(selectedDate, 'yyyy-MM-dd');
-    const bookedSet = new Set(bookedAppointments.map(a => a.scheduled_datetime).filter(Boolean));
-    const slots = [];
-    for (let h = 8; h < 18; h++) {
-      for (let m = 0; m < 60; m += 20) {
-        const time = `${String(h).padStart(2,'0')}:${String(m).padStart(2,'0')}`;
-        const dt = buildDatetime(dateStr, time);
-        const dtDate = new Date(dt);
-        const minDt = addHours(now, 1);
-        const maxDt = addHours(now, 36);
-        if (dtDate < minDt || dtDate > maxDt) continue;
-        if (bookedSet.has(dt)) continue;
-        slots.push(time);
-      }
-    }
-    return slots;
-  }, [selectedDate, bookedAppointments]);
-
   const standardSlots = useMemo(() => {
     if (!selectedDate || !privateProfileId) return [];
     const dateStr = format(selectedDate, 'yyyy-MM-dd');
@@ -102,8 +82,6 @@ function AgendamentoPerfilInner() {
       return validateSchedulingWindow(dt).valid;
     });
   }, [selectedDate, availabilitySlots, bookedAppointments, privateProfileId]);
-
-  const availableSlots = appointmentType === 'priority' ? prioritySlots : standardSlots;
 
   const { data: serviceQuote, isLoading: quoteLoading, error: quoteError } = useQuery({
     queryKey: ['service-pricing', 'appointment-profile', privateProfileId, appointmentType],
@@ -343,7 +321,7 @@ function AgendamentoPerfilInner() {
                       disabled={isDateDisabled}
                       className="rounded-xl border w-fit"
                     />
-                    {availabilitySlots.length === 0 && privateProfileId && (
+                    {appointmentType !== 'priority' && availabilitySlots.length === 0 && privateProfileId && (
                       <p className="mt-2 text-xs text-amber-600 flex items-center gap-1">
                         <AlertCircle className="w-3.5 h-3.5" />
                         Profissional não configurou disponibilidade ainda.
@@ -356,23 +334,42 @@ function AgendamentoPerfilInner() {
                         ? `Horários — ${format(selectedDate, "EEE, dd/MM", { locale: ptBR })}`
                         : 'Selecione uma data primeiro'}
                     </Label>
-                    {selectedDate && availableSlots.length === 0 && (
-                      <p className="text-sm text-muted-foreground py-4">Nenhum horário disponível neste dia.</p>
+                    {appointmentType === 'priority' ? (
+                      <div className="space-y-2">
+                        <Input
+                          type="time"
+                          value={selectedTime || ''}
+                          onChange={(event) => setSelectedTime(event.target.value || null)}
+                          min="08:00"
+                          max="17:40"
+                          step="1200"
+                          disabled={!selectedDate}
+                        />
+                        <p className="text-xs text-muted-foreground">
+                          Escolha o horário desejado. A solicitação está sujeita ao aceite do profissional.
+                        </p>
+                      </div>
+                    ) : (
+                      <>
+                        {selectedDate && standardSlots.length === 0 && (
+                          <p className="text-sm text-muted-foreground py-4">Nenhum horário disponível neste dia.</p>
+                        )}
+                        <div className="grid grid-cols-2 gap-2">
+                          {standardSlots.map((slot) => (
+                            <button
+                              key={slot}
+                              onClick={() => setSelectedTime(slot)}
+                              className={`p-3 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
+                                selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-muted hover:bg-accent text-foreground'
+                              }`}
+                            >
+                              <Clock className="w-3.5 h-3.5" />
+                              {slot}
+                            </button>
+                          ))}
+                        </div>
+                      </>
                     )}
-                    <div className="grid grid-cols-2 gap-2">
-                      {availableSlots.map((slot) => (
-                        <button
-                          key={slot}
-                          onClick={() => setSelectedTime(slot)}
-                          className={`p-3 rounded-xl text-sm font-medium transition-all flex items-center gap-1.5 ${
-                            selectedTime === slot ? 'bg-emerald-500 text-white' : 'bg-muted hover:bg-accent text-foreground'
-                          }`}
-                        >
-                          <Clock className="w-3.5 h-3.5" />
-                          {slot}
-                        </button>
-                      ))}
-                    </div>
                   </div>
                 </div>
 

@@ -9,7 +9,11 @@ import {
   isCorsOriginAllowed,
   resolveAllowedCorsOrigins,
 } from '../../supabase/functions/_shared/cors-policy.ts';
-import { handlePreflight } from '../../supabase/functions/_shared/http.ts';
+import {
+  buildCorsHeaders,
+  handlePreflight,
+  resolveRequestCorsOptions,
+} from '../../supabase/functions/_shared/http.ts';
 
 const root = process.cwd();
 const temporaryDirectories: string[] = [];
@@ -183,6 +187,35 @@ describe('Edge Function CORS policy', () => {
       }));
       expect(response?.status).toBe(403);
       expect(response?.headers.get('Access-Control-Allow-Origin')).not.toBe('*');
+    } finally {
+      runtime.Deno = previousDeno;
+    }
+  });
+
+  it('binds normal responses to the validated requesting origin instead of the first configured origin', () => {
+    const runtime = globalThis as unknown as { Deno?: { env: { get: (name: string) => string | undefined } } };
+    const previousDeno = runtime.Deno;
+    runtime.Deno = {
+      env: {
+        get: (name) => ({
+          APP_ENV: 'staging',
+          EDGE_ALLOWED_ORIGINS: 'https://first.rapido.example,https://second.rapido.example',
+        } as Record<string, string>)[name],
+      },
+    };
+
+    try {
+      const trustedCors = resolveRequestCorsOptions(new Request('https://edge.example/function', {
+        method: 'POST',
+        headers: { Origin: 'https://second.rapido.example' },
+      }), { allowedMethods: ['POST'] });
+      expect(buildCorsHeaders(trustedCors)['Access-Control-Allow-Origin']).toBe('https://second.rapido.example');
+
+      const untrustedCors = resolveRequestCorsOptions(new Request('https://edge.example/function', {
+        method: 'POST',
+        headers: { Origin: 'https://attacker.example' },
+      }), { allowedMethods: ['POST'] });
+      expect(buildCorsHeaders(untrustedCors)['Access-Control-Allow-Origin']).toBeUndefined();
     } finally {
       runtime.Deno = previousDeno;
     }

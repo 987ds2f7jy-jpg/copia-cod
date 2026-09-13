@@ -2,6 +2,7 @@ import { AppError, isAppError, toAppError } from './errors.ts';
 import { logTechnicalEvent, sanitizeErrorCode } from './observability.ts';
 import type { ApiErrorResponse, ApiSuccess } from './types.ts';
 import {
+  getAllowedCorsOrigin,
   getCanonicalCorsOrigin,
   isCorsOriginAllowed,
   resolveAllowedCorsOrigins,
@@ -46,7 +47,10 @@ export function buildCorsHeaders(options: CorsOptions = {}) {
     ...(options.allowedHeaders || []),
   ]);
 
-  const allowOrigin = options.allowOrigin || getCanonicalCorsOrigin(getRuntimeAllowedOrigins());
+  const hasExplicitOrigin = Object.prototype.hasOwnProperty.call(options, 'allowOrigin');
+  const allowOrigin = hasExplicitOrigin
+    ? options.allowOrigin?.trim() || ''
+    : getCanonicalCorsOrigin(getRuntimeAllowedOrigins());
   const headers: Record<string, string> = {
     'Access-Control-Allow-Headers': allowedHeaders.join(', '),
     'Access-Control-Allow-Methods': allowedMethods.join(', '),
@@ -58,6 +62,24 @@ export function buildCorsHeaders(options: CorsOptions = {}) {
   }
 
   return headers;
+}
+
+/**
+ * Bind a normal response to the validated request Origin. Preflight already
+ * performs this validation, but POST responses must not fall back to the first
+ * configured origin when more than one allowed browser origin exists.
+ */
+export function resolveRequestCorsOptions(req: Request, cors: CorsOptions = {}): CorsOptions {
+  const requestOrigin = req.headers.get('Origin');
+
+  if (!requestOrigin) {
+    return cors;
+  }
+
+  return {
+    ...cors,
+    allowOrigin: getAllowedCorsOrigin(requestOrigin, getRuntimeAllowedOrigins()),
+  };
 }
 
 export function createRequestId() {

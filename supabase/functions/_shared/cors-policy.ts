@@ -45,8 +45,14 @@ export function resolveAllowedCorsOrigins({
 }
 
 export function isCorsOriginAllowed(origin: unknown, allowedOrigins: string[]) {
+  return Boolean(getAllowedCorsOrigin(origin, allowedOrigins));
+}
+
+export function getAllowedCorsOrigin(origin: unknown, allowedOrigins: string[]) {
   const normalizedOrigin = normalizeOrigin(origin);
-  return Boolean(normalizedOrigin && allowedOrigins.includes(normalizedOrigin));
+  return normalizedOrigin && allowedOrigins.includes(normalizedOrigin)
+    ? normalizedOrigin
+    : '';
 }
 
 export function getCanonicalCorsOrigin(allowedOrigins: string[]) {
