@@ -27,6 +27,12 @@ verify_jwt = false
 [functions.backoffice-analytics-summary]
 verify_jwt = false
 
+[functions.backoffice-services-list]
+verify_jwt = false
+
+[functions.backoffice-services-update]
+verify_jwt = false
+
 [functions.notifications-list]
 verify_jwt = false
 

@@ -1,9 +1,10 @@
-import { BarChart3, ClipboardList } from 'lucide-react';
+import { BarChart3, ClipboardList, Settings2 } from 'lucide-react';
 import { NavLink } from 'react-router-dom';
 
 const items = [
   { to: '/admin/backoffice/pending-registrations', label: 'Cadastros pendentes', icon: ClipboardList },
   { to: '/admin/backoffice/analytics', label: 'Análise de dados', icon: BarChart3 },
+  { to: '/admin/backoffice/services', label: 'Serviços', icon: Settings2 },
 ];
 
 export function BackofficeSidebar() {

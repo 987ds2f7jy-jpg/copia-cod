@@ -5,6 +5,7 @@ import { ProtectedBackofficeRoute } from './components/ProtectedBackofficeRoute'
 import { AnalyticsPage } from './pages/AnalyticsPage';
 import { BackofficeLoginPage } from './pages/BackofficeLoginPage';
 import { PendingProfessionalsPage } from './pages/PendingProfessionalsPage';
+import { ServicesPage } from './pages/ServicesPage';
 
 export default function BackofficeRoutes() {
   return (
@@ -15,6 +16,7 @@ export default function BackofficeRoutes() {
           <Route index element={<Navigate to="pending-registrations" replace />} />
           <Route path="pending-registrations" element={<PendingProfessionalsPage />} />
           <Route path="analytics" element={<AnalyticsPage />} />
+          <Route path="services" element={<ServicesPage />} />
         </Route>
         <Route path="*" element={<Navigate to="login" replace />} />
       </Routes>
