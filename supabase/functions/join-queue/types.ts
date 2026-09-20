@@ -21,6 +21,7 @@ export type AppUserRecord = {
 
 export type QueueRecord = {
   id: string;
+  createdNow?: boolean;
   patient_id: string;
   patient_name: string | null;
   patient_email: string | null;

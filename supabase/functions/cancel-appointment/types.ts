@@ -30,6 +30,7 @@ export type CancelAppointmentRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findAppointmentById(appointmentId: string): Promise<AppointmentRecord | null>;
   listProfessionalIdentityIdsForUser(userId: string): Promise<string[]>;
+  findProfessionalAppUserIdByProfileId(profileId: string): Promise<string | null>;
   cancelAppointment(params: {
     appointmentId: string;
     reason: string;

@@ -5,7 +5,7 @@ import {
   notifyInternalBestEffort,
 } from '../notifications/notify-best-effort.ts';
 import type { SupabaseClient } from '../supabase.ts';
-import type { PaymentOwnerType } from './types.ts';
+import type { PaymentChargeStatus, PaymentOwnerType } from './types.ts';
 
 const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   appointment: 'appointments',
@@ -13,6 +13,36 @@ const OWNER_TABLE: Record<PaymentOwnerType, string> = {
   solicitacao_exame: 'solicitacoes_exames',
   plan_subscription: 'plan_subscription_orders',
 };
+
+const NOTIFIABLE_PAYMENT_STATUS = {
+  paid: {
+    typeKey: 'financial.payment_approved',
+    deduplicationSegment: 'approved',
+  },
+  payment_failed: {
+    typeKey: 'financial.payment_failed',
+    deduplicationSegment: 'failed',
+  },
+  payment_expired: {
+    typeKey: 'financial.payment_expired',
+    deduplicationSegment: 'expired',
+  },
+  refunded: {
+    typeKey: 'financial.refund_processed',
+    deduplicationSegment: 'refunded',
+  },
+} satisfies Partial<Record<PaymentChargeStatus, {
+  typeKey: string;
+  deduplicationSegment: string;
+}>>;
+
+export type NotifiablePaymentStatus = keyof typeof NOTIFIABLE_PAYMENT_STATUS;
+
+export function isNotifiablePaymentStatus(
+  status: PaymentChargeStatus,
+): status is NotifiablePaymentStatus {
+  return status in NOTIFIABLE_PAYMENT_STATUS;
+}
 
 async function resolvePaymentOwnerRecipientUserId(
   client: SupabaseClient,
@@ -60,33 +90,36 @@ async function resolvePaymentOwnerRecipientUserId(
   return recipientUserId;
 }
 
-export async function notifyPaymentApprovedBestEffort(
+export async function notifyPaymentStatusBestEffort(
   client: SupabaseClient,
   {
     paymentChargeId,
     ownerType,
     ownerId,
+    status,
     requestId,
     functionName,
   }: {
     paymentChargeId: string;
     ownerType: PaymentOwnerType;
     ownerId: string;
+    status: NotifiablePaymentStatus;
     requestId?: string | null;
     functionName: string;
   },
 ) {
+  const notification = NOTIFIABLE_PAYMENT_STATUS[status];
   let recipientUserId: string | null = null;
-  let deduplicationKey = `payment_charge:${paymentChargeId}:approved:unresolved`;
+  let deduplicationKey = `payment_charge:${paymentChargeId}:${notification.deduplicationSegment}:unresolved`;
 
   try {
     recipientUserId = await resolvePaymentOwnerRecipientUserId(client, ownerType, ownerId);
-    deduplicationKey = `payment_charge:${paymentChargeId}:approved:${recipientUserId}`;
+    deduplicationKey = `payment_charge:${paymentChargeId}:${notification.deduplicationSegment}:${recipientUserId}`;
   } catch (error) {
     logInternalNotificationFailure({
       functionName,
       requestId,
-      typeKey: 'financial.payment_approved',
+      typeKey: notification.typeKey,
       recipientUserId,
       relatedEntityType: 'payment_charge',
       relatedEntityId: paymentChargeId,
@@ -101,7 +134,7 @@ export async function notifyPaymentApprovedBestEffort(
     requestId,
     input: {
       recipientUserId,
-      typeKey: 'financial.payment_approved',
+      typeKey: notification.typeKey,
       relatedEntityType: 'payment_charge',
       relatedEntityId: paymentChargeId,
       deduplicationKey,

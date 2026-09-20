@@ -1,5 +1,9 @@
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import { AppError } from '../_shared/errors.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import type {
   AcceptSolicitacaoExameCommand,
   AcceptSolicitacaoExameRepository,
@@ -80,8 +84,10 @@ export async function acceptSolicitacaoExame({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: AcceptSolicitacaoExameRepository;
+  notificationService?: InternalNotificationNotifier;
 } & AcceptSolicitacaoExameCommand): Promise<AcceptSolicitacaoExameResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -215,6 +221,21 @@ export async function acceptSolicitacaoExame({
     professionalProfileId: accepted.medico_id,
     status: accepted.status,
   });
+
+  if (notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'accept-solicitacao-exame',
+      requestId,
+      input: {
+        recipientUserId: accepted.paciente_id,
+        typeKey: 'clinical_request.accepted',
+        relatedEntityType: 'clinical_request',
+        relatedEntityId: accepted.id,
+        deduplicationKey: `clinical_request:${accepted.id}:accepted:patient:${accepted.paciente_id}`,
+      },
+    });
+  }
 
   return {
     solicitacaoExame: accepted,

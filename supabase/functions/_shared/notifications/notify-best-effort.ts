@@ -17,6 +17,10 @@ export function logInternalNotificationFailure(
   context: NotificationFailureContext,
   error: unknown,
 ) {
+  const errorRecord = error && typeof error === 'object'
+    ? error as Record<string, unknown>
+    : {};
+
   console.error('[internal-notification] notify:failed', {
     functionName: context.functionName,
     requestId: context.requestId || null,
@@ -25,6 +29,10 @@ export function logInternalNotificationFailure(
     relatedEntityType: context.relatedEntityType || null,
     relatedEntityId: context.relatedEntityId || null,
     deduplicationKey: context.deduplicationKey || null,
+    errorMessage: error instanceof Error ? error.message : String(errorRecord.message || error || ''),
+    errorCode: errorRecord.code || null,
+    errorDetails: errorRecord.details || null,
+    errorHint: errorRecord.hint || null,
     error,
   });
 }

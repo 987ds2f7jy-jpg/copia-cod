@@ -1,4 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  logInternalNotificationFailure,
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import type {
   RequestWithdrawalCommand,
   RequestWithdrawalRepository,
@@ -47,9 +52,11 @@ export async function requestWithdrawal({
   authenticatedUser,
   appUserId,
   repository,
+  notificationService,
 }: {
   appUserId: string;
   repository: RequestWithdrawalRepository;
+  notificationService?: InternalNotificationNotifier;
 } & RequestWithdrawalCommand): Promise<RequestWithdrawalResult> {
   const { monthStart, monthEnd, monthEndExclusive } = formatMonthBounds();
 
@@ -136,6 +143,35 @@ export async function requestWithdrawal({
     saqueId: String(saque?.id || ''),
     saldoDisponivel,
   });
+
+  if (notificationService) {
+    const withdrawalId = String(saque?.id || '').trim();
+
+    if (withdrawalId) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'request-withdrawal',
+        requestId,
+        input: {
+          recipientUserId: appUserId,
+          typeKey: 'financial.withdrawal_requested',
+          relatedEntityType: 'withdrawal',
+          relatedEntityId: withdrawalId,
+          deduplicationKey: `withdrawal:${withdrawalId}:requested:${appUserId}`,
+        },
+      });
+    } else {
+      logInternalNotificationFailure({
+        functionName: 'request-withdrawal',
+        requestId,
+        typeKey: 'financial.withdrawal_requested',
+        recipientUserId: appUserId,
+        relatedEntityType: 'withdrawal',
+        relatedEntityId: null,
+        deduplicationKey: null,
+      }, new Error('Created withdrawal does not have an id.'));
+    }
+  }
 
   return { saque, saldoDisponivel };
 }

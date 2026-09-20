@@ -88,16 +88,17 @@ describe('internal notifications Phase 1', () => {
   it('uses one owner-aware deduplication key for real and simulated payment approval', () => {
     const webhook = read('supabase/functions/payments-webhook/handler.ts');
     const simulated = read('supabase/functions/_shared/payments/mark-payment-as-paid.ts');
-    const helper = read('supabase/functions/_shared/payments/payment-approved-notification.ts');
+    const helper = read('supabase/functions/_shared/payments/payment-status-notification.ts');
 
-    expect(webhook).toContain("if (nextStatus === 'paid')");
-    expect(webhook.lastIndexOf('notifyPaymentApprovedBestEffort')).toBeGreaterThan(
+    expect(webhook).toContain('if (isNotifiablePaymentStatus(nextStatus))');
+    expect(webhook.lastIndexOf('notifyPaymentStatusBestEffort')).toBeGreaterThan(
       webhook.indexOf('await updateOwnerPaymentStatus'),
     );
-    expect(simulated.lastIndexOf('notifyPaymentApprovedBestEffort')).toBeGreaterThan(
+    expect(simulated.lastIndexOf('notifyPaymentStatusBestEffort')).toBeGreaterThan(
       simulated.lastIndexOf('await updateOwnerAsPaid'),
     );
     expect(helper).toContain('payment_charge:${paymentChargeId}:approved:${recipientUserId}');
+    expect(helper).toContain("typeKey: 'financial.payment_approved'");
     expect(helper).toContain("solicitacao_exame: 'solicitacoes_exames'");
     expect(helper).not.toContain('providerStatus');
   });

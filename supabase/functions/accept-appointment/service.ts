@@ -290,6 +290,21 @@ export async function acceptAppointment({
         resourceId: appointmentId,
         status: planCreditResult.reason,
       });
+
+      if (planCreditResult.reason === 'used_now' && planContext.usage?.id && notificationService) {
+        await notifyInternalBestEffort({
+          notificationService,
+          functionName: 'accept-appointment',
+          requestId,
+          input: {
+            recipientUserId: appointmentWindow.patientUserId,
+            typeKey: 'plan.credit_consumed',
+            relatedEntityType: 'appointment',
+            relatedEntityId: appointmentId,
+            deduplicationKey: `plan_credit:${planContext.usage.id}:consumed:patient:${appointmentWindow.patientUserId}`,
+          },
+        });
+      }
     }
   }
 

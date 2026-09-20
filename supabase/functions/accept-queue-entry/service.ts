@@ -1,4 +1,8 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import type {
@@ -28,8 +32,10 @@ export async function acceptQueueEntry({
   queueId,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: AcceptQueueEntryRepository;
+  notificationService?: InternalNotificationNotifier;
 } & AcceptQueueEntryCommand): Promise<AcceptQueueEntryResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -131,7 +137,12 @@ export async function acceptQueueEntry({
       });
     }
 
-    if (planContext.queue.paymentRequired || !planContext.queue.planCreditUsageId || !planContext.usage?.id) {
+    if (
+      planContext.queue.paymentRequired ||
+      !planContext.queue.planCreditUsageId ||
+      !planContext.queue.patientId ||
+      !planContext.usage?.id
+    ) {
       throw new AppError({
         status: 409,
         code: 'PLAN_QUEUE_CREDIT_USAGE_REQUIRED',
@@ -140,6 +151,7 @@ export async function acceptQueueEntry({
       });
     }
 
+    const planCreditUsageId = planContext.usage.id;
     const creditResult = await repository.confirmPlanCreditBeforeAcceptance({ context: planContext });
 
     logTechnicalEvent('info', {
@@ -152,6 +164,21 @@ export async function acceptQueueEntry({
       resourceId: queueId,
       status: creditResult.reason,
     });
+
+    if (creditResult.reason === 'used_now' && notificationService) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'accept-queue-entry',
+        requestId,
+        input: {
+          recipientUserId: planContext.queue.patientId,
+          typeKey: 'plan.credit_consumed',
+          relatedEntityType: 'queue',
+          relatedEntityId: planContext.queue.id,
+          deduplicationKey: `plan_credit:${planCreditUsageId}:consumed:patient:${planContext.queue.patientId}`,
+        },
+      });
+    }
   }
 
   const row = await repository.acceptQueueEntry({
@@ -171,6 +198,21 @@ export async function acceptQueueEntry({
     resourceId: row.queue_id,
     status: 'succeeded',
   });
+
+  if (notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'accept-queue-entry',
+      requestId,
+      input: {
+        recipientUserId: row.queue_patient_id,
+        typeKey: 'queue.accepted',
+        relatedEntityType: 'queue',
+        relatedEntityId: row.queue_id,
+        deduplicationKey: `queue:${row.queue_id}:accepted:patient:${row.queue_patient_id}`,
+      },
+    });
+  }
 
   return {
     queue: {

@@ -1,5 +1,5 @@
 import { AppError } from '../errors.ts';
-import { notifyPaymentApprovedBestEffort } from './payment-approved-notification.ts';
+import { notifyPaymentStatusBestEffort } from './payment-status-notification.ts';
 import { activatePlanSubscriptionForPayment } from '../plans/activate-plan-subscription.ts';
 import type { SupabaseClient } from '../supabase.ts';
 import type {
@@ -253,10 +253,11 @@ export async function markPaymentAsPaid(
   }
 
   await updateOwnerAsPaid(client, charge.owner_type, charge.owner_id, charge.id, paidAt);
-  await notifyPaymentApprovedBestEffort(client, {
+  await notifyPaymentStatusBestEffort(client, {
     paymentChargeId: charge.id,
     ownerType: charge.owner_type,
     ownerId: charge.owner_id,
+    status: 'paid',
     requestId: input.requestId,
     functionName: 'mark-payment-as-paid',
   });

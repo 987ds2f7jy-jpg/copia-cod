@@ -1,5 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
+import {
   assertPaymentReadyForOperation,
   mapAppointmentPaymentGuardSnapshot,
 } from '../_shared/payments/payment-guards.ts';
@@ -58,8 +62,10 @@ export async function startConsultaSession({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: StartConsultaSessionRepository;
+  notificationService?: InternalNotificationNotifier;
 } & StartConsultaSessionCommand): Promise<StartConsultaSessionResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -143,8 +149,9 @@ export async function startConsultaSession({
   });
 
   const roomPayload = buildConsultaRoomPayload(consultation);
+  const transitionedToStarted = consultation.status !== 'em_atendimento';
   const requiresConsultationUpdate =
-    consultation.status !== 'em_atendimento' ||
+    transitionedToStarted ||
     !consultation.inicio_at ||
     !consultation.sala_id ||
     !consultation.token_sala;
@@ -184,6 +191,21 @@ export async function startConsultaSession({
     appointmentStatus: nextAppointment?.status || null,
     queueStatus: nextQueue?.status || null,
   });
+
+  if (transitionedToStarted && notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'start-consulta-session',
+      requestId,
+      input: {
+        recipientUserId: updatedConsultation.paciente_id,
+        typeKey: 'teleconsulta.started',
+        relatedEntityType: 'consulta',
+        relatedEntityId: updatedConsultation.id,
+        deduplicationKey: `consulta:${updatedConsultation.id}:started:patient:${updatedConsultation.paciente_id}`,
+      },
+    });
+  }
 
   return {
     consultation: mapConsultationRecord(updatedConsultation),

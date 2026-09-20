@@ -40,6 +40,7 @@ export async function handleRequestWithdrawalRequest(req: Request) {
       authenticatedUser,
       appUserId: appUser.id,
       repository: runtime.repository,
+      notificationService: runtime.notificationService,
     });
 
     return successResponse(result, requestId, { status: 201, cors: CORS });

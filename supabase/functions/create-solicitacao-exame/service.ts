@@ -1,5 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
 import type { AppUserRecord } from '../_shared/appUsers.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { getSolicitacaoExameServiceCode } from '../_shared/pricing/service-codes.ts';
 import { normalizeUploadPath, normalizeUploadPathList } from '../_shared/uploadPaths.ts';
 import type {
@@ -53,8 +57,10 @@ export async function createSolicitacaoExame({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: CreateSolicitacaoExameRepository;
+  notificationService?: InternalNotificationNotifier;
 } & CreateSolicitacaoExameCommand): Promise<CreateSolicitacaoExameResult> {
   const appUser = ensurePatientAppUser(
     await repository.findAppUserByAuthUserId(authenticatedUser.authUserId),
@@ -216,6 +222,21 @@ export async function createSolicitacaoExame({
     serviceCode: solicitacaoExame.service_code,
     quotedGrossPrice: solicitacaoExame.quoted_gross_price,
   });
+
+  if (notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'create-solicitacao-exame',
+      requestId,
+      input: {
+        recipientUserId: appUser.id,
+        typeKey: 'clinical_request.created',
+        relatedEntityType: 'clinical_request',
+        relatedEntityId: solicitacaoExame.id,
+        deduplicationKey: `clinical_request:${solicitacaoExame.id}:created:patient:${appUser.id}`,
+      },
+    });
+  }
 
   return {
     solicitacaoExame,

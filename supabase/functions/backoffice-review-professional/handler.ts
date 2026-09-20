@@ -20,6 +20,7 @@ export async function handleBackofficeReviewProfessionalRequest(req: Request) {
       req,
       client: runtime.client,
       repository: runtime.repository,
+      notificationService: runtime.notificationService,
       input,
       requestId,
     });

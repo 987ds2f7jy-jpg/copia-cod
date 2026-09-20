@@ -1,6 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { findAppUserByAuthUserId } from '../_shared/appUsers.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
 import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
 import {
@@ -143,6 +144,7 @@ export function createCreateSolicitacaoExameRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createCreateSolicitacaoExameRepository(client),
   };
 }

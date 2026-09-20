@@ -1,8 +1,28 @@
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { createServiceRoleClient, type SupabaseClient } from '../_shared/supabase.ts';
 
 export function createBackofficeReviewProfessionalRepository(client: SupabaseClient) {
   return {
+    async findProfessionalAppUserId(professionalProfileId: string): Promise<string | null> {
+      const { data, error } = await client
+        .from('professional_profiles')
+        .select('id, user_id')
+        .eq('id', professionalProfileId)
+        .maybeSingle();
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'PROFESSIONAL_NOTIFICATION_RECIPIENT_LOOKUP_FAILED',
+          message: 'Unable to resolve professional notification recipient.',
+          details: error.message,
+        });
+      }
+
+      return String(data?.user_id || '').trim() || null;
+    },
+
     async review(input: {
       professionalProfileId: string;
       adminUserId: string;
@@ -80,5 +100,9 @@ export function createBackofficeReviewProfessionalRepository(client: SupabaseCli
 
 export function createBackofficeReviewProfessionalRuntime() {
   const client = createServiceRoleClient();
-  return { client, repository: createBackofficeReviewProfessionalRepository(client) };
+  return {
+    client,
+    notificationService: new InternalNotificationService(client),
+    repository: createBackofficeReviewProfessionalRepository(client),
+  };
 }

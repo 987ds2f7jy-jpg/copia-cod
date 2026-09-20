@@ -10,7 +10,7 @@ Provide in-application notifications to authenticated patients and professionals
 
 This is a standalone system module, isolated from `src/backoffice/` and used by end users. Its canonical documentation lives in `docs/context/notifications/`; the backoffice feature index contains only a related-module reference. It must not be treated as a backoffice-only feature or share the dedicated admin identity/session.
 
-The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, frontend, and the Phase 1 appointment, payment, and review integrations documented below. It does not contain a scheduled dispatcher or the remaining Phase 2/Phase 3 integrations. Therefore the overall feature remains partially implemented.
+The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, frontend, and the Phase 1/Phase 2/Phase 3A integrations documented below. It does not contain a scheduled dispatcher, preferences, external channels, or the remaining mapped integrations. Therefore the overall feature remains partially implemented.
 
 Route: `/Notifications` (capital `N`, generated from the `Notifications` key in `src/pages.config.js`).
 
@@ -24,7 +24,7 @@ End users supported by the server-side access guard:
 Creation architecture prepared in the repository:
 
 ```text
-confirmed Phase 1 business flow
+confirmed Phase 1/Phase 2/Phase 3A business flow
   → InternalNotificationService
   → notification_types lookup and template rendering
   → user_notifications snapshot
@@ -445,7 +445,7 @@ Those destinations are protected by the normal application route/page guards. Cl
 
 ## Integrated flows
 
-Phase 1 calls use `InternalNotificationService` only after the authoritative business write succeeds. Calls are best-effort: notification failures are logged with type, recipient, entity, deduplication key, request ID, and raw error, but do not roll back or mask a confirmed domain operation.
+Phase 1, Phase 2, and Phase 3A calls use `InternalNotificationService` only after the authoritative business write succeeds. Calls are best-effort: notification failures are logged with type, recipient, entity, deduplication key, request ID, raw error, and available message/code/details/hint fields, but do not roll back or mask a confirmed domain operation.
 
 ### Appointments
 
@@ -454,8 +454,10 @@ Phase 1 calls use `InternalNotificationService` only after the authoritative bus
 | Appointment created | `appointment.created` | Patient `app_users.id` | `supabase/functions/create-appointment/service.ts::createAppointment`, after repository creation | `appointment` | `appointment:{appointmentId}:created:patient:{patientUserId}` | implemented |
 | Direct professional receives appointment | `appointment.received` | Selected professional `professional_profiles.user_id` | Same successful creation point, only when a profile was selected directly | `appointment` | `appointment:{appointmentId}:received:professional:{professionalUserId}` | implemented |
 | Appointment accepted | `appointment.accepted` | `appointments.patient_id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, only after a new acceptance transaction | `appointment` | `appointment:{appointmentId}:accepted:patient:{patientUserId}` | implemented |
+| Patient cancels assigned appointment | `appointment.cancelled` | Assigned professional resolved from `professional_profiles.user_id` | `supabase/functions/cancel-appointment/service.ts::cancelAppointment`, after the cancellation transaction | `appointment` | `appointment:{appointmentId}:cancelled:professional:{professionalUserId}` | implemented |
+| Professional cancels appointment | `appointment.cancelled` | `appointments.patient_id` | Same successful cancellation point | `appointment` | `appointment:{appointmentId}:cancelled:patient:{patientUserId}` | implemented |
 
-Open-specialty fan-out, cancellation, reminders, and starting notifications remain pending. The repeated/already-accepted path does not emit `appointment.accepted`.
+The repeated/already-cancelled path does not emit. Administrative cancellations, patient cancellations without an assigned professional, actor confirmations, open-specialty fan-out, reminders, and starting notifications do not emit.
 
 ### Payments, finance, and withdrawals
 
@@ -463,48 +465,69 @@ Open-specialty fan-out, cancellation, reminders, and starting notifications rema
 |---|---|---|---|---|---|---|
 | Payment approved | `financial.payment_approved` | Owner patient/app user, resolved from `appointment`, `queue`, `solicitacao_exame`, or `plan_subscription` | `supabase/functions/payments-webhook/handler.ts::applyProviderStatus`, after an applied `paid` transition and owner update | `payment_charge` | `payment_charge:{paymentChargeId}:approved:{recipientUserId}` | implemented |
 | Simulated/reconciled payment approved | `financial.payment_approved` | Same owner resolution | `supabase/functions/_shared/payments/mark-payment-as-paid.ts::markPaymentAsPaid`, only for a new transition to paid | `payment_charge` | Same key as the webhook | implemented |
+| Payment failed | `financial.payment_failed` | Same owner resolution | `payments-webhook/handler.ts::applyProviderStatus`, after an applied `payment_failed` transition and owner update | `payment_charge` | `payment_charge:{paymentChargeId}:failed:{recipientUserId}` | implemented |
+| Payment expired | `financial.payment_expired` | Same owner resolution | Same point for an applied `payment_expired` transition | `payment_charge` | `payment_charge:{paymentChargeId}:expired:{recipientUserId}` | implemented |
+| Refund processed | `financial.refund_processed` | Same owner resolution | Same point for an applied `refunded` transition | `payment_charge` | `payment_charge:{paymentChargeId}:refunded:{recipientUserId}` | implemented |
+| Withdrawal requested | `financial.withdrawal_requested` | Requesting professional `app_users.id` | `supabase/functions/request-withdrawal/service.ts::requestWithdrawal`, after `createSaque` succeeds | `withdrawal` | `withdrawal:{withdrawalId}:requested:{professionalUserId}` | implemented |
 
-The shared key prevents duplicates across webhook, simulation, reconciliation, and retry paths. Payment payloads are not copied into notification data. Other payment lifecycle, revenue, and withdrawal events remain pending.
+The shared status helper resolves payment owners consistently. Gateway payloads, failure reasons, refund payloads, withdrawal amounts, PIX keys, and banking data are not copied into notification data. Chargeback, charge-creation, revenue, and withdrawal paid/rejected events remain pending.
 
 ### Reviews
 
 | Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
 |---|---|---|---|---|---|---|
 | Professional evaluation pending | `review.professional_pending` | `consultas.paciente_id` | `supabase/functions/finish-consulta/service.ts::finishConsulta`, after a real transition to `finalizada` and related updates | `consulta` | `review:{consultaId}:pending:patient:{patientUserId}` | implemented |
+| Consultation evaluation received | `review.received` | `consultas.profissional_user_id` | `supabase/functions/submit-consulta-evaluation/service.ts::submitConsultaEvaluation`, immediately after evaluation creation | `consulta` | `review:{consultaId}:received:professional:{professionalUserId}` | implemented |
 
-Already-finalized idempotent calls do not emit the event. `review.received` remains pending.
+The legacy `submit-appointment-review` flow does not emit; the consultation evaluation is the canonical integrated source for this phase.
 
 ### Clinical requests
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Clinical request created | `clinical_request.created` | Creating patient `app_users.id` | `supabase/functions/create-solicitacao-exame/service.ts::createSolicitacaoExame`, after persistence/payment-charge setup succeeds | `clinical_request` | `clinical_request:{requestId}:created:patient:{patientUserId}` | implemented |
+| Clinical request accepted | `clinical_request.accepted` | `solicitacoes_exames.paciente_id` | `supabase/functions/accept-solicitacao-exame/service.ts::acceptSolicitacaoExame`, after a new conditional acceptance update | `clinical_request` | `clinical_request:{requestId}:accepted:patient:{patientUserId}` | implemented |
 
-The catalog contains created, accepted, rejected, completed, and document-available types; no clinical-request flow calls the service.
+Rejected, completed, and document-available events remain pending. No clinical details are included in notification data.
 
 ### Professional registration/approval
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Registration approved | `professional.registration_approved` | `professional_profiles.user_id` | `supabase/functions/backoffice-review-professional/service.ts::reviewBackofficeProfessional`, after the transactional RPC | `professional_profile` | `professional_profile:{profileId}:approved:{professionalUserId}` | implemented |
+| Registration rejected | `professional.registration_rejected` | `professional_profiles.user_id` | Same successful transactional review point | `professional_profile` | `professional_profile:{profileId}:rejected:{professionalUserId}` | implemented |
 
-The catalog includes submitted, approved, rejected, published, and suspended types. Neither normal registration nor backoffice review currently calls the service.
+The pending-only RPC prevents emission for already-reviewed profiles. Internal reason/notes are never passed to notification creation. The legacy normal-app admin review remains unintegrated.
 
 ### Plans
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Plan activated | `plan.activated` | Order `app_user_id`, with the existing `patient_id` fallback resolved to `app_users.id` | `supabase/functions/_shared/plans/activate-plan-subscription.ts::activatePlanSubscriptionForPayment`, after `markOrderActive` | `plan` | `plan_order:{orderId}:activated:{recipientUserId}` | implemented |
+| Appointment credit consumed | `plan.credit_consumed` | Appointment patient `app_users.id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, after credit confirmation returns `used_now` | `appointment` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
+| Queue credit consumed | `plan.credit_consumed` | Queue patient `app_users.id` | `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry`, after credit confirmation returns `used_now` | `queue` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
 
-The catalog covers activation, expiry, cancellation, reservation/consumption, and denied coverage; no plan flow calls the service.
+Already-active plan repair/retry paths and `already_used` credit confirmations do not emit. Expiry, cancellation, credit reservation, and coverage-denied events remain pending.
 
 ### Queue/immediate consultation
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Patient joins queue | `queue.joined` | Patient `app_users.id` | `supabase/functions/join-queue/service.ts::joinQueue`, after a newly created queue entry | `queue` | `queue:{queueId}:joined:patient:{patientUserId}` | implemented |
+| Professional accepts queue entry | `queue.accepted` | Transaction result `queue_patient_id` | `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry`, after the acceptance transaction | `queue` | `queue:{queueId}:accepted:patient:{patientUserId}` | implemented |
 
-The catalog covers joined, request received, accepted, expired, and cancelled; no queue flow calls the service.
+An existing active entry, including the concurrent uniqueness-recovery path, does not emit `queue.joined`. Professional fan-out, room availability, expiration, and cancellation remain pending.
 
 ### Teleconsultation
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Consultation started | `teleconsulta.started` | `consultas.paciente_id` | `supabase/functions/start-consulta-session/service.ts::startConsultaSession`, after a new atomic transition to `em_atendimento` | `consulta` | `consulta:{consultaId}:started:patient:{patientUserId}` | implemented |
+| Consultation finished | `teleconsulta.finished` | `consultas.paciente_id` | `supabase/functions/finish-consulta/service.ts::finishConsulta`, after a new transition to `finalizada` and linked updates | `consulta` | `consulta:{consultaId}:finished:patient:{patientUserId}` | implemented |
 
-The catalog covers room available, started, finished, and record available; no teleconsultation flow calls the service.
+Idempotent room-state repair and already-finalized paths do not emit. `teleconsulta.finished` and `review.professional_pending` remain separate notifications because completion and the evaluation prompt are distinct events. Room and record availability remain pending.
 
-Result: the infrastructure, user-facing reader, and five Phase 1 business events are integrated. All other catalog events remain pending as described in `notification-events-map.md`.
+Result: the infrastructure, user-facing reader, five Phase 1 types, nine Phase 2 types, and seven Phase 3A types are integrated. All remaining catalog events stay pending as described in `notification-events-map.md`.
 
 ## Supabase configuration
 
@@ -537,13 +560,13 @@ Confirmed current integration/context points:
 - `src/components/ProtectedRoute.jsx` — normal user-session guard used by the notification page/destinations.
 - `src/pages/SolicitacaoExames.jsx`, `src/pages/MeusPagamentos.jsx`, and `src/pages/MeusPlanos.jsx` — protected destination screens selected by `notificationDestination`.
 - `supabase/functions/_shared/auth.ts`, `sessionAccount.ts`, `http.ts`, and `supabase.ts` — shared authentication, active-account, HTTP/CORS, and privileged-client helpers.
-- `supabase/functions/_shared/payments/payment-approved-notification.ts` — resolves the payment owner to an app user and emits the Phase 1 approved-payment event without exposing provider payloads.
+- `supabase/functions/_shared/payments/payment-status-notification.ts` — resolves the payment owner to an app user and emits approved/failed/expired/refunded events without exposing provider payloads.
 - `supabase/migrations/20260912090000_create_internal_notifications.sql` — schema, constraints, grants, indexes, and catalog seed.
 - `supabase/config.toml` — gateway configuration for the four Functions.
 - `tests/unit/notifications/NotificationRenderer.test.ts` — renderer unit coverage.
 - `docs/NOTIFICATIONS_CONTEXT.md` — earlier concise module context.
 
-Phase 1 integration touchpoints are `create-appointment`, `accept-appointment`, `payments-webhook`, the shared local paid-transition helper, and `finish-consulta`. Other business-flow families remain pending.
+Integrated touchpoints include appointment creation/acceptance/cancellation, payment webhook/local paid transition, consultation start/finish/evaluation, queue join/acceptance, backoffice professional review, withdrawal request, plan activation/credit consumption, and clinical-request creation/acceptance. Other mapped events remain pending.
 
 ## Manual validation checklist
 
@@ -571,7 +594,7 @@ limit 50;
 ```
 
 - [ ] Confirm the migration and seeded catalog exist in the target environment.
-- [ ] Create each Phase 1 domain event through its trusted backend flow; never insert from the browser.
+- [ ] Create each Phase 1/Phase 2/Phase 3A domain event through its trusted backend flow; never insert from the browser.
 - [ ] Confirm one `user_notifications` snapshot and one `internal/sent` delivery.
 - [ ] Open `/Notifications` as the recipient and confirm list rendering.
 - [ ] Confirm the bell and avatar badges show the unread count and refresh within the polling interval.
@@ -588,12 +611,12 @@ limit 50;
 Relevant automated command:
 
 ```bash
-npm test -- tests/unit/notifications/NotificationRenderer.test.ts
+npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-notifications-phase2.test.ts src/test/internal-notifications-phase3a.test.ts tests/unit/notifications/NotificationRenderer.test.ts
 ```
 
 ## Implementation verification
 
-- `git diff --check`: passed for the Phase 1 implementation.
+- `git diff --check`: run for the combined Phase 2/Phase 3A implementation.
 - Targeted Vitest command: attempted, but local dependencies are unavailable (`vitest` is not recognized as a command).
 - `npm run build`: attempted, but local dependencies are unavailable (`vite` is not recognized as a command).
 - `npm run lint`: attempted, but local dependencies are unavailable (`eslint` is not recognized as a command).
@@ -604,7 +627,7 @@ npm test -- tests/unit/notifications/NotificationRenderer.test.ts
 ## Risks and pending verification
 
 - Remote migration, seed, Function deployment, secrets, gateway configuration, and live data cannot be confirmed from repository contents.
-- Only the five Phase 1 events create notifications; all Phase 2/Phase 3 domain events remain pending.
+- Only the documented Phase 1/Phase 2/Phase 3A events create notifications; all other mapped events remain pending.
 - `notifications-dispatch-scheduled` and scheduled reminder execution are absent.
 - `notification_preferences` and a preferences UI are absent.
 - Only the internal channel is operational; email, WhatsApp, SMS, push, and gateway are schema/type placeholders.
@@ -613,14 +636,14 @@ npm test -- tests/unit/notifications/NotificationRenderer.test.ts
 - The template renderer returns plain strings but does not strip/escape HTML itself; safety currently depends on text-node rendering and must be preserved by future consumers.
 - Notification insertion and delivery insertion are separate database requests, not one transaction. A delivery failure can leave a notification without a delivery; a retry with the same deduplication key can repair the internal delivery.
 - Deduplication recovery looks up only the globally unique key and does not compare the existing recipient/type/entity with the new input; key construction must therefore include stable recipient and event identity.
-- A Phase 1 regression test covers seeded keys, post-persistence placement, idempotent guards, owner-aware payment keys, and best-effort failure behavior. Dedicated database-backed tests for notification creation, ownership, all four Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
+- Phase 1/Phase 2/Phase 3A regression tests cover seeded keys, post-persistence placement, idempotent guards, owner-aware keys, recipient selection, privacy boundaries, and best-effort failure behavior. Dedicated database-backed tests for notification creation, ownership, all four Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
 - Manual browser, database, and deployed Function validation was not performed in this task.
 
 ## Future improvements
 
 Subject to separate feature work and design/security review:
 
-- integrate the remaining Phase 2/Phase 3 appointment, payment, review, clinical-request, professional, plan, queue, withdrawal, and teleconsultation events;
+- integrate the remaining appointment, payment, clinical-request, professional, plan, queue, withdrawal, and teleconsultation events;
 - add the scheduled reminder dispatcher and its authenticated scheduler contract;
 - add notification preferences while respecting required notification types;
 - add cursor/load-more or infinite scrolling and an unread filter;
