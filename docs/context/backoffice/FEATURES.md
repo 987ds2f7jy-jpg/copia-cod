@@ -59,22 +59,14 @@ Detailed document:
 
 - [features/services-management.md](features/services-management.md)
 
-## Internal Notifications
+## Related Modules
+
+### Internal Notifications
 
 Status: partially implemented
 
-Provides an isolated internal-notifications module for patients and professionals. The database catalog, central creation service, user-scoped read APIs, unread counters, read state, notification center, bell, and avatar badge are present. No domain flow currently calls the creation service, and no scheduled dispatcher was found. This is a general end-user module, not a backoffice feature; it is indexed here only for project-wide context tracking.
+Standalone module used by patients and professionals for internal notifications, unread counters, read status and notification badges.
 
-Routes:
+Documentation:
 
-- `/Notifications`
-
-Main tables:
-
-- `notification_types`
-- `user_notifications`
-- `notification_deliveries`
-
-Detailed document:
-
-- [features/internal-notifications.md](features/internal-notifications.md)
+- [../notifications/internal-notifications.md](../notifications/internal-notifications.md)

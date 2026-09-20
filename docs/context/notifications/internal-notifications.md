@@ -8,7 +8,7 @@ Code reviewed: 2026-09-20
 
 Provide in-application notifications to authenticated patients and professionals. The module supports a notification catalog and templates, user-specific records, unread counts, individual and bulk read actions, a notification center, and badges on the bell and user avatar.
 
-This is a standalone system module, isolated from `src/backoffice/` and used by end users. It is documented under the backoffice context only because `docs/context/backoffice/FEATURES.md` is the project's quick index for administrative and cross-cutting features. It must not be treated as a backoffice-only feature or share the dedicated admin identity/session.
+This is a standalone system module, isolated from `src/backoffice/` and used by end users. Its canonical documentation lives in `docs/context/notifications/`; the backoffice feature index contains only a related-module reference. It must not be treated as a backoffice-only feature or share the dedicated admin identity/session.
 
 The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, and frontend. It does not contain calls from domain flows to the central service or a scheduled dispatcher. Therefore the end-to-end business feature is only partially implemented.
 
@@ -585,7 +585,7 @@ npm test -- tests/unit/notifications/NotificationRenderer.test.ts
 - `git diff --check`: passed.
 - `npm test -- tests/unit/notifications/NotificationRenderer.test.ts`: attempted, but `vitest` is unavailable in this workspace (`vitest` is not recognized as a command).
 - Database, browser, and deployed Edge Function checks: not run; this task changed documentation only and did not access a remote environment.
-- Files changed by this task: `docs/context/backoffice/FEATURES.md` and `docs/context/backoffice/features/internal-notifications.md` only.
+- Documentation-only files involved: `docs/context/backoffice/FEATURES.md`, `docs/context/notifications/FEATURES.md`, and `docs/context/notifications/internal-notifications.md`.
 
 ## Risks and pending verification
 
