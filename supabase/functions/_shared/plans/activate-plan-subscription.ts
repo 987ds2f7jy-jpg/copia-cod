@@ -1,4 +1,6 @@
 import { AppError, isAppError } from '../errors.ts';
+import { InternalNotificationService } from '../notifications/InternalNotificationService.ts';
+import { notifyInternalBestEffort } from '../notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../observability.ts';
 import {
   activateExternalPlanSubscription,
@@ -493,6 +495,19 @@ export async function activatePlanSubscriptionForPayment(
       requestSnapshot,
       responseSnapshot: response.raw,
       plansServiceSubscriptionId: response.subscriptionId,
+    });
+
+    await notifyInternalBestEffort({
+      notificationService: new InternalNotificationService(client),
+      functionName: 'plan-activation',
+      requestId,
+      input: {
+        recipientUserId: appUser.id,
+        typeKey: 'plan.activated',
+        relatedEntityType: 'plan',
+        relatedEntityId: order.id,
+        deduplicationKey: `plan_order:${order.id}:activated:${appUser.id}`,
+      },
     });
 
     logTechnicalEvent('info', {

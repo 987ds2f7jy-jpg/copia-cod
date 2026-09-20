@@ -1,4 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  logInternalNotificationFailure,
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
 import type {
   CancelAppointmentCommand,
@@ -68,8 +73,10 @@ export async function cancelAppointment({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: CancelAppointmentRepository;
+  notificationService?: InternalNotificationNotifier;
 } & CancelAppointmentCommand): Promise<CancelAppointmentResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -113,6 +120,11 @@ export async function cancelAppointment({
     professionalIdentityIds,
   });
 
+  const cancelledByPatient = appointment.patient_id === appUser.id;
+  const cancelledByProfessional = appUser.role === 'professional'
+    && Boolean(appointment.professional_id)
+    && professionalIdentityIds.includes(String(appointment.professional_id));
+
   logTechnicalEvent('info', {
     functionName: 'cancel-appointment',
     requestId,
@@ -139,6 +151,58 @@ export async function cancelAppointment({
     resourceId: updatedAppointment.id,
     status: 'succeeded',
   });
+
+  if (notificationService && (cancelledByPatient || cancelledByProfessional)) {
+    let recipientUserId: string | null = cancelledByProfessional
+      ? updatedAppointment.patient_id
+      : null;
+    const recipientRole = cancelledByProfessional ? 'patient' : 'professional';
+
+    if (cancelledByPatient && updatedAppointment.professional_id) {
+      try {
+        recipientUserId = await repository.findProfessionalAppUserIdByProfileId(
+          updatedAppointment.professional_id,
+        );
+
+        if (!recipientUserId) {
+          logInternalNotificationFailure({
+            functionName: 'cancel-appointment',
+            requestId,
+            typeKey: 'appointment.cancelled',
+            recipientUserId: null,
+            relatedEntityType: 'appointment',
+            relatedEntityId: updatedAppointment.id,
+            deduplicationKey: `appointment:${updatedAppointment.id}:cancelled:professional:unresolved`,
+          }, new Error('Professional profile does not have an app user id.'));
+        }
+      } catch (error) {
+        logInternalNotificationFailure({
+          functionName: 'cancel-appointment',
+          requestId,
+          typeKey: 'appointment.cancelled',
+          recipientUserId: null,
+          relatedEntityType: 'appointment',
+          relatedEntityId: updatedAppointment.id,
+          deduplicationKey: `appointment:${updatedAppointment.id}:cancelled:professional:unresolved`,
+        }, error);
+      }
+    }
+
+    if (recipientUserId) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'cancel-appointment',
+        requestId,
+        input: {
+          recipientUserId,
+          typeKey: 'appointment.cancelled',
+          relatedEntityType: 'appointment',
+          relatedEntityId: updatedAppointment.id,
+          deduplicationKey: `appointment:${updatedAppointment.id}:cancelled:${recipientRole}:${recipientUserId}`,
+        },
+      });
+    }
+  }
 
   return {
     appointment: updatedAppointment,

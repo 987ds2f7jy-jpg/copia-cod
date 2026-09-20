@@ -46,6 +46,7 @@ export async function handleAcceptQueueEntryRequest(req: Request) {
       queueId: input.queueId,
       authenticatedUser,
       repository: runtime.repository,
+      notificationService: runtime.notificationService,
     });
 
     return successResponse(result, requestId, {

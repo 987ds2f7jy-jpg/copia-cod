@@ -1,6 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { findAppUserByAuthUserId } from '../_shared/appUsers.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -62,6 +63,25 @@ function createCancelAppointmentRepository(client: SupabaseClient): CancelAppoin
       return (privateResult.data || []).map((row) => String(row.id || '')).filter(Boolean);
     },
 
+    async findProfessionalAppUserIdByProfileId(profileId: string): Promise<string | null> {
+      const { data, error } = await client
+        .from('professional_profiles')
+        .select('id, user_id')
+        .eq('id', profileId)
+        .maybeSingle();
+
+      if (error) {
+        throw new AppError({
+          status: 500,
+          code: 'PROFESSIONAL_PROFILE_LOOKUP_FAILED',
+          message: 'Unable to resolve professional notification recipient.',
+          details: error.message,
+        });
+      }
+
+      return String(data?.user_id || '').trim() || null;
+    },
+
     async cancelAppointment({ appointmentId, reason }): Promise<AppointmentRecord> {
       const { data, error } = await client
         .rpc('cancel_appointment_with_plan_release', {
@@ -103,6 +123,7 @@ export function createCancelAppointmentRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createCancelAppointmentRepository(client),
   };
 }

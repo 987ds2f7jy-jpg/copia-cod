@@ -1,6 +1,7 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { findAppUserByAuthUserId } from '../_shared/appUsers.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -300,6 +301,7 @@ export function createSubmitConsultaEvaluationRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createSubmitConsultaEvaluationRepository(client),
   };
 }

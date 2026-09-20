@@ -1,5 +1,10 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  logInternalNotificationFailure,
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
+import {
   mapConsultaEvaluationRecord,
   resolveConsultaParticipantRole,
 } from '../_shared/teleconsulta.ts';
@@ -21,8 +26,10 @@ export async function submitConsultaEvaluation({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: SubmitConsultaEvaluationRepository;
+  notificationService?: InternalNotificationNotifier;
 } & SubmitConsultaEvaluationCommand): Promise<SubmitConsultaEvaluationResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -129,6 +136,31 @@ export async function submitConsultaEvaluation({
     rating: input.rating,
     comment: input.comment,
   });
+
+  if (notificationService && consultation.profissional_user_id) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'submit-consulta-evaluation',
+      requestId,
+      input: {
+        recipientUserId: consultation.profissional_user_id,
+        typeKey: 'review.received',
+        relatedEntityType: 'consulta',
+        relatedEntityId: consultation.id,
+        deduplicationKey: `review:${consultation.id}:received:professional:${consultation.profissional_user_id}`,
+      },
+    });
+  } else if (notificationService) {
+    logInternalNotificationFailure({
+      functionName: 'submit-consulta-evaluation',
+      requestId,
+      typeKey: 'review.received',
+      recipientUserId: null,
+      relatedEntityType: 'consulta',
+      relatedEntityId: consultation.id,
+      deduplicationKey: `review:${consultation.id}:received:professional:unresolved`,
+    }, new Error('Consultation does not have a professional app user id.'));
+  }
 
   let reviewSynced = false;
   let reviewStats: SubmitConsultaEvaluationResult['reviewStats'] = null;

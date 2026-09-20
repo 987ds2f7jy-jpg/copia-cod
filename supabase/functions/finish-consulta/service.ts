@@ -172,6 +172,19 @@ export async function finishConsulta({
       requestId,
       input: {
         recipientUserId: closedConsultation.paciente_id,
+        typeKey: 'teleconsulta.finished',
+        relatedEntityType: 'consulta',
+        relatedEntityId: closedConsultation.id,
+        deduplicationKey: `consulta:${closedConsultation.id}:finished:patient:${closedConsultation.paciente_id}`,
+      },
+    });
+
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'finish-consulta',
+      requestId,
+      input: {
+        recipientUserId: closedConsultation.paciente_id,
         typeKey: 'review.professional_pending',
         relatedEntityType: 'consulta',
         relatedEntityId: closedConsultation.id,

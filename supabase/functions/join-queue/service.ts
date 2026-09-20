@@ -1,4 +1,8 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
@@ -110,8 +114,10 @@ export async function joinQueue({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: JoinQueueRepository;
+  notificationService?: InternalNotificationNotifier;
 } & JoinQueueCommand): Promise<JoinQueueResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -250,6 +256,21 @@ export async function joinQueue({
     resourceId: queueEntry.id,
     status: queueEntry.status,
   });
+
+  if (queueEntry.createdNow !== false && notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'join-queue',
+      requestId,
+      input: {
+        recipientUserId: appUser.id,
+        typeKey: 'queue.joined',
+        relatedEntityType: 'queue',
+        relatedEntityId: queueEntry.id,
+        deduplicationKey: `queue:${queueEntry.id}:joined:patient:${appUser.id}`,
+      },
+    });
+  }
 
   return buildQueueResult(queueEntry, false);
 }

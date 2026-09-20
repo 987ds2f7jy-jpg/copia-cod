@@ -1,5 +1,6 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { requireAppUserByAuthUserId, requireRole } from '../_shared/professional.ts';
 import {
   createServiceRoleClient,
@@ -177,6 +178,7 @@ export function createRequestWithdrawalRuntime() {
       requireRole(appUser, ['professional']);
       return appUser;
     },
+    notificationService: new InternalNotificationService(client),
     repository: createRequestWithdrawalRepository(client),
   };
 }

@@ -315,6 +315,7 @@ describe('plan flow integrity', () => {
       findPlanQueueAcceptanceContext: vi.fn().mockResolvedValue({
         queue: {
           id: '80000000-0000-4000-8000-000000000001',
+          patientId: 'patient-user',
           specialty: 'Clinico Geral',
           status: 'waiting',
           fundingSource: 'plan',

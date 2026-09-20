@@ -25,6 +25,7 @@ export type ProfessionalDutyRecord = {
 export type PlanQueueAcceptanceContext = {
   queue: {
     id: string;
+    patientId: string;
     specialty: string;
     status: string;
     fundingSource: string;

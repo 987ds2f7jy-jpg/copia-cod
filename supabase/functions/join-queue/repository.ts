@@ -1,5 +1,6 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
 import {
   resolvePlanCoverage,
@@ -351,7 +352,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
           });
         }
 
-        return planQueue;
+        return { ...planQueue, createdNow: true };
       }
 
       const { data, error } = await client
@@ -442,7 +443,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
 
           if (!existingError && existing?.id) {
             if (existing.payment_required === false || existing.funding_source === 'plan') {
-              return existing;
+              return { ...existing, createdNow: false };
             }
 
             const existingPayment = await createPaymentCharge(client, {
@@ -454,6 +455,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
 
             return {
               ...existing,
+              createdNow: false,
               current_payment_charge_id: existingPayment.paymentChargeId,
               payment: existingPayment,
             };
@@ -479,7 +481,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
       }
 
       if (params.linkedPaidPayment) {
-        return row;
+        return { ...row, createdNow: true };
       }
 
       const paymentCharge = await createPaymentCharge(client, {
@@ -491,6 +493,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
 
       return {
         ...row,
+        createdNow: true,
         current_payment_charge_id: paymentCharge.paymentChargeId,
         payment: paymentCharge,
       };
@@ -503,6 +506,7 @@ export function createJoinQueueRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createJoinQueueRepository(client),
   };
 }

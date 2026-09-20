@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { consumePlanCreditOnce } from '../_shared/plans/credit-consumption.ts';
 import type {
   AcceptQueueEntryRepository,
@@ -326,7 +327,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
     async findPlanQueueAcceptanceContext(queueId) {
       const { data: queueData, error: queueError } = await client
         .from('queues')
-        .select('id, specialty, status, funding_source, coverage_status, payment_required, plan_credit_usage_id')
+        .select('id, patient_id, specialty, status, funding_source, coverage_status, payment_required, plan_credit_usage_id')
         .eq('id', queueId)
         .maybeSingle();
 
@@ -377,6 +378,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
       return {
         queue: {
           id: String(queueData.id),
+          patientId: String(queueData.patient_id || ''),
           specialty: String(queueData.specialty || ''),
           status: String(queueData.status || ''),
           fundingSource: String(queueData.funding_source || ''),
@@ -445,6 +447,7 @@ export function createAcceptQueueEntryRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client),
+    notificationService: new InternalNotificationService(client),
     repository: createSupabaseAcceptQueueEntryRepository(client),
   };
 }
