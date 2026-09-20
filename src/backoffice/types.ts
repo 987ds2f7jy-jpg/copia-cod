@@ -27,3 +27,18 @@ export type BackofficeAnalyticsSummary = {
   totalUsers: number;
   totalCompletedConsultations: number;
 };
+
+export type BackofficeServicePrice = {
+  id: string;
+  service_code: string;
+  specialty_code: string;
+  display_name: string;
+  fee_group: 'duty' | 'specialty' | 'services';
+  gross_price: number;
+  currency: string;
+  active: boolean;
+  effective_from: string;
+  effective_to: string | null;
+  created_at: string;
+  updated_at: string;
+};
