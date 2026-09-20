@@ -22,6 +22,7 @@ export type ProfessionalProfileRecord = {
 
 export type AppointmentAcceptanceWindowRecord = {
   id: string;
+  patientUserId: string;
   status: string;
   appointmentType: string;
   scheduledDatetime: string | null;

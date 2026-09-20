@@ -158,6 +158,7 @@ function createProfileCommand({
 function appointmentWindow(overrides: Partial<AppointmentAcceptanceWindowRecord> = {}): AppointmentAcceptanceWindowRecord {
   return {
     id: '30000000-0000-4000-8000-000000000001',
+    patientUserId: '10000000-0000-4000-8000-000000000001',
     status: 'SOLICITADO',
     appointmentType: 'PERFIL',
     scheduledDatetime: `${futureDate()}T08:00:00`,

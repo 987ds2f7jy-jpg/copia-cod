@@ -46,6 +46,7 @@ export async function handleFinishConsultaRequest(req: Request) {
       input,
       authenticatedUser,
       repository: runtime.repository,
+      notificationService: runtime.notificationService,
     });
 
     return successResponse(result, requestId, {

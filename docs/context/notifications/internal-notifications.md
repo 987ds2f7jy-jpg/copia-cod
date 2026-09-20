@@ -10,7 +10,7 @@ Provide in-application notifications to authenticated patients and professionals
 
 This is a standalone system module, isolated from `src/backoffice/` and used by end users. Its canonical documentation lives in `docs/context/notifications/`; the backoffice feature index contains only a related-module reference. It must not be treated as a backoffice-only feature or share the dedicated admin identity/session.
 
-The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, and frontend. It does not contain calls from domain flows to the central service or a scheduled dispatcher. Therefore the end-to-end business feature is only partially implemented.
+The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, frontend, and the Phase 1 appointment, payment, and review integrations documented below. It does not contain a scheduled dispatcher or the remaining Phase 2/Phase 3 integrations. Therefore the overall feature remains partially implemented.
 
 Route: `/Notifications` (capital `N`, generated from the `Notifications` key in `src/pages.config.js`).
 
@@ -24,7 +24,7 @@ End users supported by the server-side access guard:
 Creation architecture prepared in the repository:
 
 ```text
-confirmed business flow (not integrated yet)
+confirmed Phase 1 business flow
   → InternalNotificationService
   → notification_types lookup and template rendering
   → user_notifications snapshot
@@ -75,7 +75,8 @@ supabase/functions/_shared/notifications/
 ├── NotificationAccess.ts
 ├── NotificationChannels.ts
 ├── NotificationRenderer.ts
-└── NotificationTypes.ts
+├── NotificationTypes.ts
+└── notify-best-effort.ts
 ```
 
 Edge Functions found:
@@ -444,25 +445,34 @@ Those destinations are protected by the normal application route/page guards. Cl
 
 ## Integrated flows
 
-Repository-wide searches found no import/instantiation of `InternalNotificationService` and no `.notify(...)` call in any domain Edge Function. The migration seeds types, but seeds do not create user notifications.
+Phase 1 calls use `InternalNotificationService` only after the authoritative business write succeeds. Calls are best-effort: notification failures are logged with type, recipient, entity, deduplication key, request ID, and raw error, but do not roll back or mask a confirmed domain operation.
 
 ### Appointments
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Appointment created | `appointment.created` | Patient `app_users.id` | `supabase/functions/create-appointment/service.ts::createAppointment`, after repository creation | `appointment` | `appointment:{appointmentId}:created:patient:{patientUserId}` | implemented |
+| Direct professional receives appointment | `appointment.received` | Selected professional `professional_profiles.user_id` | Same successful creation point, only when a profile was selected directly | `appointment` | `appointment:{appointmentId}:received:professional:{professionalUserId}` | implemented |
+| Appointment accepted | `appointment.accepted` | `appointments.patient_id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, only after a new acceptance transaction | `appointment` | `appointment:{appointmentId}:accepted:patient:{patientUserId}` | implemented |
 
-Seeded types include created, received, accepted, cancelled, reminders, and starting, but appointment flows do not call the notification service.
+Open-specialty fan-out, cancellation, reminders, and starting notifications remain pending. The repeated/already-accepted path does not emit `appointment.accepted`.
 
 ### Payments, finance, and withdrawals
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Payment approved | `financial.payment_approved` | Owner patient/app user, resolved from `appointment`, `queue`, `solicitacao_exame`, or `plan_subscription` | `supabase/functions/payments-webhook/handler.ts::applyProviderStatus`, after an applied `paid` transition and owner update | `payment_charge` | `payment_charge:{paymentChargeId}:approved:{recipientUserId}` | implemented |
+| Simulated/reconciled payment approved | `financial.payment_approved` | Same owner resolution | `supabase/functions/_shared/payments/mark-payment-as-paid.ts::markPaymentAsPaid`, only for a new transition to paid | `payment_charge` | Same key as the webhook | implemented |
 
-Seeded types cover payment lifecycle, refund, professional revenue, and withdrawal lifecycle, but no corresponding service call was found.
+The shared key prevents duplicates across webhook, simulation, reconciliation, and retry paths. Payment payloads are not copied into notification data. Other payment lifecycle, revenue, and withdrawal events remain pending.
 
 ### Reviews
 
-Status: not found / pending integration.
+| Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
+|---|---|---|---|---|---|---|
+| Professional evaluation pending | `review.professional_pending` | `consultas.paciente_id` | `supabase/functions/finish-consulta/service.ts::finishConsulta`, after a real transition to `finalizada` and related updates | `consulta` | `review:{consultaId}:pending:patient:{patientUserId}` | implemented |
 
-The catalog contains `review.professional_pending` and `review.received`; no review flow calls the service.
+Already-finalized idempotent calls do not emit the event. `review.received` remains pending.
 
 ### Clinical requests
 
@@ -494,7 +504,7 @@ Status: not found / pending integration.
 
 The catalog covers room available, started, finished, and record available; no teleconsultation flow calls the service.
 
-Result: the infrastructure and user-facing reader exist, but no real application event currently produces a notification through this module.
+Result: the infrastructure, user-facing reader, and five Phase 1 business events are integrated. All other catalog events remain pending as described in `notification-events-map.md`.
 
 ## Supabase configuration
 
@@ -527,12 +537,13 @@ Confirmed current integration/context points:
 - `src/components/ProtectedRoute.jsx` — normal user-session guard used by the notification page/destinations.
 - `src/pages/SolicitacaoExames.jsx`, `src/pages/MeusPagamentos.jsx`, and `src/pages/MeusPlanos.jsx` — protected destination screens selected by `notificationDestination`.
 - `supabase/functions/_shared/auth.ts`, `sessionAccount.ts`, `http.ts`, and `supabase.ts` — shared authentication, active-account, HTTP/CORS, and privileged-client helpers.
+- `supabase/functions/_shared/payments/payment-approved-notification.ts` — resolves the payment owner to an app user and emits the Phase 1 approved-payment event without exposing provider payloads.
 - `supabase/migrations/20260912090000_create_internal_notifications.sql` — schema, constraints, grants, indexes, and catalog seed.
 - `supabase/config.toml` — gateway configuration for the four Functions.
 - `tests/unit/notifications/NotificationRenderer.test.ts` — renderer unit coverage.
 - `docs/NOTIFICATIONS_CONTEXT.md` — earlier concise module context.
 
-No appointment, payment, consultation, clinical-request, professional-approval, queue, plan, withdrawal, or other business-flow file currently integrates the creation service.
+Phase 1 integration touchpoints are `create-appointment`, `accept-appointment`, `payments-webhook`, the shared local paid-transition helper, and `finish-consulta`. Other business-flow families remain pending.
 
 ## Manual validation checklist
 
@@ -560,7 +571,7 @@ limit 50;
 ```
 
 - [ ] Confirm the migration and seeded catalog exist in the target environment.
-- [ ] Create a test notification through a temporary trusted server-side harness that invokes `InternalNotificationService`; never insert from the browser.
+- [ ] Create each Phase 1 domain event through its trusted backend flow; never insert from the browser.
 - [ ] Confirm one `user_notifications` snapshot and one `internal/sent` delivery.
 - [ ] Open `/Notifications` as the recipient and confirm list rendering.
 - [ ] Confirm the bell and avatar badges show the unread count and refresh within the polling interval.
@@ -580,17 +591,20 @@ Relevant automated command:
 npm test -- tests/unit/notifications/NotificationRenderer.test.ts
 ```
 
-## Documentation task verification
+## Implementation verification
 
-- `git diff --check`: passed.
-- `npm test -- tests/unit/notifications/NotificationRenderer.test.ts`: attempted, but `vitest` is unavailable in this workspace (`vitest` is not recognized as a command).
-- Database, browser, and deployed Edge Function checks: not run; this task changed documentation only and did not access a remote environment.
-- Documentation-only files involved: `docs/context/backoffice/FEATURES.md`, `docs/context/notifications/FEATURES.md`, and `docs/context/notifications/internal-notifications.md`.
+- `git diff --check`: passed for the Phase 1 implementation.
+- Targeted Vitest command: attempted, but local dependencies are unavailable (`vitest` is not recognized as a command).
+- `npm run build`: attempted, but local dependencies are unavailable (`vite` is not recognized as a command).
+- `npm run lint`: attempted, but local dependencies are unavailable (`eslint` is not recognized as a command).
+- `npm run typecheck`: unavailable because the project has no `typecheck` script.
+- `npm run check:supabase-functions-config`: passed for all 79 configured Functions.
+- Database, browser, and deployed Edge Function checks: not run; no remote environment was accessed.
 
 ## Risks and pending verification
 
 - Remote migration, seed, Function deployment, secrets, gateway configuration, and live data cannot be confirmed from repository contents.
-- No domain flow creates notifications, so the feature cannot produce real notifications without additional integration work.
+- Only the five Phase 1 events create notifications; all Phase 2/Phase 3 domain events remain pending.
 - `notifications-dispatch-scheduled` and scheduled reminder execution are absent.
 - `notification_preferences` and a preferences UI are absent.
 - Only the internal channel is operational; email, WhatsApp, SMS, push, and gateway are schema/type placeholders.
@@ -599,14 +613,14 @@ npm test -- tests/unit/notifications/NotificationRenderer.test.ts
 - The template renderer returns plain strings but does not strip/escape HTML itself; safety currently depends on text-node rendering and must be preserved by future consumers.
 - Notification insertion and delivery insertion are separate database requests, not one transaction. A delivery failure can leave a notification without a delivery; a retry with the same deduplication key can repair the internal delivery.
 - Deduplication recovery looks up only the globally unique key and does not compare the existing recipient/type/entity with the new input; key construction must therefore include stable recipient and event identity.
-- Only renderer unit tests were found. Dedicated tests for the central service, ownership, all four Function contracts, frontend hooks/components, polling, pagination, and destination access were not found.
-- Manual browser, database, and deployed Function validation was not performed in this documentation-only task.
+- A Phase 1 regression test covers seeded keys, post-persistence placement, idempotent guards, owner-aware payment keys, and best-effort failure behavior. Dedicated database-backed tests for notification creation, ownership, all four Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
+- Manual browser, database, and deployed Function validation was not performed in this task.
 
 ## Future improvements
 
 Subject to separate feature work and design/security review:
 
-- integrate confirmed appointment, payment, review, clinical-request, professional, plan, queue, withdrawal, and teleconsultation events;
+- integrate the remaining Phase 2/Phase 3 appointment, payment, review, clinical-request, professional, plan, queue, withdrawal, and teleconsultation events;
 - add the scheduled reminder dispatcher and its authenticated scheduler contract;
 - add notification preferences while respecting required notification types;
 - add cursor/load-more or infinite scrolling and an unread filter;

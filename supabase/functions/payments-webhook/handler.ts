@@ -15,6 +15,7 @@ import {
   createPaymentProvider,
   getConfiguredPaymentProviderName,
 } from '../_shared/payments/providers/index.ts';
+import { notifyPaymentApprovedBestEffort } from '../_shared/payments/payment-approved-notification.ts';
 import { activatePlanSubscriptionForPayment } from '../_shared/plans/activate-plan-subscription.ts';
 import type {
   ProviderChargeStatusResult,
@@ -651,6 +652,16 @@ async function applyProviderStatus({
   }
 
   await updateOwnerPaymentStatus(client, charge, nextStatus, paidAt);
+
+  if (nextStatus === 'paid') {
+    await notifyPaymentApprovedBestEffort(client, {
+      paymentChargeId: charge.id,
+      ownerType: charge.owner_type,
+      ownerId: charge.owner_id,
+      requestId,
+      functionName: FUNCTION_NAME,
+    });
+  }
 
   const activation = charge.owner_type === 'plan_subscription' && nextStatus === 'paid'
     ? await activatePlanSubscriptionForPayment(client, {

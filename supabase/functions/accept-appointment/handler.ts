@@ -46,6 +46,7 @@ export async function handleAcceptAppointmentRequest(req: Request) {
       appointmentId: input.appointmentId,
       authenticatedUser,
       repository: runtime.repository,
+      notificationService: runtime.notificationService,
     });
 
     return successResponse(result, requestId, {

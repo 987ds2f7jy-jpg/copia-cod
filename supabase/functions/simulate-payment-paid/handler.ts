@@ -261,7 +261,7 @@ export async function handleSimulatePaymentPaidRequest(req: Request) {
     const paymentChargeId = input.paymentChargeId ||
       await findCurrentPaymentChargeId(client, input.ownerType as PaymentOwnerType, input.ownerId);
     await assertPaymentChargeOwnership(client, paymentChargeId, appUser);
-    const result = await markPaymentAsPaid(client, { paymentChargeId });
+    const result = await markPaymentAsPaid(client, { paymentChargeId, requestId });
 
     return successResponse(result, requestId, {
       status: 200,

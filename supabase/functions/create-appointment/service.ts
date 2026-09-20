@@ -1,4 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  logInternalNotificationFailure,
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
@@ -154,8 +159,10 @@ export async function createAppointment({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: CreateAppointmentRepository;
+  notificationService?: InternalNotificationNotifier;
 } & CreateAppointmentCommand): Promise<CreateAppointmentResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -196,6 +203,7 @@ export async function createAppointment({
   let serviceCode: ServiceCode = SPECIALTY_REQUEST_SERVICE_CODE;
   let pricingProfessionalProfileId: string | null = null;
   let pricingSpecialty: string | null = null;
+  let professionalAppUserId: string | null = null;
   let planCoverage: PlanCoverageVerification | null = null;
   let effectiveFundingSource: FundingSource = 'self_pay';
 
@@ -259,6 +267,7 @@ export async function createAppointment({
     }
 
     professionalId = professional.profileId;
+    professionalAppUserId = professional.appUserId;
     professionalName = professional.fullName;
     specialty = professional.specialty;
     appointmentType = input.priority ? 'priority' : 'PERFIL';
@@ -334,6 +343,46 @@ export async function createAppointment({
     resourceId: appointment.id,
     status: appointment.status,
   });
+
+  if (notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'create-appointment',
+      requestId,
+      input: {
+        recipientUserId: appUser.id,
+        typeKey: 'appointment.created',
+        relatedEntityType: 'appointment',
+        relatedEntityId: appointment.id,
+        deduplicationKey: `appointment:${appointment.id}:created:patient:${appUser.id}`,
+      },
+    });
+
+    if (input.professionalProfileId && professionalAppUserId) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'create-appointment',
+        requestId,
+        input: {
+          recipientUserId: professionalAppUserId,
+          typeKey: 'appointment.received',
+          relatedEntityType: 'appointment',
+          relatedEntityId: appointment.id,
+          deduplicationKey: `appointment:${appointment.id}:received:professional:${professionalAppUserId}`,
+        },
+      });
+    } else if (input.professionalProfileId) {
+      logInternalNotificationFailure({
+        functionName: 'create-appointment',
+        requestId,
+        typeKey: 'appointment.received',
+        recipientUserId: null,
+        relatedEntityType: 'appointment',
+        relatedEntityId: appointment.id,
+        deduplicationKey: null,
+      }, new Error('Selected professional does not have an app user id.'));
+    }
+  }
 
   return {
     appointment: {

@@ -1,5 +1,6 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import { createPaymentCharge } from '../_shared/payments/create-payment-charge.ts';
 import { resolvePlanCoverage } from '../_shared/plans/coverage.ts';
 import { resolveServicePricing } from '../_shared/pricing/resolve-service-pricing.ts';
@@ -803,6 +804,7 @@ export function createCreateAppointmentRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createCreateAppointmentRepository(client),
   };
 }

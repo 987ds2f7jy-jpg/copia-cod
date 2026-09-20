@@ -35,6 +35,7 @@ export type CreatedPaymentCharge = {
 
 export type MarkPaymentAsPaidInput = {
   paymentChargeId: string;
+  requestId?: string | null;
 };
 
 export type MarkPaymentAsPaidResult = {

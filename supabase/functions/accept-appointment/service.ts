@@ -1,4 +1,8 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
 import {
   APPOINTMENT_EXPIRED_ERROR,
@@ -164,8 +168,10 @@ export async function acceptAppointment({
   appointmentId,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: AcceptAppointmentRepository;
+  notificationService?: InternalNotificationNotifier;
 } & AcceptAppointmentCommand): Promise<AcceptAppointmentResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -248,6 +254,7 @@ export async function acceptAppointment({
 
   const planContext = await repository.findPlanAppointmentAcceptanceContext(appointmentId);
   let row: AcceptAppointmentTransactionRecord | null = null;
+  let acceptedNow = false;
 
   if (planContext) {
     assertPlanAppointmentCanBeAcceptedByProfessional({
@@ -292,6 +299,7 @@ export async function acceptAppointment({
       professionalAppUserId: professional.appUserId,
       professionalProfileId: professional.profileId,
     });
+    acceptedNow = true;
   }
 
   logTechnicalEvent('info', {
@@ -304,6 +312,24 @@ export async function acceptAppointment({
     resourceId: row.appointment_id,
     status: 'succeeded',
   });
+
+  if (acceptedNow && notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'accept-appointment',
+      requestId,
+      input: {
+        recipientUserId: appointmentWindow.patientUserId,
+        typeKey: 'appointment.accepted',
+        data: {
+          professional_name: row.appointment_professional_name,
+        },
+        relatedEntityType: 'appointment',
+        relatedEntityId: row.appointment_id,
+        deduplicationKey: `appointment:${row.appointment_id}:accepted:patient:${appointmentWindow.patientUserId}`,
+      },
+    });
+  }
 
   return mapAcceptAppointmentResult(row);
 }

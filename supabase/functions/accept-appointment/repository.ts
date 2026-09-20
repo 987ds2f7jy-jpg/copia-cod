@@ -1,6 +1,7 @@
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import type {
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
@@ -453,6 +454,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
         .from('appointments')
         .select(`
           id,
+          patient_id,
           status,
           appointment_type,
           scheduled_datetime,
@@ -484,6 +486,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
 
       return {
         id: normalizeString(row.id),
+        patientUserId: normalizeString(row.patient_id),
         status: normalizeString(row.status),
         appointmentType: normalizeString(row.appointment_type),
         scheduledDatetime: normalizeString(row.scheduled_datetime) || null,
@@ -860,6 +863,7 @@ export function createAcceptAppointmentRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client),
+    notificationService: new InternalNotificationService(client),
     repository: createSupabaseAcceptAppointmentRepository(client),
   };
 }

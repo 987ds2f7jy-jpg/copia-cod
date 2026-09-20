@@ -1,5 +1,9 @@
 import { AppError } from '../_shared/errors.ts';
 import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
+import {
   buildConsultaRoomPayload,
   mapConsultationRecord,
   resolveConsultaParticipantRole,
@@ -37,8 +41,10 @@ export async function finishConsulta({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: FinishConsultaRepository;
+  notificationService?: InternalNotificationNotifier;
 } & FinishConsultaCommand): Promise<FinishConsultaResult> {
   const appUser = await repository.findAppUserByAuthUserId(authenticatedUser.authUserId);
 
@@ -114,8 +120,9 @@ export async function finishConsulta({
   const startedAt = consultation.inicio_at || new Date().toISOString();
   const finishedAt = consultation.fim_at || new Date().toISOString();
   const roomPayload = buildConsultaRoomPayload(consultation);
+  const transitionedToFinalized = consultation.status !== 'finalizada';
   const needsConsultationUpdate =
-    consultation.status !== 'finalizada' ||
+    transitionedToFinalized ||
     !consultation.fim_at ||
     !consultation.inicio_at ||
     !consultation.sala_id ||
@@ -157,6 +164,21 @@ export async function finishConsulta({
     appointmentStatus: nextAppointment?.status || null,
     queueStatus: nextQueue?.status || null,
   });
+
+  if (transitionedToFinalized && notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'finish-consulta',
+      requestId,
+      input: {
+        recipientUserId: closedConsultation.paciente_id,
+        typeKey: 'review.professional_pending',
+        relatedEntityType: 'consulta',
+        relatedEntityId: closedConsultation.id,
+        deduplicationKey: `review:${closedConsultation.id}:pending:patient:${closedConsultation.paciente_id}`,
+      },
+    });
+  }
 
   return {
     consultation: mapConsultationRecord(closedConsultation),
