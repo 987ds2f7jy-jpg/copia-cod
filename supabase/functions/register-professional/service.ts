@@ -1,4 +1,8 @@
 import { AppError } from '../_shared/errors.ts';
+import {
+  notifyInternalBestEffort,
+  type InternalNotificationNotifier,
+} from '../_shared/notifications/notify-best-effort.ts';
 import { normalizeUploadPath, normalizeUploadPathList } from '../_shared/uploadPaths.ts';
 import type {
   RegisterProfessionalCommand,
@@ -36,8 +40,10 @@ export async function registerProfessional({
   input,
   authenticatedUser,
   repository,
+  notificationService,
 }: {
   repository: RegisterProfessionalRepository;
+  notificationService?: InternalNotificationNotifier;
 } & RegisterProfessionalCommand): Promise<RegisterProfessionalResult> {
   const authEmail = String(authenticatedUser.email || '').trim().toLowerCase();
 
@@ -176,6 +182,21 @@ export async function registerProfessional({
     privateProfileId: privateProfile.id,
     publicProfileId: publicProfile.id,
   });
+
+  if (notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'register-professional',
+      requestId,
+      input: {
+        recipientUserId: appUser.id,
+        typeKey: 'professional.registration_submitted',
+        relatedEntityType: 'professional_profile',
+        relatedEntityId: privateProfile.id,
+        deduplicationKey: `professional_profile:${privateProfile.id}:submitted:${appUser.id}`,
+      },
+    });
+  }
 
   return {
     privateProfile,

@@ -36,7 +36,7 @@ export type PlanQueueAcceptanceContext = {
   usage: {
     id: string;
     status: string;
-    externalSubscriptionScoreId: string | null;
+    internalSubscriptionScoreId: string | null;
   } | null;
 };
 

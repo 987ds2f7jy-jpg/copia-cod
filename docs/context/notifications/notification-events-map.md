@@ -1,8 +1,8 @@
 # Notification Events Map
 
-Status: Phase 1, scoped Phase 2, and safe Phase 3A events are implemented; scheduler/fan-out and remaining events stay mapped only.
+Status: Phase 1, scoped Phase 2, safe Phase 3A, and scoped Phase 3B events are implemented; remaining scheduler/fan-out events stay mapped only.
 
-Code reviewed: 2026-09-20
+Code reviewed: 2026-09-23
 
 ## Objective
 
@@ -27,9 +27,9 @@ The repository currently contains:
 - unread counters and badges in the authenticated application layout;
 - seeded type keys in `supabase/migrations/20260912090000_create_internal_notifications.sql`.
 
-The infrastructure is partially implemented. Phase 1, scoped Phase 2, and safe Phase 3A flows call `InternalNotificationService` from appointment, payment, review, professional-registration, clinical-request, teleconsultation, queue, withdrawal, and plan flows. Remaining events are mapped for future work.
+The infrastructure is partially implemented. Phase 1, scoped Phase 2, safe Phase 3A, and scoped Phase 3B flows call `InternalNotificationService` from appointment, payment, review, professional-registration, clinical-request, teleconsultation, queue, withdrawal, plan, and scheduled-reminder flows. Remaining events are mapped for future work.
 
-The repository does not contain `notifications-dispatch-scheduled` or `notification_preferences`. The existing central service currently creates only the internal channel delivery.
+The repository contains the protected `notifications-dispatch-scheduled` dispatcher but does not contain `notification_preferences`. The existing central service currently creates only the internal channel delivery. The remote Supabase Cron job is an environment operation and is not represented as an active job by repository state alone.
 
 ## Event Map
 
@@ -50,7 +50,7 @@ Status values in this table have the following meaning:
 | Appointment | Professional rejects an appointment | No rejection service, endpoint, or durable rejection transition was found | — (not seeded) | Appointment patient | `appointment` | — | `not_found` | The catalog also has no appointment-rejected type key. Do not reinterpret cancellation as rejection. |
 | Appointment | Patient cancels an appointment | After `repository.cancelAppointment(...)` succeeds in `supabase/functions/cancel-appointment/service.ts::cancelAppointment` | `appointment.cancelled` | Assigned counterpart professional | `appointment` / `appointmentId` | `appointment:{appointmentId}:cancelled:professional:{professionalUserId}` | `already_integrated` | The professional profile is resolved to `professional_profiles.user_id` after cancellation. No actor confirmation or emission for unassigned appointments. |
 | Appointment | Professional cancels an appointment | Same successful cancellation transaction in `cancelAppointment` | `appointment.cancelled` | Appointment patient | `appointment` / `appointmentId` | `appointment:{appointmentId}:cancelled:patient:{patientUserId}` | `already_integrated` | Emits only after cancellation/credit release succeeds. Administrative cancellation has no notification rule and does not emit. |
-| Appointment | Day-of appointment reminder | No notification scheduler or reminder worker was found | `appointment.reminder_day` | Patient and/or professional | `appointment` / appointment ID | `appointment:{appointmentId}:reminder_day:{recipientUserId}` | `not_found` | Requires a scheduled dispatcher, timezone policy, eligible-status filter, and retry policy. |
+| Appointment | Day-of appointment reminder | Daily execution of `supabase/functions/notifications-dispatch-scheduled` | `appointment.reminder_day` | Patient and assigned professional, when one exists | `appointment` / appointment ID | `appointment:{appointmentId}:reminder_day:{recipientRole}:{recipientUserId}` | `already_integrated` | Protected by an internal secret; local date/time use `America/Sao_Paulo`; retry is absorbed by the stable recipient-specific key. |
 | Appointment | One-hour appointment reminder | No notification scheduler or reminder worker was found | `appointment.reminder_1h` | Patient and/or professional | `appointment` / appointment ID | `appointment:{appointmentId}:reminder_1h:{recipientUserId}` | `not_found` | Requires the same scheduler decisions as the day reminder. |
 | Appointment | Ten-minute appointment reminder | No notification scheduler or reminder worker was found | `appointment.reminder_10m` | Patient and/or professional | `appointment` / appointment ID | `appointment:{appointmentId}:reminder_10m:{recipientUserId}` | `not_found` | Requires the same scheduler decisions as the day reminder. |
 | Appointment | Appointment can start | No explicit notification trigger was found; only consultation scheduling/deadline helpers exist | `appointment.starting` | Patient and/or professional | `appointment` or `consulta` | `appointment:{appointmentId}:starting:{recipientUserId}` | `not_found` | Define the start window and whether this is distinct from `teleconsulta.room_available`. |
@@ -74,14 +74,14 @@ Status values in this table have the following meaning:
 | Clinical request | Professional rejects request | No rejection service or durable rejected transition was found | `clinical_request.rejected` | Request patient | `clinical_request` / request ID | `clinical_request:{requestId}:rejected:patient:{patientUserId}` | `not_found` | The type key exists, but `update-solicitacao-exame` explicitly does not perform workflow transitions. |
 | Clinical request | Professional completes request | After `finish_solicitacao_exame_atendimento_transaction` succeeds in `supabase/functions/finish-solicitacao-exame-atendimento/service.ts::finishSolicitacaoExameAtendimento` | `clinical_request.completed` | Request patient | `clinical_request` / request ID | `clinical_request:{requestId}:completed:patient:{patientUserId}` | `needs_schema_verification` | The current lookup/result contract does not carry `paciente_id`; fetch or return it from the trusted repository layer. |
 | Clinical request | Request document becomes available | The finish transaction returns a prontuário ID, but no explicit document publication/release transition was found | `clinical_request.document_available` | Request patient | `clinical_request` / request ID | `clinical_request:{requestId}:document_available:patient:{patientUserId}` | `needs_business_rule_verification` | Decide which artifact and state count as “available”. Never include document or clinical content. |
-| Professional | Professional submits registration | After private and public pending profiles are created in `supabase/functions/register-professional/service.ts::registerProfessional` | `professional.registration_submitted` | Professional `appUser.id` | `professional_profile` / profile ID | `professional_profile:{profileId}:submitted:{professionalUserId}` | `ready_to_integrate` | Emit only after both profile writes required by the registration flow succeed. |
+| Professional | Professional submits registration | After private and public pending profiles are created in `supabase/functions/register-professional/service.ts::registerProfessional` | `professional.registration_submitted` | Professional `appUser.id` | `professional_profile` / profile ID | `professional_profile:{profileId}:submitted:{professionalUserId}` | `already_integrated` | Emitted only after both profile writes required by the registration flow succeed; duplicate registration attempts stop before notification. |
 | Professional | Backoffice approves registration | After the transactional review RPC succeeds in `supabase/functions/backoffice-review-professional/service.ts::reviewBackofficeProfessional` | `professional.registration_approved` | Professional app user resolved from `professional_profiles.user_id` | `professional_profile` / profile ID | `professional_profile:{profileId}:approved:{professionalUserId}` | `already_integrated` | Recipient lookup runs after the pending-only RPC succeeds. |
 | Professional | Backoffice rejects registration | Same successful transactional review point in `reviewBackofficeProfessional` | `professional.registration_rejected` | Professional app user resolved from `professional_profiles.user_id` | `professional_profile` / profile ID | `professional_profile:{profileId}:rejected:{professionalUserId}` | `already_integrated` | Internal reason/notes are not passed to notification creation. |
 | Professional | Legacy admin approves/rejects registration | After synchronized public/private profile updates in `supabase/functions/review-professional-application/service.ts::reviewProfessionalApplication` | `professional.registration_approved` or `professional.registration_rejected` | Professional app user | `professional_profile` / profile ID | Same profile/action/recipient key as backoffice | `needs_business_rule_verification` | A parallel legacy admin surface still exists. Decide whether it remains authoritative and use the same key to prevent duplicate notifications. |
 | Professional | Public profile is published | A possible transition is `perfil_ativo: false -> true` in `supabase/functions/upsert-professional-profile/service.ts::upsertProfessionalProfile` after approved-profile synchronization | `professional.profile_published` | Professional app user | `professional_profile` / profile ID | `professional_profile:{profileId}:published:{professionalUserId}` | `needs_business_rule_verification` | Approval and explicit profile activation have overlapping publication semantics; define the canonical event first. |
 | Professional | Profile is suspended | The legacy `reviewProfessionalApplication` flow supports `suspend`; the isolated backoffice review supports only approval/rejection | `professional.profile_suspended` | Professional app user | `professional_profile` / profile ID | `professional_profile:{profileId}:suspended:{professionalUserId}` | `needs_business_rule_verification` | Confirm which admin flow owns suspension and when public visibility is removed. |
 | Plan | Paid plan becomes active | After `markOrderActive(...)` succeeds in `supabase/functions/_shared/plans/activate-plan-subscription.ts::activatePlanSubscriptionForPayment` | `plan.activated` | Order app user (`app_user_id` or patient fallback) | `plan` / plan subscription order ID | `plan_order:{orderId}:activated:{recipientUserId}` | `already_integrated` | The stable key is shared by payment confirmation, simulation/reconciliation, and activation retry paths; `already_active` does not emit. |
-| Plan | Plan activation fails after payment | `activatePlanSubscriptionForPayment` persists an activation-failed order state | — (not seeded) | Order app user | `plan` / plan subscription order ID | — | `ready_to_integrate` | The real event exists, but no notification type key represents paid-plan activation failure. |
+| Plan | Plan activation fails after payment | After `activatePlanSubscriptionForPayment` successfully persists an activation-failed order state | `plan.activation_failed` | Order app user | `plan` / plan subscription order ID | `plan_order:{orderId}:activation_failed:{recipientUserId}` | `already_integrated` | The Phase 3B migration adds generic copy. The shared key deduplicates webhook, retry, simulation, and reconciliation paths. |
 | Plan | Plan is close to expiry | No scheduler or subscription-expiry flow was found in this repository | `plan.expiring` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:expiring:{threshold}:{recipientUserId}` | `not_found` | Likely depends on the external plans service plus a scheduled integration. |
 | Plan | Plan expires | No local expiration transition or callback was found | `plan.expired` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:expired:{recipientUserId}` | `not_found` | Appointment/queue credit release is not plan expiration. |
 | Plan | Plan is cancelled | No local subscription-cancellation transition or callback was found | `plan.cancelled` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:cancelled:{recipientUserId}` | `not_found` | Appointment/queue cancellation must not emit this event. |
@@ -137,23 +137,32 @@ Implemented without scheduler or broad fan-out:
 
 Scheduler-dependent reminders/expiry, room/record availability, queue professional fan-out/expiration/cancellation, credit reservation/coverage denial, revenue availability, and withdrawal paid/rejected remain pending under their recorded constraints.
 
+### Phase 3B
+
+Implemented in this scope:
+
+- `professional.registration_submitted` after both required pending profiles are persisted;
+- `plan.activation_failed` only after the paid-plan activation-failure state is persisted;
+- `appointment.reminder_day` through `notifications-dispatch-scheduled`, for the patient and only the assigned professional.
+
+The reminder dispatcher determines the day in `America/Sao_Paulo`, passes only `appointment_time` in `HH:mm`, and accepts `SOLICITADO`, `requested`, `pending`, `accepted`, `confirmed`, and `CONFIRMADO`. Immediate appointment types and all other statuses, including already-in-progress states, are excluded. `appointment.reminder_1h`, `appointment.reminder_10m`, and `appointment.starting` remain pending.
+
 ## Missing TypeKeys
 
 The following real or requested domain events have no matching key in the seeded `notification_types` catalog:
 
 - professional rejects an appointment;
 - gateway confirms a payment chargeback;
-- paid plan activation fails;
 - scheduled consultation expires or is closed as not performed;
 - patient deletes/cancels a pending clinical request, if that action is intended to notify another participant.
 
-No new type key was created by this mapping. Naming, templates, required status, and audience for these events require a separate catalog decision and migration.
+Phase 3B adds only `plan.activation_failed`. Naming, templates, required status, and audience for the events still listed above require a separate catalog decision and migration.
 
 ## Missing Integration Points
 
-- Only the documented Phase 1/Phase 2/Phase 3A flows currently call `InternalNotificationService`; all other mapped events remain pending.
+- Only the documented Phase 1/Phase 2/Phase 3A/Phase 3B flows currently call `InternalNotificationService`; all other mapped events remain pending.
 - No professional appointment-rejection flow was found.
-- No appointment reminder/starting notification scheduler was found.
+- The day reminder dispatcher exists; one-hour, ten-minute, and starting reminder scheduling does not.
 - No explicit teleconsultation room-publication or clinical-document-publication transition was found.
 - No clinical-request rejection flow was found.
 - No queue-expiration worker or transition was found.
@@ -182,7 +191,7 @@ The related destination must be authenticated and must revalidate access to the 
 
 ## Implementation Notes
 
-Existing and future calls must run server-side and only after the authoritative state change has succeeded. Phase 1/Phase 2/Phase 3A use a best-effort wrapper that logs notification failure without changing the confirmed business response. Future integrations must preserve that boundary and define any retry/observability policy explicitly.
+Existing and future calls must run server-side and only after the authoritative state change has succeeded. Phase 1/Phase 2/Phase 3A/Phase 3B use best-effort behavior that logs notification failure without changing a confirmed business response; the Phase 3B batch also isolates failures per recipient. Future integrations must preserve that boundary and define any retry/observability policy explicitly.
 
 Use one stable key per logical event and recipient. Because `user_notifications.deduplication_key` is globally unique and conflict recovery does not compare recipient/type/entity, every key must include the event identity and recipient.
 
@@ -212,7 +221,7 @@ The shared payment-status helper now handles applied `paid`, `payment_failed`, `
 
 `createPaymentCharge` should emit `financial.payment_created` only for a new provider charge after its owner is attached and provider response is saved. Payment notification recipients must be resolved through the charge owner type; the gateway payload must never be passed as notification `data`.
 
-Plan activation now emits after `markOrderActive(...)` in `activatePlanSubscriptionForPayment`, using the same stable order/recipient key across webhook, simulation, reconciliation, and retry paths. The early `already_active` return does not emit.
+Plan activation now emits after `markOrderActive(...)` in `activatePlanSubscriptionForPayment`, using the same stable order/recipient key across webhook, simulation, reconciliation, and retry paths. After `markOrderActivationFailed(...)` succeeds, the same helper emits `plan.activation_failed` with a separate stable failure key. The early `already_active` return and failures before failure-state persistence do not emit.
 
 ### Consultations and reviews
 
@@ -228,7 +237,7 @@ Do not infer rejection from deletion, and do not infer document availability mer
 
 ### Professional lifecycle
 
-Approval/rejection now emits after the backoffice transactional RPC, followed by a trusted lookup of `professional_profiles.user_id`. Registration submission remains future work.
+Registration submission emits to the newly registered `app_users.id` after both private and public pending profiles are created. Approval/rejection emits after the backoffice transactional RPC, followed by a trusted lookup of `professional_profiles.user_id`.
 
 The legacy `reviewProfessionalApplication` path must share the same deduplication identity if it remains operational. Publication and suspension need one authoritative administrative transition before calls are added.
 
@@ -248,12 +257,12 @@ Withdrawal requested now emits after `createSaque` returns the persisted withdra
 
 ### Scheduled events
 
-Reminder, starting, plan-expiry, and similar time-based events require a future authenticated scheduled dispatcher. That dispatcher must select only eligible current states, apply an explicit timezone/window policy, return or log per-entity outcomes, and use deterministic recipient-specific deduplication keys.
+`notifications-dispatch-scheduled` implements only the day-of appointment reminder. It is a service-role Function protected by `NOTIFICATIONS_SCHEDULER_SECRET`, determines the day in `America/Sao_Paulo`, and records per-recipient plus batch outcomes. A Supabase Cron HTTP job must invoke it daily at 04:00 local time; with a UTC cron expression this is currently `0 7 * * *`, while the Function itself never derives the business day from the runtime timezone. One-hour, ten-minute, starting, plan-expiry, and other scheduled events remain future work.
 
 ## Mapping Verification
 
 - Existing notification type keys were compared with the migration seed.
 - Domain services, repositories, payment webhooks, plan helpers, and scheduled workers were inspected.
-- Phase 1/Phase 2/Phase 3A `InternalNotificationService` integrations are present for the documented appointment, payment, review, backoffice professional-review, clinical-request, teleconsultation, queue, withdrawal, and plan events.
+- Phase 1/Phase 2/Phase 3A/Phase 3B `InternalNotificationService` integrations are present for the documented appointment, payment, review, professional-registration, clinical-request, teleconsultation, queue, withdrawal, plan, and day-reminder events.
 - This document does not assert that repository migrations or functions are deployed to a remote environment.
-- The scoped Phase 3A implementation changed only mapped backend flows, shared notification/plan helpers, tests, and documentation. No migration, frontend file, table, new type key, scheduler, broad fan-out, external channel, or business rule was added.
+- The scoped Phase 3B implementation adds one catalog key, updates the existing day-reminder template, and adds one protected scheduler. It does not add broad fan-out, external channels, preferences, or the one-hour, ten-minute, and starting reminders.

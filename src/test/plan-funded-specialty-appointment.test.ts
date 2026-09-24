@@ -29,13 +29,15 @@ describe('plan-funded specialty appointment contract', () => {
 
     const coverage = read('supabase/functions/_shared/plans/coverage.ts');
 
-    expect(coverage).toContain("const FIND_SCORE_PATH = '/subscription-score/find'");
+    expect(coverage).toContain('getPlansFacade(client)');
+    expect(coverage).toContain('plans.findAvailableSubscriptionScore');
+    expect(coverage).not.toContain('/subscription-score/find');
     expect(createAppointmentFiles).not.toContain('/subscription-score/use');
   });
 
   it('creates payment charges only for payment-required appointments', () => {
     const repository = read('supabase/functions/create-appointment/repository.ts');
-    const planTransactionIndex = repository.indexOf(".rpc('create_plan_funded_appointment'");
+    const planTransactionIndex = repository.indexOf(".rpc('create_internal_plan_funded_appointment'");
     const paymentChargeIndex = repository.indexOf('createPaymentCharge(client');
 
     expect(planTransactionIndex).toBeGreaterThan(-1);

@@ -2,7 +2,7 @@
 
 Status: partially implemented
 
-Code reviewed: 2026-09-20
+Code reviewed: 2026-09-23
 
 ## Objective and scope
 
@@ -10,7 +10,7 @@ Provide in-application notifications to authenticated patients and professionals
 
 This is a standalone system module, isolated from `src/backoffice/` and used by end users. Its canonical documentation lives in `docs/context/notifications/`; the backoffice feature index contains only a related-module reference. It must not be treated as a backoffice-only feature or share the dedicated admin identity/session.
 
-The repository contains the schema, seeded catalog, central service, four read/update Edge Functions, frontend, and the Phase 1/Phase 2/Phase 3A integrations documented below. It does not contain a scheduled dispatcher, preferences, external channels, or the remaining mapped integrations. Therefore the overall feature remains partially implemented.
+The repository contains the schema, catalog, central service, four read/update Edge Functions, frontend, and the Phase 1/Phase 2/Phase 3A/scoped Phase 3B integrations documented below. Phase 3B adds the protected day-reminder dispatcher; preferences, external channels, other reminders, and remaining mapped integrations do not exist. Therefore the overall feature remains partially implemented.
 
 Route: `/Notifications` (capital `N`, generated from the `Notifications` key in `src/pages.config.js`).
 
@@ -24,7 +24,7 @@ End users supported by the server-side access guard:
 Creation architecture prepared in the repository:
 
 ```text
-confirmed Phase 1/Phase 2/Phase 3A business flow
+confirmed Phase 1/Phase 2/Phase 3A/Phase 3B business flow or protected scheduler
   → InternalNotificationService
   → notification_types lookup and template rendering
   → user_notifications snapshot
@@ -86,11 +86,11 @@ supabase/functions/notifications-list/index.ts
 supabase/functions/notifications-unread-count/index.ts
 supabase/functions/notifications-mark-read/index.ts
 supabase/functions/notifications-mark-all-read/index.ts
+supabase/functions/notifications-dispatch-scheduled/index.ts
 ```
 
 Not found:
 
-- `supabase/functions/notifications-dispatch-scheduled` — Status: not found / pending future implementation;
 - `notification_preferences` — Status: not found / pending future implementation;
 - a `NotificationDropdown` component — Status: not found;
 - a separate `NotificationTemplates` file/service — Status: not found; templates are stored in `notification_types`;
@@ -207,6 +207,7 @@ The migration seeds the following exact catalog using `ON CONFLICT (key) DO NOTH
 ### `plan`
 
 - `plan.activated`
+- `plan.activation_failed` (added by `20260923090000_add_phase3b_notification_types.sql`)
 - `plan.expiring`
 - `plan.expired`
 - `plan.cancelled`
@@ -393,9 +394,14 @@ Main errors: `400 INVALID_JSON` for malformed POST JSON, method `405`, authentic
 
 ### `notifications-dispatch-scheduled`
 
-Status: not found / pending future implementation.
+Status: implemented for `appointment.reminder_day`.
 
-No scheduled reminder Function, cron definition, or matching `supabase/config.toml` entry was found. Seeded reminder types do not by themselves schedule or create notifications.
+- Method: `POST`.
+- Authentication: `x-notifications-scheduler-secret` matched against `NOTIFICATIONS_SCHEDULER_SECRET`; no end-user session.
+- Runtime: service-role client.
+- Optional manual payload: `{ "date": "YYYY-MM-DD" }`; omission uses the current `America/Sao_Paulo` date.
+- Success data: batch date/timezone and scanned, eligible, processed, created, deduplicated, skipped, and failed counts.
+- Isolation: a notification or professional-recipient lookup failure is logged and does not stop later recipients.
 
 ## Frontend behavior
 
@@ -445,7 +451,7 @@ Those destinations are protected by the normal application route/page guards. Cl
 
 ## Integrated flows
 
-Phase 1, Phase 2, and Phase 3A calls use `InternalNotificationService` only after the authoritative business write succeeds. Calls are best-effort: notification failures are logged with type, recipient, entity, deduplication key, request ID, raw error, and available message/code/details/hint fields, but do not roll back or mask a confirmed domain operation.
+Phase 1, Phase 2, Phase 3A, and Phase 3B calls use `InternalNotificationService`. Business-flow calls run only after the authoritative write succeeds and are best-effort. The scheduled batch isolates each recipient failure. Failures are logged with type, recipient, entity, deduplication key, request/execution ID, raw error, and available message/code/details/hint fields, without rolling back or masking a confirmed domain operation.
 
 ### Appointments
 
@@ -456,8 +462,9 @@ Phase 1, Phase 2, and Phase 3A calls use `InternalNotificationService` only afte
 | Appointment accepted | `appointment.accepted` | `appointments.patient_id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, only after a new acceptance transaction | `appointment` | `appointment:{appointmentId}:accepted:patient:{patientUserId}` | implemented |
 | Patient cancels assigned appointment | `appointment.cancelled` | Assigned professional resolved from `professional_profiles.user_id` | `supabase/functions/cancel-appointment/service.ts::cancelAppointment`, after the cancellation transaction | `appointment` | `appointment:{appointmentId}:cancelled:professional:{professionalUserId}` | implemented |
 | Professional cancels appointment | `appointment.cancelled` | `appointments.patient_id` | Same successful cancellation point | `appointment` | `appointment:{appointmentId}:cancelled:patient:{patientUserId}` | implemented |
+| Daily appointment reminder | `appointment.reminder_day` | Patient and assigned professional app user, when present | Daily `notifications-dispatch-scheduled` batch | `appointment` | `appointment:{appointmentId}:reminder_day:{recipientRole}:{recipientUserId}` | implemented |
 
-The repeated/already-cancelled path does not emit. Administrative cancellations, patient cancellations without an assigned professional, actor confirmations, open-specialty fan-out, reminders, and starting notifications do not emit.
+The repeated/already-cancelled path does not emit. Administrative cancellations, patient cancellations without an assigned professional, actor confirmations, and open-specialty fan-out do not emit. One-hour, ten-minute, and starting reminders remain unimplemented.
 
 ### Payments, finance, and withdrawals
 
@@ -494,6 +501,7 @@ Rejected, completed, and document-available events remain pending. No clinical d
 
 | Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
 |---|---|---|---|---|---|---|
+| Registration submitted | `professional.registration_submitted` | Newly registered `app_users.id` | `supabase/functions/register-professional/service.ts::registerProfessional`, after both required pending profiles | `professional_profile` | `professional_profile:{profileId}:submitted:{professionalUserId}` | implemented |
 | Registration approved | `professional.registration_approved` | `professional_profiles.user_id` | `supabase/functions/backoffice-review-professional/service.ts::reviewBackofficeProfessional`, after the transactional RPC | `professional_profile` | `professional_profile:{profileId}:approved:{professionalUserId}` | implemented |
 | Registration rejected | `professional.registration_rejected` | `professional_profiles.user_id` | Same successful transactional review point | `professional_profile` | `professional_profile:{profileId}:rejected:{professionalUserId}` | implemented |
 
@@ -504,10 +512,11 @@ The pending-only RPC prevents emission for already-reviewed profiles. Internal r
 | Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
 |---|---|---|---|---|---|---|
 | Plan activated | `plan.activated` | Order `app_user_id`, with the existing `patient_id` fallback resolved to `app_users.id` | `supabase/functions/_shared/plans/activate-plan-subscription.ts::activatePlanSubscriptionForPayment`, after `markOrderActive` | `plan` | `plan_order:{orderId}:activated:{recipientUserId}` | implemented |
+| Plan activation failed | `plan.activation_failed` | Order `app_user_id`, with the existing `patient_id` fallback | Same helper, only after `markOrderActivationFailed` succeeds | `plan` | `plan_order:{orderId}:activation_failed:{recipientUserId}` | implemented |
 | Appointment credit consumed | `plan.credit_consumed` | Appointment patient `app_users.id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, after credit confirmation returns `used_now` | `appointment` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
 | Queue credit consumed | `plan.credit_consumed` | Queue patient `app_users.id` | `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry`, after credit confirmation returns `used_now` | `queue` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
 
-Already-active plan repair/retry paths and `already_used` credit confirmations do not emit. Expiry, cancellation, credit reservation, and coverage-denied events remain pending.
+Already-active plan repair/retry paths and `already_used` credit confirmations do not emit. Repeated representations of the same activation failure reuse one key. Expiry, cancellation, credit reservation, and coverage-denied events remain pending.
 
 ### Queue/immediate consultation
 
@@ -527,7 +536,7 @@ An existing active entry, including the concurrent uniqueness-recovery path, doe
 
 Idempotent room-state repair and already-finalized paths do not emit. `teleconsulta.finished` and `review.professional_pending` remain separate notifications because completion and the evaluation prompt are distinct events. Room and record availability remain pending.
 
-Result: the infrastructure, user-facing reader, five Phase 1 types, nine Phase 2 types, and seven Phase 3A types are integrated. All remaining catalog events stay pending as described in `notification-events-map.md`.
+Result: the infrastructure, user-facing reader, five Phase 1 types, nine Phase 2 types, seven Phase 3A types, and three Phase 3B types are integrated. All remaining events stay pending as described in `notification-events-map.md`.
 
 ## Supabase configuration
 
@@ -540,6 +549,9 @@ verify_jwt = false
 [functions.notifications-unread-count]
 verify_jwt = false
 
+[functions.notifications-dispatch-scheduled]
+verify_jwt = false
+
 [functions.notifications-mark-read]
 verify_jwt = false
 
@@ -547,7 +559,42 @@ verify_jwt = false
 verify_jwt = false
 ```
 
-This project performs application authentication inside each Function through `requireNotificationEndUser`. `OPTIONS` is handled first so preflight does not require a token. `notifications-dispatch-scheduled` has no entry because the Function does not exist.
+The four end-user Functions authenticate through `requireNotificationEndUser`; `OPTIONS` is handled first. The scheduled Function does not use an end-user session: it requires `x-notifications-scheduler-secret` to match the `NOTIFICATIONS_SCHEDULER_SECRET` Edge Function secret and then uses the service-role client.
+
+## Daily appointment reminder scheduler
+
+`notifications-dispatch-scheduled` implements only `appointment.reminder_day`. On each run it determines the target date in `America/Sao_Paulo` (or accepts a validated `YYYY-MM-DD` date for manual testing), loads appointments for that day, and processes failures independently.
+
+Eligible statuses, copied from active appointment flows in the repository, are:
+
+- `SOLICITADO`;
+- `requested`;
+- `pending`;
+- `accepted`;
+- `confirmed`;
+- `CONFIRMADO`.
+
+All other statuses are excluded, including in-progress, cancelled, completed/finalized, expired, and not-performed values. Appointment types `instant`, `plantao`, and `imediato` are also excluded. The patient always receives an eligible reminder; the professional receives one only when `appointments.professional_id` resolves to `professional_profiles.user_id`. There is no specialty, availability, online, or candidate fan-out.
+
+The Function passes only `{ "appointment_time": "HH:mm" }`. Explicit appointment time is preferred; an offset-bearing `scheduled_datetime` is converted server-side with `America/Sao_Paulo`. The catalog template is `Você tem uma consulta hoje às {{appointment_time}}.`
+
+The remote Supabase Cron job must be configured per environment to send an HTTP `POST` daily at 04:00 `America/Sao_Paulo`. For a UTC-only cron configuration, the applicable expression is currently `0 7 * * *`. The Function still computes the local business date explicitly and does not trust the runtime timezone. The request must include:
+
+```text
+x-notifications-scheduler-secret: <same value as NOTIFICATIONS_SCHEDULER_SECRET>
+```
+
+Manual invocation for a controlled date:
+
+```bash
+curl --request POST \
+  "$SUPABASE_URL/functions/v1/notifications-dispatch-scheduled" \
+  --header "Content-Type: application/json" \
+  --header "x-notifications-scheduler-secret: $NOTIFICATIONS_SCHEDULER_SECRET" \
+  --data '{"date":"2026-09-23"}'
+```
+
+Omit `date` for the current São Paulo day. Re-execution is safe because each patient/professional key is stable. Logs contain only entity/recipient identifiers, role, type, key, outcome, and execution ID; the response includes aggregate created/deduplicated/skipped/failed counts.
 
 ## Touchpoints outside the isolated notification folders
 
@@ -561,12 +608,13 @@ Confirmed current integration/context points:
 - `src/pages/SolicitacaoExames.jsx`, `src/pages/MeusPagamentos.jsx`, and `src/pages/MeusPlanos.jsx` — protected destination screens selected by `notificationDestination`.
 - `supabase/functions/_shared/auth.ts`, `sessionAccount.ts`, `http.ts`, and `supabase.ts` — shared authentication, active-account, HTTP/CORS, and privileged-client helpers.
 - `supabase/functions/_shared/payments/payment-status-notification.ts` — resolves the payment owner to an app user and emits approved/failed/expired/refunded events without exposing provider payloads.
-- `supabase/migrations/20260912090000_create_internal_notifications.sql` — schema, constraints, grants, indexes, and catalog seed.
-- `supabase/config.toml` — gateway configuration for the four Functions.
+- `supabase/migrations/20260912090000_create_internal_notifications.sql` — schema, constraints, grants, indexes, and original catalog seed.
+- `supabase/migrations/20260923090000_add_phase3b_notification_types.sql` — idempotent `plan.activation_failed` insert and day-reminder template update.
+- `supabase/config.toml` — gateway configuration for the end-user Functions and protected scheduled dispatcher.
 - `tests/unit/notifications/NotificationRenderer.test.ts` — renderer unit coverage.
 - `docs/NOTIFICATIONS_CONTEXT.md` — earlier concise module context.
 
-Integrated touchpoints include appointment creation/acceptance/cancellation, payment webhook/local paid transition, consultation start/finish/evaluation, queue join/acceptance, backoffice professional review, withdrawal request, plan activation/credit consumption, and clinical-request creation/acceptance. Other mapped events remain pending.
+Integrated touchpoints include appointment creation/acceptance/cancellation/day reminder, payment webhook/local paid transition, consultation start/finish/evaluation, queue join/acceptance, professional registration/backoffice review, withdrawal request, plan activation/failure/credit consumption, and clinical-request creation/acceptance. Other mapped events remain pending.
 
 ## Manual validation checklist
 
@@ -594,7 +642,7 @@ limit 50;
 ```
 
 - [ ] Confirm the migration and seeded catalog exist in the target environment.
-- [ ] Create each Phase 1/Phase 2/Phase 3A domain event through its trusted backend flow; never insert from the browser.
+- [ ] Create each Phase 1/Phase 2/Phase 3A/Phase 3B domain event through its trusted backend flow or protected scheduler; never insert from the browser.
 - [ ] Confirm one `user_notifications` snapshot and one `internal/sent` delivery.
 - [ ] Open `/Notifications` as the recipient and confirm list rendering.
 - [ ] Confirm the bell and avatar badges show the unread count and refresh within the polling interval.
@@ -611,24 +659,24 @@ limit 50;
 Relevant automated command:
 
 ```bash
-npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-notifications-phase2.test.ts src/test/internal-notifications-phase3a.test.ts tests/unit/notifications/NotificationRenderer.test.ts
+npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-notifications-phase2.test.ts src/test/internal-notifications-phase3a.test.ts src/test/internal-notifications-phase3b.test.ts tests/unit/notifications/NotificationRenderer.test.ts
 ```
 
 ## Implementation verification
 
-- `git diff --check`: run for the combined Phase 2/Phase 3A implementation.
-- Targeted Vitest command: attempted, but local dependencies are unavailable (`vitest` is not recognized as a command).
+- `git diff --check`: passed for the Phase 3B implementation.
+- Targeted Phase 3B Vitest command and full `npm test`: attempted, but local dependencies are unavailable (`vitest` is not recognized as a command).
 - `npm run build`: attempted, but local dependencies are unavailable (`vite` is not recognized as a command).
 - `npm run lint`: attempted, but local dependencies are unavailable (`eslint` is not recognized as a command).
 - `npm run typecheck`: unavailable because the project has no `typecheck` script.
-- `npm run check:supabase-functions-config`: passed for all 79 configured Functions.
+- `npm run check:supabase-functions-config`: passed for all 80 configured Functions.
 - Database, browser, and deployed Edge Function checks: not run; no remote environment was accessed.
 
 ## Risks and pending verification
 
 - Remote migration, seed, Function deployment, secrets, gateway configuration, and live data cannot be confirmed from repository contents.
-- Only the documented Phase 1/Phase 2/Phase 3A events create notifications; all other mapped events remain pending.
-- `notifications-dispatch-scheduled` and scheduled reminder execution are absent.
+- Only the documented Phase 1/Phase 2/Phase 3A/Phase 3B events create notifications; all other mapped events remain pending.
+- Repository state cannot confirm that the remote 04:00 Supabase Cron job or its shared secret has been applied.
 - `notification_preferences` and a preferences UI are absent.
 - Only the internal channel is operational; email, WhatsApp, SMS, push, and gateway are schema/type placeholders.
 - `expires_at` exists but current list and unread-count queries do not exclude expired rows.
@@ -636,7 +684,7 @@ npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-not
 - The template renderer returns plain strings but does not strip/escape HTML itself; safety currently depends on text-node rendering and must be preserved by future consumers.
 - Notification insertion and delivery insertion are separate database requests, not one transaction. A delivery failure can leave a notification without a delivery; a retry with the same deduplication key can repair the internal delivery.
 - Deduplication recovery looks up only the globally unique key and does not compare the existing recipient/type/entity with the new input; key construction must therefore include stable recipient and event identity.
-- Phase 1/Phase 2/Phase 3A regression tests cover seeded keys, post-persistence placement, idempotent guards, owner-aware keys, recipient selection, privacy boundaries, and best-effort failure behavior. Dedicated database-backed tests for notification creation, ownership, all four Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
+- Phase 1/Phase 2/Phase 3A/Phase 3B regression tests cover catalog keys, post-persistence placement, idempotent guards, owner-aware keys, recipient selection, timezone formatting, batch resilience, privacy boundaries, and best-effort behavior. Dedicated database-backed tests for notification creation, ownership, Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
 - Manual browser, database, and deployed Function validation was not performed in this task.
 
 ## Future improvements
@@ -644,7 +692,7 @@ npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-not
 Subject to separate feature work and design/security review:
 
 - integrate the remaining appointment, payment, clinical-request, professional, plan, queue, withdrawal, and teleconsultation events;
-- add the scheduled reminder dispatcher and its authenticated scheduler contract;
+- add the remaining one-hour, ten-minute, and starting reminder schedules only under separately approved scope;
 - add notification preferences while respecting required notification types;
 - add cursor/load-more or infinite scrolling and an unread filter;
 - define expiry behavior;

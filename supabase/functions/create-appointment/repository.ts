@@ -74,6 +74,9 @@ type ExternalScoreResource = {
   } | null;
 };
 
+// Phase 2A compatibility-only code starts here. The former inline HTTP lookup is
+// intentionally retained for rollback/review, but the active repository method
+// calls the shared internal resolvePlanCoverage facade below. Remove in Phase 2B.
 const FIND_SCORE_PATH = '/subscription-score/find';
 const DEFAULT_REQUEST_TIMEOUT_MS = 8_000;
 const APPOINTMENT_SELECT = `
@@ -399,6 +402,9 @@ async function verifyPlanCoverageForSpecialtyInternal({
       reason: 'plan_credit_available',
       specialtyCode,
       planSubscriptionOrderId: candidate.order.id,
+      internalSubscriptionId: normalizeString(subscription?.id || resource.subscription_id),
+      internalSubscriptionScoreId: normalizeString(resource.id),
+      internalScoreId: normalizeString(score?.id || resource.score_id),
       plansServiceSubscriptionId: normalizeString(candidate.order.plans_service_subscription_id) || null,
       externalSubscriptionId: subscription?.id || resource.subscription_id || null,
       externalSubscriptionScoreId: normalizeString(resource.id),
@@ -418,6 +424,7 @@ async function verifyPlanCoverageForSpecialtyInternal({
     details: { specialtyCode },
   });
 }
+// End Phase 2A compatibility-only HTTP lookup.
 
 function buildCoverageSnapshot(coverage: PlanCoverageVerification | null) {
   if (!coverage) {
@@ -428,6 +435,9 @@ function buildCoverageSnapshot(coverage: PlanCoverageVerification | null) {
     reason: coverage.reason,
     specialty_code: coverage.specialtyCode,
     plan_subscription_order_id: coverage.planSubscriptionOrderId,
+    internal_subscription_id: coverage.internalSubscriptionId,
+    internal_subscription_score_id: coverage.internalSubscriptionScoreId,
+    internal_score_id: coverage.internalScoreId,
     plans_service_subscription_id: coverage.plansServiceSubscriptionId,
     external_subscription_id: coverage.externalSubscriptionId,
     external_subscription_score_id: coverage.externalSubscriptionScoreId,
@@ -590,7 +600,7 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
         }
 
         const { data: planAppointmentData, error: planAppointmentError } = await client
-          .rpc('create_plan_funded_appointment', {
+          .rpc('create_internal_plan_funded_appointment', {
             p_patient_id: params.patientId,
             p_patient_name: params.patientName,
             p_patient_email: params.patientEmail,
@@ -611,12 +621,7 @@ function createCreateAppointmentRepository(client: SupabaseClient): CreateAppoin
             p_fee_rule_id: params.pricing.feeRuleId,
             p_symptoms: params.symptoms,
             p_plan_subscription_order_id: planCoverage.planSubscriptionOrderId,
-            p_plans_service_subscription_id: normalizeString(planCoverage.externalSubscriptionId)
-              || planCoverage.plansServiceSubscriptionId,
-            p_external_subscription_score_id: planCoverage.externalSubscriptionScoreId,
-            p_external_score_id: normalizeString(planCoverage.externalScoreId) || null,
-            p_external_plan_id: planCoverage.externalPlanId,
-            p_external_specialization_id: planCoverage.externalSpecializationId,
+            p_internal_subscription_score_id: planCoverage.internalSubscriptionScoreId,
             p_specialty_code: planCoverage.specialtyCode,
             p_request_snapshot: planCoverage.requestSnapshot,
             p_response_snapshot: planCoverage.responseSnapshot,

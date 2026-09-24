@@ -14,7 +14,7 @@ import {
   type AggregatedPlanCredit,
 } from '../_shared/plans/plan-scores.ts';
 import { PLAN_CATALOG, type PlanCode } from '../_shared/plans/plan-catalog.ts';
-import { listExternalPlanScores } from '../_shared/plans-service/client.ts';
+import { getPlansFacade } from '../_shared/plans/facade.ts';
 import { requireAppUserByAuthUserId, requireRole, type AppUser } from '../_shared/professional.ts';
 import {
   createServiceRoleClient,
@@ -47,6 +47,7 @@ type PlanSubscriptionOrderRow = {
   payment_required: boolean | null;
   current_payment_charge_id: string | null;
   plans_service_subscription_id: string | null;
+  internal_plans_subscription_id: string | null;
   external_key: string | null;
   error_code: string | null;
   error_message: string | null;
@@ -250,21 +251,13 @@ function buildCatalogCreditResolution(
   };
 }
 
-function normalizeExternalSubscriptionId(value: unknown) {
-  const parsed = Number(value || 0);
-
-  if (Number.isInteger(parsed) && parsed > 0) {
-    return parsed;
-  }
-
-  return null;
-}
-
 async function resolveCredits({
+  client,
   order,
   planCode,
   requestId,
 }: {
+  client: SupabaseClient;
   order: PlanSubscriptionOrderRow;
   planCode: PlanCode;
   requestId: string;
@@ -276,22 +269,40 @@ async function resolveCredits({
   }
 
   const externalKey = normalizeString(order.external_key);
-  const subscriptionId = normalizeExternalSubscriptionId(order.plans_service_subscription_id);
+  const subscriptionId = normalizeString(order.internal_plans_subscription_id);
 
   if (!externalKey) {
     return buildCatalogCreditResolution(planCode, true, 'external_key_missing');
   }
 
   if (!subscriptionId) {
-    return buildCatalogCreditResolution(planCode, true, 'plans_service_subscription_id_missing');
+    return buildCatalogCreditResolution(planCode, true, 'internal_subscription_id_missing');
   }
 
   try {
-    const externalScores = await listExternalPlanScores({
+    const internalScores = await getPlansFacade(client).listSubscriptionScores({
       externalKey,
       subscriptionId,
     });
-    const credits = aggregateExternalScoresForCredits(externalScores.subscriptions);
+    const credits = aggregateExternalScoresForCredits(internalScores.subscriptions.map((subscription) => ({
+      id: subscription.id,
+      plan_id: subscription.legacyPlanId,
+      plan_name: subscription.planName,
+      status: subscription.rawStatus,
+      status_label: subscription.status,
+      created_at: subscription.createdAt,
+      scores: subscription.scores.map((score) => ({
+        subscription_score_id: score.subscriptionScoreId,
+        score_id: score.scoreId,
+        status: score.rawStatus,
+        status_label: score.status,
+        specialization_id: score.legacySpecializationId,
+        specialization_name: score.specializationName,
+        concil_type: score.concilType,
+        created_at: score.createdAt,
+        used_at: score.usedAt,
+      })),
+    })));
 
     return {
       credits,
@@ -302,9 +313,9 @@ async function resolveCredits({
   } catch (error) {
     const reason = error instanceof AppError
       ? error.code
-      : 'plans_service_scores_unavailable';
+      : 'internal_plans_scores_unavailable';
 
-    console.warn('[get-my-plans] plans-service:scores-fallback', {
+    console.warn('[get-my-plans] internal-plans:scores-fallback', {
       requestId,
       orderId: order.id,
       reason,
@@ -442,6 +453,7 @@ function mapCurrentPlan(order: PlanSubscriptionOrderRow, planCode: PlanCode) {
     renewalDayLabel: renewalDayLabelFrom(order),
     externalPlanId: Number(order.external_plan_id || catalog.externalPlanId),
     plansServiceSubscriptionId: order.plans_service_subscription_id,
+    internalPlansSubscriptionId: order.internal_plans_subscription_id,
     paymentRequired: Boolean(order.payment_required ?? true),
     currentPaymentChargeId: order.current_payment_charge_id,
     error: order.error_code || order.error_message
@@ -454,6 +466,7 @@ function mapCurrentPlan(order: PlanSubscriptionOrderRow, planCode: PlanCode) {
 }
 
 async function buildPlanResponse(
+  client: SupabaseClient,
   appUser: AppUser,
   order: PlanSubscriptionOrderRow,
   requestId: string,
@@ -473,6 +486,7 @@ async function buildPlanResponse(
   }
 
   const creditResolution = await resolveCredits({
+    client,
     order,
     planCode,
     requestId,
@@ -514,6 +528,7 @@ async function listPatientPlanOrders(client: SupabaseClient, appUserId: string) 
       payment_required,
       current_payment_charge_id,
       plans_service_subscription_id,
+      internal_plans_subscription_id,
       external_key,
       error_code,
       error_message,
@@ -569,7 +584,7 @@ export async function handleGetMyPlansRequest(req: Request) {
     const orders = await listPatientPlanOrders(client, appUser.id);
     const currentOrder = selectCurrentOrder(orders);
     const result = currentOrder
-      ? await buildPlanResponse(appUser, currentOrder, requestId)
+      ? await buildPlanResponse(client, appUser, currentOrder, requestId)
       : buildNoPlanResponse(appUser);
 
     console.info('[get-my-plans] plans:loaded', {

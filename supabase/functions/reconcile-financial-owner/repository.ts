@@ -3,7 +3,7 @@ import { AppError } from '../_shared/errors.ts';
 import { insertAuditEvent } from '../_shared/observability.ts';
 import { markPaymentAsPaid } from '../_shared/payments/mark-payment-as-paid.ts';
 import { createPaymentProvider } from '../_shared/payments/providers/index.ts';
-import { listExternalPlanScores } from '../_shared/plans-service/client.ts';
+import { getPlansFacade } from '../_shared/plans/facade.ts';
 import { requireAppUserByAuthUserId, requireRole } from '../_shared/professional.ts';
 import {
   createServiceRoleClient,
@@ -16,7 +16,6 @@ import type {
   ReconciliationStepResult,
   ReconcileFinancialOwnerRepository,
 } from './types.ts';
-import { resolveExternalCreditStatus } from './service.ts';
 
 type PaymentChargeRow = {
   id: string;
@@ -40,7 +39,7 @@ type PlanOwnerRow = {
 type PlanUsageRow = {
   id: string;
   status: string;
-  external_subscription_score_id: string | null;
+  internal_subscription_score_id: string | null;
   plan_subscription_order_id: string | null;
 };
 
@@ -212,7 +211,7 @@ async function reconcilePlanCredit(
 
   const { data: usageData, error: usageError } = await client
     .from('plan_credit_usages')
-    .select('id, status, external_subscription_score_id, plan_subscription_order_id')
+    .select('id, status, internal_subscription_score_id, plan_subscription_order_id')
     .eq('id', owner.plan_credit_usage_id)
     .eq('owner_type', ownerType)
     .eq('owner_id', ownerId)
@@ -222,55 +221,55 @@ async function reconcilePlanCredit(
   }
   const usage = usageData as PlanUsageRow;
 
+  const plans = getPlansFacade(client);
   if (usage.status === 'used') {
-    const { error } = await client.rpc('reconcile_plan_credit_usage_from_external', {
-      p_usage_id: usage.id, p_owner_type: ownerType, p_owner_id: ownerId, p_request_id: requestId,
-    });
-    if (error) throw new AppError({ status: 500, code: 'PLAN_CREDIT_LOCAL_REPAIR_FAILED', message: 'Unable to repair the local plan credit state.' });
+    try {
+      await plans.reconcilePlanCredit({ usageId: usage.id, ownerType, ownerId, requestId });
+    } catch {
+      throw new AppError({ status: 500, code: 'PLAN_CREDIT_LOCAL_REPAIR_FAILED', message: 'Unable to repair the local plan credit state.' });
+    }
     return { attempted: true, changed: owner.coverage_status !== 'plan_used', status: 'resolved', reasonCode: 'LOCAL_PLAN_OWNER_REPAIRED' };
   }
 
-  const externalScoreId = normalized(usage.external_subscription_score_id);
-  if (!externalScoreId || !usage.plan_subscription_order_id) {
-    return { attempted: false, changed: false, status: 'manual_review_required', reasonCode: 'PLAN_CREDIT_EXTERNAL_ID_MISSING' };
+  const internalScoreId = normalized(usage.internal_subscription_score_id);
+  if (!internalScoreId || !usage.plan_subscription_order_id) {
+    return { attempted: false, changed: false, status: 'manual_review_required', reasonCode: 'PLAN_CREDIT_INTERNAL_ID_MISSING' };
   }
 
   const { data: orderData, error: orderError } = await client
     .from('plan_subscription_orders')
-    .select('id, external_key, plans_service_subscription_id')
+    .select('id, external_key, internal_plans_subscription_id')
     .eq('id', usage.plan_subscription_order_id)
     .maybeSingle();
-  const order = orderData as { id?: string; external_key?: string; plans_service_subscription_id?: string } | null;
+  const order = orderData as { id?: string; external_key?: string; internal_plans_subscription_id?: string } | null;
   if (orderError || !order?.id || !normalized(order.external_key)) {
     return { attempted: false, changed: false, status: 'manual_review_required', reasonCode: 'PLAN_SUBSCRIPTION_IDENTITY_MISSING' };
   }
 
   let scores;
   try {
-    scores = await listExternalPlanScores({
+    scores = await plans.listSubscriptionScores({
       externalKey: normalized(order.external_key),
-      subscriptionId: normalized(order.plans_service_subscription_id) || undefined,
+      subscriptionId: normalized(order.internal_plans_subscription_id) || undefined,
     });
   } catch {
-    return { attempted: true, changed: false, status: 'manual_review_required', reasonCode: 'PLANS_SERVICE_RECHECK_FAILED' };
+    return { attempted: true, changed: false, status: 'manual_review_required', reasonCode: 'INTERNAL_PLANS_RECHECK_FAILED' };
   }
 
-  const externalStatus = resolveExternalCreditStatus(
-    scores.subscriptions as Array<{ scores?: Array<Record<string, unknown>> | null }>,
-    externalScoreId,
-  );
-  if (externalStatus !== 'used') {
-    return { attempted: true, changed: false, status: 'manual_review_required', reasonCode: 'PLAN_CREDIT_NOT_CONFIRMED_EXTERNALLY' };
+  const internalStatus = scores.subscriptions
+    .flatMap((subscription) => subscription.scores)
+    .find((score) => score.subscriptionScoreId === internalScoreId)?.status;
+  if (internalStatus !== 'used') {
+    return { attempted: true, changed: false, status: 'manual_review_required', reasonCode: 'PLAN_CREDIT_NOT_CONFIRMED_INTERNALLY' };
   }
 
-  const { error: reconcileError } = await client.rpc('reconcile_plan_credit_usage_from_external', {
-    p_usage_id: usage.id, p_owner_type: ownerType, p_owner_id: ownerId, p_request_id: requestId,
-  });
-  if (reconcileError) {
+  try {
+    await plans.reconcilePlanCredit({ usageId: usage.id, ownerType, ownerId, requestId });
+  } catch {
     throw new AppError({ status: 500, code: 'PLAN_CREDIT_LOCAL_REPAIR_FAILED', message: 'Unable to repair the locally confirmed plan credit.' });
   }
 
-  return { attempted: true, changed: true, status: 'resolved', reasonCode: 'PLAN_CREDIT_CONFIRMED_EXTERNALLY' };
+  return { attempted: true, changed: true, status: 'resolved', reasonCode: 'PLAN_CREDIT_CONFIRMED_INTERNALLY' };
 }
 
 export function createReconcileFinancialOwnerRepository(client: SupabaseClient): ReconcileFinancialOwnerRepository {

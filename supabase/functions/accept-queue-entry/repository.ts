@@ -349,7 +349,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
       if (queueData.plan_credit_usage_id) {
         const { data: usageData, error: usageError } = await client
           .from('plan_credit_usages')
-          .select('id, status, external_subscription_score_id')
+          .select('id, status, internal_subscription_score_id')
           .eq('id', queueData.plan_credit_usage_id)
           .eq('owner_type', 'queue')
           .eq('owner_id', queueId)
@@ -368,8 +368,8 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
           ? {
             id: String(usageData.id),
             status: String(usageData.status || ''),
-            externalSubscriptionScoreId: usageData.external_subscription_score_id
-              ? String(usageData.external_subscription_score_id)
+            internalSubscriptionScoreId: usageData.internal_subscription_score_id
+              ? String(usageData.internal_subscription_score_id)
               : null,
           }
           : null;
@@ -391,7 +391,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
     },
 
     async confirmPlanCreditBeforeAcceptance({ context }) {
-      if (!context.usage?.id || !context.usage.externalSubscriptionScoreId) {
+      if (!context.usage?.id || !context.usage.internalSubscriptionScoreId) {
         throw new AppError({
           status: 409,
           code: 'PLAN_QUEUE_CREDIT_USAGE_REQUIRED',
@@ -405,7 +405,7 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
         ownerType: 'queue',
         ownerId: context.queue.id,
         usageId: context.usage.id,
-        externalSubscriptionScoreId: context.usage.externalSubscriptionScoreId,
+        internalSubscriptionScoreId: context.usage.internalSubscriptionScoreId,
       });
     },
 

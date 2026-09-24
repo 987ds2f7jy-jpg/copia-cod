@@ -162,6 +162,7 @@ export async function handleRetryPlanActivationRequest(req: Request) {
     const activation = await activatePlanSubscriptionForPayment(client, {
       paymentChargeId: order.current_payment_charge_id as string,
       requestId,
+      retry: true,
     });
 
     return successResponse({ activation }, requestId, { status: 200, cors: CORS });

@@ -39,6 +39,9 @@ verify_jwt = false
 [functions.notifications-unread-count]
 verify_jwt = false
 
+[functions.notifications-dispatch-scheduled]
+verify_jwt = false
+
 [functions.notifications-mark-read]
 verify_jwt = false
 
@@ -152,6 +155,9 @@ verify_jwt = false
 
 [functions.join-queue]
 verify_jwt = false
+
+[functions.internal-plans-worker]
+verify_jwt = true
 
 [functions.leave-queue]
 verify_jwt = false
