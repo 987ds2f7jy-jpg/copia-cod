@@ -5,6 +5,7 @@ import {
   type InternalNotificationNotifier,
 } from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
+import { getPlanCoverageDenialReason } from '../_shared/plans/coverage.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
   normalizePricingSpecialty,
@@ -345,6 +346,46 @@ export async function createAppointment({
   });
 
   if (notificationService) {
+    if (
+      appointment.funding_source === 'plan'
+      && appointment.coverage_status === 'plan_pending_use'
+      && appointment.plan_credit_usage_id
+    ) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'create-appointment',
+        requestId,
+        input: {
+          recipientUserId: appUser.id,
+          typeKey: 'plan.credit_reserved',
+          data: {
+            plan_credit_usage_id: appointment.plan_credit_usage_id,
+            appointment_id: appointment.id,
+          },
+          relatedEntityType: 'appointment',
+          relatedEntityId: appointment.id,
+          deduplicationKey: `plan_credit_usage:${appointment.plan_credit_usage_id}:reserved:patient:${appUser.id}`,
+        },
+      });
+    } else if (!input.professionalProfileId && !planCoverage) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'create-appointment',
+        requestId,
+        input: {
+          recipientUserId: appUser.id,
+          typeKey: 'plan.coverage_denied',
+          data: {
+            reason_code: getPlanCoverageDenialReason(specialty),
+            appointment_id: appointment.id,
+          },
+          relatedEntityType: 'appointment',
+          relatedEntityId: appointment.id,
+          deduplicationKey: `appointment:${appointment.id}:plan_coverage_denied:patient:${appUser.id}`,
+        },
+      });
+    }
+
     await notifyInternalBestEffort({
       notificationService,
       functionName: 'create-appointment',

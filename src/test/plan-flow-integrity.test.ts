@@ -107,7 +107,10 @@ function appointmentRepository(planCoverage: typeof coverage | null) {
   };
 }
 
-async function createSpecialty(repository: CreateAppointmentRepository) {
+async function createSpecialty(
+  repository: CreateAppointmentRepository,
+  notificationService?: { notify: ReturnType<typeof vi.fn> },
+) {
   return createAppointment({
     requestId: 'request-specialty',
     input: {
@@ -121,6 +124,7 @@ async function createSpecialty(repository: CreateAppointmentRepository) {
     },
     authenticatedUser: { authUserId: 'auth-patient', email: 'patient@example.invalid' },
     repository,
+    notificationService,
   });
 }
 
@@ -197,7 +201,10 @@ function queueRepository(planCoverage: typeof coverage | null) {
   };
 }
 
-async function createQueue(repository: JoinQueueRepository) {
+async function createQueue(
+  repository: JoinQueueRepository,
+  notificationService?: { notify: ReturnType<typeof vi.fn> },
+) {
   return joinQueue({
     requestId: 'request-queue',
     input: {
@@ -208,6 +215,7 @@ async function createQueue(repository: JoinQueueRepository) {
     },
     authenticatedUser: { authUserId: 'auth-patient', email: 'patient@example.invalid' },
     repository,
+    notificationService,
   });
 }
 
@@ -273,6 +281,88 @@ describe('plan flow integrity', () => {
 
     await expect(createQueue(repository)).rejects.toMatchObject({ code: 'PLANS_SERVICE_TIMEOUT' });
     expect(createQueueEntry).not.toHaveBeenCalled();
+  });
+
+  it('notifies a persisted appointment credit reservation once per usage identity', async () => {
+    const { repository, createRecord } = appointmentRepository(coverage);
+    const notify = vi.fn().mockResolvedValue({ skipped: false, deduplicated: false });
+
+    await createSpecialty(repository, { notify });
+
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: patientId,
+      typeKey: 'plan.credit_reserved',
+      relatedEntityType: 'appointment',
+      relatedEntityId: '50000000-0000-4000-8000-000000000001',
+      deduplicationKey: `plan_credit_usage:${usageId}:reserved:patient:${patientId}`,
+    }));
+    expect(createRecord.mock.invocationCallOrder[0]).toBeLessThan(notify.mock.invocationCallOrder[0]);
+    expect(notify.mock.calls.some(([input]) => input.typeKey === 'plan.credit_consumed')).toBe(false);
+  });
+
+  it('notifies a persisted queue credit reservation once per usage identity', async () => {
+    const { repository, createQueueEntry } = queueRepository(coverage);
+    const notify = vi.fn().mockResolvedValue({ skipped: false, deduplicated: false });
+
+    await createQueue(repository, { notify });
+
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: patientId,
+      typeKey: 'plan.credit_reserved',
+      relatedEntityType: 'queue',
+      relatedEntityId: '80000000-0000-4000-8000-000000000001',
+      deduplicationKey: `plan_credit_usage:${usageId}:reserved:patient:${patientId}`,
+    }));
+    expect(createQueueEntry.mock.invocationCallOrder[0]).toBeLessThan(notify.mock.invocationCallOrder[0]);
+  });
+
+  it('keeps a valid reservation successful when notification delivery fails', async () => {
+    const { repository } = appointmentRepository(coverage);
+    const notify = vi.fn().mockRejectedValue(new Error('notification unavailable'));
+    const log = vi.spyOn(console, 'error').mockImplementation(() => undefined);
+
+    await expect(createSpecialty(repository, { notify }))
+      .resolves.toMatchObject({ appointment: { planCreditUsageId: usageId } });
+    expect(log).toHaveBeenCalledWith(
+      '[internal-notification] notify:failed',
+      expect.objectContaining({
+        typeKey: 'plan.credit_reserved',
+        recipientUserId: patientId,
+        relatedEntityId: '50000000-0000-4000-8000-000000000001',
+      }),
+    );
+    log.mockRestore();
+  });
+
+  it('notifies concrete appointment coverage denial with a stable owner key', async () => {
+    const { repository } = appointmentRepository(null);
+    const notify = vi.fn().mockResolvedValue({ skipped: false, deduplicated: false });
+
+    await createSpecialty(repository, { notify });
+
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: patientId,
+      typeKey: 'plan.coverage_denied',
+      data: expect.objectContaining({ reason_code: 'no_plan_credit_available' }),
+      deduplicationKey: `appointment:50000000-0000-4000-8000-000000000001:plan_coverage_denied:patient:${patientId}`,
+    }));
+  });
+
+  it('notifies concrete queue coverage denial but not technical lookup failures', async () => {
+    const { repository } = queueRepository(null);
+    const notify = vi.fn().mockResolvedValue({ skipped: false, deduplicated: false });
+
+    await createQueue(repository, { notify });
+    expect(notify).toHaveBeenCalledWith(expect.objectContaining({
+      recipientUserId: patientId,
+      typeKey: 'plan.coverage_denied',
+      deduplicationKey: `queue:80000000-0000-4000-8000-000000000001:plan_coverage_denied:patient:${patientId}`,
+    }));
+
+    notify.mockClear();
+    vi.mocked(repository.resolvePlanCoverage).mockRejectedValueOnce(new Error('database unavailable'));
+    await expect(createQueue(repository, { notify })).rejects.toThrow('database unavailable');
+    expect(notify).not.toHaveBeenCalled();
   });
 
   it('confirms a queue credit before the plan-specific acceptance transaction', async () => {
