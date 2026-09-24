@@ -29,7 +29,7 @@ async function buildPatientExport(client: SupabaseClient, userId: string) {
     .select('id, plan_code, external_plan_id, amount, currency, status, payment_status, payment_required, paid_at, activated_at, created_at, updated_at')
     .or(`patient_id.eq.${userId},app_user_id.eq.${userId}`).limit(1000);
   if (planOrdersResult.error) throw new AppError({ status: 500, code: 'PRIVACY_EXPORT_QUERY_FAILED', message: 'Unable to export plan subscriptions.' });
-  const creditUsages = await rows(client, 'plan_credit_usages', 'id, owner_type, owner_id, appointment_id, plan_subscription_order_id, plans_service_subscription_id, external_subscription_score_id, external_score_id, external_plan_id, external_specialization_id, specialty_code, status, used_at, created_at, updated_at', { column: 'patient_id', value: userId });
+  const creditUsages = await rows(client, 'plan_credit_usages', 'id, owner_type, owner_id, appointment_id, plan_subscription_order_id, plans_backend, internal_subscription_score_id, plans_service_subscription_id, external_subscription_score_id, external_score_id, external_plan_id, external_specialization_id, specialty_code, status, used_at, created_at, updated_at', { column: 'patient_id', value: userId });
 
   const ownerGroups = [
     ['appointment', appointments.map((item: Record<string, unknown>) => String(item.id))],

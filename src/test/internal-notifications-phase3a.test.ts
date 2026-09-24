@@ -81,16 +81,15 @@ describe('internal notifications Phase 3A', () => {
     expect(notificationBlock).not.toContain('bankingData');
   });
 
-  it('emits plan activation only after a newly completed activation', () => {
-    const helper = read('supabase/functions/_shared/plans/activate-plan-subscription.ts');
+  it('emits plan activation only after the async worker completes activation', () => {
+    const processor = read('supabase/functions/_shared/plans/queue/InternalPlansJobProcessor.ts');
+    const worker = read('supabase/functions/internal-plans-worker/handler.ts');
 
-    expect(helper.indexOf("typeKey: 'plan.activated'")).toBeGreaterThan(
-      helper.indexOf('await markOrderActive'),
+    expect(processor.indexOf('await this.hooks.onActivationSucceeded')).toBeGreaterThan(
+      processor.indexOf('await this.repository.completeJob'),
     );
-    expect(helper.indexOf("reason: 'already_active'")).toBeLessThan(
-      helper.indexOf("typeKey: 'plan.activated'"),
-    );
-    expect(helper).toContain('plan_order:${order.id}:activated:${appUser.id}');
-    expect(helper).toContain('notifyInternalBestEffort');
+    expect(worker).toContain("typeKey: succeeded ? 'plan.activated' : 'plan.activation_failed'");
+    expect(worker).toContain("succeeded ? 'activated' : 'activation_failed'");
+    expect(worker).toContain('notifyInternalBestEffort');
   });
 });

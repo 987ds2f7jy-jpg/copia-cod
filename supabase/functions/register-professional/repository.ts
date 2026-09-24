@@ -1,5 +1,6 @@
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
+import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
 import {
   createServiceRoleClient,
   createSupabaseAuthUserLookup,
@@ -295,6 +296,7 @@ export function createRegisterProfessionalRuntime() {
 
   return {
     authUserLookup: createSupabaseAuthUserLookup(client) as AuthenticatedUserLookup,
+    notificationService: new InternalNotificationService(client),
     repository: createRegisterProfessionalRepository(client),
   };
 }

@@ -12,19 +12,20 @@ describe('plan credit consumption on professional acceptance', () => {
   it('keeps plan credit consumption out of appointment creation', () => {
     const createAppointmentRepository = read('supabase/functions/create-appointment/repository.ts');
     const createAppointmentService = read('supabase/functions/create-appointment/service.ts');
+    const coverage = read('supabase/functions/_shared/plans/coverage.ts');
 
-    expect(createAppointmentRepository).toContain("'/subscription-score/find'");
+    expect(createAppointmentRepository).toContain('resolvePlanCoverage');
+    expect(coverage).toContain('findAvailableSubscriptionScore');
     expect(createAppointmentService).not.toContain('/subscription-score/use');
-    expect(createAppointmentRepository).not.toContain('/subscription-score/use');
+    expect(coverage).not.toContain('/subscription-score/find');
   });
 
   it('consumes the subscription score only inside accept-appointment', () => {
     const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
     const acceptService = read('supabase/functions/accept-appointment/service.ts');
 
-    expect(acceptRepository).toContain("const USE_SCORE_PATH = '/subscription-score/use'");
-    expect(acceptRepository).toContain('score_id: subscriptionScoreId');
-    expect(acceptRepository).toContain('context.usage?.externalSubscriptionScoreId');
+    expect(acceptRepository).toContain("consumePlanCreditOnce({");
+    expect(acceptRepository).toContain('usage.internalSubscriptionScoreId');
     expect(acceptService).toContain('confirmPlanCreditBeforeAcceptance');
     expect(acceptService).toContain('repository.acceptAppointment');
     expect(acceptService.indexOf('confirmPlanCreditBeforeAcceptance')).toBeLessThan(
@@ -52,26 +53,23 @@ describe('plan credit consumption on professional acceptance', () => {
 
   it('updates local audit and appointment coverage status after use result', () => {
     const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
-    const migration = read('supabase/migrations/20260712190000_harden_plan_coverage_credit_integrity.sql');
+    const migration = read('supabase/migrations/20260924090000_create_internal_plans_domain.sql');
+    const consumption = read('supabase/functions/_shared/plans/credit-consumption.ts');
 
-    expect(acceptRepository).toContain("rpc('finalize_plan_credit_usage'");
+    expect(consumption).toContain('getPlansFacade(client).consumePlanCredit');
+    expect(migration).toContain('CREATE OR REPLACE FUNCTION public.consume_internal_plan_credit');
     expect(migration).toContain("SET status = 'used'");
     expect(migration).toContain("SET coverage_status = 'plan_used'");
-    expect(acceptRepository).toContain("status: 'use_failed'");
-    expect(acceptRepository).toContain("coverage_status: 'plan_use_failed'");
+    expect(consumption).not.toContain('/subscription-score/use');
   });
 
-  it('claims a pending usage atomically before contacting plans-service', () => {
-    const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
-    const migration = read('supabase/migrations/20260712190000_harden_plan_coverage_credit_integrity.sql');
+  it('locks and finalizes score, usage and owner in one internal transaction', () => {
+    const migration = read('supabase/migrations/20260924090000_create_internal_plans_domain.sql');
 
-    expect(acceptRepository).toContain(".update({ status: 'consuming'");
-    expect(acceptRepository).toContain(".in('status', ['pending_use', 'use_failed'])");
-    expect(acceptRepository.indexOf("status: 'consuming'")).toBeLessThan(
-      acceptRepository.indexOf('postUseScoreToPlansService(requestPayload)'),
-    );
-    expect(migration).toContain('idx_plan_credit_usages_active_owner_unique');
-    expect(migration).toContain('idx_plan_credit_usages_open_external_score_unique');
+    expect(migration).toMatch(/WHERE id = p_subscription_score_id\s+FOR UPDATE;/);
+    expect(migration).toMatch(/WHERE id = p_usage_id AND owner_type = p_owner_type AND owner_id = p_owner_id\s+FOR UPDATE;/);
+    expect(migration).toContain("SET status = 'used'");
+    expect(migration).toContain("SET coverage_status = 'plan_used'");
   });
 
   it('preserves self-pay path by only loading plan context when funding_source is plan', () => {

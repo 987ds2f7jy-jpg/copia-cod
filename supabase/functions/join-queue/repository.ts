@@ -78,6 +78,9 @@ function buildCoverageSnapshot(coverage: PlanCoverageVerification | null) {
     reason: coverage.reason,
     specialty_code: coverage.specialtyCode,
     plan_subscription_order_id: coverage.planSubscriptionOrderId,
+    internal_subscription_id: coverage.internalSubscriptionId,
+    internal_subscription_score_id: coverage.internalSubscriptionScoreId,
+    internal_score_id: coverage.internalScoreId,
     plans_service_subscription_id: coverage.plansServiceSubscriptionId,
     external_subscription_id: coverage.externalSubscriptionId,
     external_subscription_score_id: coverage.externalSubscriptionScoreId,
@@ -300,7 +303,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
       if (isPlanFunded && params.planCoverage) {
         const coverage = params.planCoverage;
         const { data: planQueueData, error: planQueueError } = await client
-          .rpc('create_plan_funded_queue', {
+          .rpc('create_internal_plan_funded_queue', {
             p_patient_id: params.patientId,
             p_patient_name: params.patientName,
             p_patient_email: params.patientEmail,
@@ -318,12 +321,7 @@ function createJoinQueueRepository(client: SupabaseClient): JoinQueueRepository 
             p_pricing_rule_id: params.pricing.pricingRuleId,
             p_fee_rule_id: params.pricing.feeRuleId,
             p_plan_subscription_order_id: coverage.planSubscriptionOrderId,
-            p_plans_service_subscription_id: normalizeString(coverage.externalSubscriptionId)
-              || coverage.plansServiceSubscriptionId,
-            p_external_subscription_score_id: coverage.externalSubscriptionScoreId,
-            p_external_score_id: normalizeString(coverage.externalScoreId) || null,
-            p_external_plan_id: coverage.externalPlanId,
-            p_external_specialization_id: coverage.externalSpecializationId,
+            p_internal_subscription_score_id: coverage.internalSubscriptionScoreId,
             p_specialty_code: coverage.specialtyCode,
             p_request_snapshot: coverage.requestSnapshot,
             p_response_snapshot: coverage.responseSnapshot,

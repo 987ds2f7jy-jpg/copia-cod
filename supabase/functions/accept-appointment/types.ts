@@ -38,8 +38,7 @@ export type AppointmentAcceptanceWindowRecord = {
 export type PlanCreditUsageRecord = {
   id: string;
   status: string;
-  externalSubscriptionScoreId: string | null;
-  externalScoreId: string | null;
+  internalSubscriptionScoreId: string | null;
   requestSnapshot: Record<string, unknown>;
   responseSnapshot: Record<string, unknown>;
 };

@@ -2,9 +2,9 @@
 
 ## Internal Notifications
 
-Status: partially implemented — Phase 1, Phase 2, and safe Phase 3A integrations implemented
+Status: partially implemented — Phase 1, Phase 2, Phase 3A, and scoped Phase 3B integrations implemented
 
-Provides an internal notifications module for patients and professionals. It uses notification templates, user-specific notification records, unread counters, read status and frontend badges. Confirmed Phase 1, Phase 2, and safe Phase 3A flows create notifications through `InternalNotificationService`.
+Provides an internal notifications module for patients and professionals. It uses notification templates, user-specific notification records, unread counters, read status and frontend badges. Confirmed Phase 1, Phase 2, Phase 3A, and scoped Phase 3B flows create notifications through `InternalNotificationService`.
 
 Main tables:
 
@@ -18,6 +18,7 @@ Edge Functions:
 - `notifications-unread-count`
 - `notifications-mark-read`
 - `notifications-mark-all-read`
+- `notifications-dispatch-scheduled`
 
 Phase 1 integrations:
 
@@ -42,6 +43,14 @@ Phase 3A integrations:
 - `financial.withdrawal_requested` for the requesting professional;
 - `plan.activated` for the order app user;
 - `plan.credit_consumed` for the patient, only from appointment/queue `used_now` branches with a stable usage ID.
+
+Phase 3B integrations:
+
+- `professional.registration_submitted` for the newly registered professional, after both required profiles are persisted;
+- `plan.activation_failed` for the plan-order owner, after the activation-failure state is persisted;
+- `appointment.reminder_day` for the patient and, when assigned, the professional, through the protected daily dispatcher.
+
+The daily dispatcher uses `America/Sao_Paulo`, accepts only eligible scheduled appointments for the local day, and is intended to be invoked at 04:00 local time. The remote cron job and `NOTIFICATIONS_SCHEDULER_SECRET` must be configured in each Supabase environment.
 
 Detailed document:
 

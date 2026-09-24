@@ -2,6 +2,7 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
 import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
+import { consumePlanCreditOnce } from '../_shared/plans/credit-consumption.ts';
 import type {
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
@@ -46,8 +47,7 @@ type PlanAppointmentRow = {
 type PlanCreditUsageRow = {
   id: string;
   status: string | null;
-  external_subscription_score_id: string | null;
-  external_score_id: string | null;
+  internal_subscription_score_id: string | null;
   request_snapshot: Record<string, unknown> | null;
   response_snapshot: Record<string, unknown> | null;
 };
@@ -61,8 +61,6 @@ type ConsultaRow = {
 
 const REQUESTED_APPOINTMENT_STATUSES = new Set(['requested', 'pending', 'SOLICITADO']);
 const ACCEPTED_APPOINTMENT_STATUSES = new Set(['accepted', 'confirmed', 'CONFIRMADO', 'in_progress', 'em_atendimento']);
-const USE_SCORE_PATH = '/subscription-score/use';
-const DEFAULT_PLANS_SERVICE_TIMEOUT_MS = 8_000;
 
 function normalizeString(value: unknown) {
   return String(value ?? '').trim();
@@ -70,100 +68,6 @@ function normalizeString(value: unknown) {
 
 function normalizeComparable(value: unknown) {
   return normalizeString(value).toLowerCase();
-}
-
-function toJsonRecord(value: unknown): Record<string, unknown> {
-  if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    return {};
-  }
-
-  return value as Record<string, unknown>;
-}
-
-function getPlansServiceApiBaseUrl() {
-  const rawUrl = normalizeString(
-    Deno.env.get('PLANS_SERVICE_BASE_URL') || Deno.env.get('PLANS_SERVICE_URL'),
-  );
-
-  if (!rawUrl) {
-    return '';
-  }
-
-  const baseUrl = rawUrl.replace(/\/+$/, '');
-  return baseUrl.endsWith('/api') ? baseUrl : `${baseUrl}/api`;
-}
-
-function getPlansServiceTimeoutMs() {
-  const parsed = Number(Deno.env.get('PLANS_SERVICE_TIMEOUT_MS') || 0);
-  return Number.isFinite(parsed) && parsed > 0 ? Math.trunc(parsed) : DEFAULT_PLANS_SERVICE_TIMEOUT_MS;
-}
-
-function buildUseScorePayload(context: PlanAppointmentAcceptanceContext) {
-  const subscriptionScoreId = Number(context.usage?.externalSubscriptionScoreId || 0);
-
-  if (!Number.isInteger(subscriptionScoreId) || subscriptionScoreId <= 0) {
-    throw new AppError({
-      status: 422,
-      code: 'PLAN_CREDIT_SUBSCRIPTION_SCORE_ID_REQUIRED',
-      message: 'Plan credit audit is missing the subscription score id required for consumption.',
-      details: {
-        appointmentId: context.appointment.id,
-        planCreditUsageId: context.usage?.id || context.appointment.planCreditUsageId,
-        externalScoreId: context.usage?.externalScoreId,
-      },
-    });
-  }
-
-  return { score_id: subscriptionScoreId };
-}
-
-async function postUseScoreToPlansService(payload: { score_id: number }) {
-  const apiBaseUrl = getPlansServiceApiBaseUrl();
-
-  if (!apiBaseUrl) {
-    throw new AppError({
-      status: 503,
-      code: 'PLANS_SERVICE_NOT_CONFIGURED',
-      message: 'Plan credit could not be consumed right now.',
-    });
-  }
-
-  const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), getPlansServiceTimeoutMs());
-  const headers = new Headers({
-    Accept: 'application/json',
-    'Content-Type': 'application/json',
-  });
-  const internalApiKey = normalizeString(Deno.env.get('PLANS_SERVICE_INTERNAL_API_KEY'));
-
-  if (internalApiKey) {
-    headers.set('X-Internal-Api-Key', internalApiKey);
-  }
-
-  try {
-    const response = await fetch(`${apiBaseUrl}${USE_SCORE_PATH}`, {
-      method: 'POST',
-      headers,
-      body: JSON.stringify(payload),
-      signal: controller.signal,
-    });
-
-    let responsePayload: unknown = null;
-
-    try {
-      responsePayload = await response.json();
-    } catch {
-      responsePayload = null;
-    }
-
-    return {
-      ok: response.ok,
-      status: response.status,
-      payload: responsePayload,
-    };
-  } finally {
-    clearTimeout(timeoutId);
-  }
 }
 
 function getRequiredEnv(name: string) {
@@ -375,8 +279,7 @@ function mapPlanContext(appointment: PlanAppointmentRow, usage: PlanCreditUsageR
       ? {
         id: usage.id,
         status: usage.status || '',
-        externalSubscriptionScoreId: usage.external_subscription_score_id || null,
-        externalScoreId: usage.external_score_id || null,
+        internalSubscriptionScoreId: usage.internal_subscription_score_id || null,
         requestSnapshot: usage.request_snapshot || {},
         responseSnapshot: usage.response_snapshot || {},
       }
@@ -543,8 +446,7 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
           .select(`
             id,
             status,
-            external_subscription_score_id,
-            external_score_id,
+            internal_subscription_score_id,
             request_snapshot,
             response_snapshot
           `)
@@ -620,6 +522,8 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
       return mapAcceptedAppointmentRow(appointment, consulta);
     },
 
+    /* Phase 2A: retained temporarily as review-only documentation of the former
+       distributed external consumption sequence. It is not executable.
     async confirmPlanCreditBeforeAcceptance({ context }) {
       const { appointment, usage } = context;
 
@@ -824,6 +728,27 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
       }
 
       return { skipped: false, reason: 'used_now' as const };
+    },
+    */
+
+    async confirmPlanCreditBeforeAcceptance({ context }) {
+      const { appointment, usage } = context;
+      if (!usage?.id || appointment.planCreditUsageId !== usage.id || !usage.internalSubscriptionScoreId) {
+        throw new AppError({
+          status: 409,
+          code: 'PLAN_CREDIT_USAGE_REQUIRED',
+          message: 'Plan-funded appointments require an internal credit reservation.',
+          details: { appointmentId: appointment.id },
+        });
+      }
+
+      return consumePlanCreditOnce({
+        client,
+        ownerType: 'appointment',
+        ownerId: appointment.id,
+        usageId: usage.id,
+        internalSubscriptionScoreId: usage.internalSubscriptionScoreId,
+      });
     },
 
     async acceptAppointment({
