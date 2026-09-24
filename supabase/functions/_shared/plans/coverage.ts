@@ -52,6 +52,14 @@ export const SPECIALTY_PLAN_LOOKUPS: Record<string, SpecialtyPlanLookup> = {
   educacao_fisica: { externalSpecializationId: 24, planIds: [2] },
 };
 
+export type PlanCoverageDenialReason = 'specialty_not_mapped' | 'no_plan_credit_available';
+
+export function getPlanCoverageDenialReason(specialtyCode: string): PlanCoverageDenialReason {
+  return SPECIALTY_PLAN_LOOKUPS[normalizePricingSpecialty(specialtyCode)]
+    ? 'no_plan_credit_available'
+    : 'specialty_not_mapped';
+}
+
 const PLAN_ID_BY_CODE: Record<string, number> = { psychology: 1, weight_loss: 2, family: 3 };
 
 function normalizeString(value: unknown) { return String(value ?? '').trim(); }

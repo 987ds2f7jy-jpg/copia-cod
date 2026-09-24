@@ -75,24 +75,15 @@ describe('internal notifications Phase 3B', () => {
   });
 
   it('emits plan activation failure only after the failure state is persisted', () => {
-    const helper = read('supabase/functions/_shared/plans/activate-plan-subscription.ts');
-    const notificationStart = helper.indexOf("typeKey: 'plan.activation_failed'");
-    const notification = helper.slice(
-      notificationStart,
-      helper.indexOf('      });', notificationStart) + '      });'.length,
-    );
+    const processor = read('supabase/functions/_shared/plans/queue/InternalPlansJobProcessor.ts');
+    const worker = read('supabase/functions/internal-plans-worker/handler.ts');
 
-    expect(helper.indexOf("typeKey: 'plan.activation_failed'")).toBeGreaterThan(
-      helper.indexOf('await markOrderActivationFailed'),
+    expect(processor.indexOf('await this.hooks.onActivationFailed')).toBeGreaterThan(
+      processor.indexOf('await this.repository.markActivationFailed'),
     );
-    expect(helper.indexOf("reason: 'already_active'")).toBeLessThan(
-      helper.indexOf("typeKey: 'plan.activation_failed'"),
-    );
-    expect(notification).toContain(
-      'plan_order:${order.id}:activation_failed:${recipientUserId}',
-    );
-    expect(notification).not.toMatch(/data:\s*\{/);
-    expect(notification).not.toMatch(/provider|requestSnapshot|stack/i);
+    expect(worker).toContain("typeKey: succeeded ? 'plan.activated' : 'plan.activation_failed'");
+    expect(worker).toContain("`plan_order:${orderId}:${succeeded ? 'activated' : 'activation_failed'}:${recipientUserId}`");
+    expect(worker).not.toMatch(/data:\s*\{/);
   });
 
   it('notifies the patient and only the assigned professional with stable keys', async () => {

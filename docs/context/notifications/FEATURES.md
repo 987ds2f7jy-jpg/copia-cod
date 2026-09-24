@@ -2,7 +2,7 @@
 
 ## Internal Notifications
 
-Status: partially implemented — Phase 1, Phase 2, Phase 3A, and scoped Phase 3B integrations implemented
+Status: partially implemented — Phase 1, Phase 2, Phase 3A, scoped Phase 3B, and Plans-on-internal-runtime integrations implemented
 
 Provides an internal notifications module for patients and professionals. It uses notification templates, user-specific notification records, unread counters, read status and frontend badges. Confirmed Phase 1, Phase 2, Phase 3A, and scoped Phase 3B flows create notifications through `InternalNotificationService`.
 
@@ -51,6 +51,16 @@ Phase 3B integrations:
 - `appointment.reminder_day` for the patient and, when assigned, the professional, through the protected daily dispatcher.
 
 The daily dispatcher uses `America/Sao_Paulo`, accepts only eligible scheduled appointments for the local day, and is intended to be invoked at 04:00 local time. The remote cron job and `NOTIFICATIONS_SCHEDULER_SECRET` must be configured in each Supabase environment.
+
+Plans notifications on the internal Plans runtime:
+
+- `plan.credit_reserved` for the patient after an appointment/queue `plan_credit_usage` is durably persisted as `pending_use`;
+- `plan.coverage_denied` for the patient after a concrete appointment/queue attempt is persisted without eligible internal coverage; read-only `check-plan-coverage` calls do not emit;
+- `plan.expiring` is registered, but has no emitter because `plan_subscriptions` has no canonical expiration timestamp or warning-window product rule;
+- `plan.expired` is registered, but has no emitter because the Plans domain has no subscription-expiration transition; score expiration is deliberately not treated as plan expiration;
+- `plan.cancelled` is registered, but has no emitter because the internal Plans domain has no cancellation service/RPC/caller.
+
+These events use `PlansFacade` / `InternalPlansProvider` state. They do not depend on the retired external Plans HTTP runtime.
 
 Detailed document:
 
