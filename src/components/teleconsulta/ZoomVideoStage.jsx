@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useCallback } from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Loader2, User, VideoOff } from 'lucide-react';
 
@@ -11,12 +11,15 @@ function ParticipantTile({
   compact = false,
 }) {
   const participantId = participant?.userId;
+  const registerHost = useCallback((element) => {
+    registerVideoContainer(participantId, element);
+  }, [participantId, registerVideoContainer]);
 
   return (
     <div className={`relative h-full w-full overflow-hidden rounded-xl bg-gray-900 ${className}`}>
       {participantId ? (
         <div
-          ref={(element) => registerVideoContainer(participantId, element)}
+          ref={registerHost}
           className="absolute inset-0 h-full w-full"
         />
       ) : null}

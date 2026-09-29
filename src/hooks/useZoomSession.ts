@@ -53,6 +53,7 @@ interface ZoomRenderSurface {
   mode: 'attach' | 'legacy-canvas' | 'legacy-video';
   element: HTMLElement;
   host: HTMLDivElement;
+  mount: HTMLDivElement;
   resizeObserver?: ResizeObserver;
 }
 
@@ -162,6 +163,15 @@ export function useZoomSession({
   const seenIncomingMessageIdsRef = useRef<Set<string>>(new Set());
   const recentIncomingMessagesRef = useRef<Array<{ signature: string; timestamp: number }>>([]);
   const renderSurfacesRef = useRef<Map<number, ZoomRenderSurface>>(new Map());
+  // Per-participant serialization includes cleanup; leave drains it before SDK reuse.
+  const surfaceJobsRef = useRef(new Map<number, Promise<void>>());
+  const surfaceTimersRef = useRef(new Map<number, number>());
+  const renderOwnersRef = useRef(new Map<number, object>());
+  const leavingRef = useRef<Promise<void> | null>(null);
+  const joiningRef = useRef<Promise<void> | null>(null);
+  const cameraJobRef = useRef<Promise<void> | null>(null);
+  const mountedRef = useRef(true);
+  const generationRef = useRef(0);
 
   const [state, setState] = useState<ZoomSessionState>({
     isConnecting: false,
@@ -181,9 +191,22 @@ export function useZoomSession({
     setState((current) => ({ ...current, ...patch }));
   }, []);
 
-  const getPreferredVideoQuality = useCallback(() => {
-    return prefersSingleVideoLayout ? VideoQuality.Video_180P : VideoQuality.Video_360P;
-  }, [prefersSingleVideoLayout]);
+  const enqueueSurface = useCallback((id: number, operation: () => Promise<void>) => {
+    const previous = surfaceJobsRef.current.get(id) ?? Promise.resolve();
+    const job = previous.then(operation).catch((error) => {
+      logUiWarning('zoom', { stage: 'video-lifecycle', error: serializeError(error) });
+    });
+    surfaceJobsRef.current.set(id, job);
+    void job.then(() => {
+      if (surfaceJobsRef.current.get(id) === job) surfaceJobsRef.current.delete(id);
+    });
+    return job;
+  }, []);
+
+  const cancelSurfaceTimer = useCallback((id: number) => {
+    window.clearTimeout(surfaceTimersRef.current.get(id));
+    surfaceTimersRef.current.delete(id);
+  }, []);
 
   const getContainerDimensions = useCallback((host: HTMLElement) => {
     return {
@@ -197,8 +220,6 @@ export function useZoomSession({
     useVideoElement: boolean,
     isSelfView: boolean,
   ) => {
-    host.innerHTML = '';
-
     if (useVideoElement) {
       const videoElement = document.createElement('video');
       videoElement.autoplay = true;
@@ -304,7 +325,7 @@ export function useZoomSession({
           detached?.remove?.();
         }
       } else {
-        mediaStream.stopRenderVideo?.(existingSurface.element as any, targetUserId);
+        await mediaStream.stopRenderVideo?.(existingSurface.element as any, targetUserId);
       }
     } catch (error) {
       logUiWarning('zoom', {
@@ -314,36 +335,26 @@ export function useZoomSession({
       });
     } finally {
       existingSurface.resizeObserver?.disconnect?.();
-      if (existingSurface.host.isConnected) {
-        existingSurface.host.innerHTML = '';
+      const parent = existingSurface.element.parentElement;
+      existingSurface.element.remove();
+      if (parent?.tagName === 'VIDEO-PLAYER-CONTAINER' && !parent.childElementCount) parent.remove();
+      existingSurface.mount.remove();
+      if (renderSurfacesRef.current.get(targetUserId) === existingSurface) {
+        renderSurfacesRef.current.delete(targetUserId);
       }
-      renderSurfacesRef.current.delete(targetUserId);
     }
   }, []);
 
-  const renderVideo = useCallback(
-    async (client: any, targetUserId: number, attempt = 0) => {
-      const container = videoElementsRef.current.get(targetUserId);
+  const attachSurface = useCallback(
+    async (client: any, targetUserId: number, isCurrent: () => boolean) => {
+      const host = videoElementsRef.current.get(targetUserId);
 
-      if (!container) {
-        if (attempt < 10) {
-          window.setTimeout(() => {
-            void renderVideo(client, targetUserId, attempt + 1);
-          }, 200);
-        }
+      if (!host) {
         return;
       }
 
       const existingSurface = renderSurfacesRef.current.get(targetUserId);
-      if (existingSurface && existingSurface.host === container) {
-        return;
-      }
-
-      const { width: containerWidth, height: containerHeight } = getContainerDimensions(container);
-      if ((containerWidth < 40 || containerHeight < 40) && attempt < 12) {
-        window.setTimeout(() => {
-          void renderVideo(client, targetUserId, attempt + 1);
-        }, 150);
+      if (existingSurface && existingSurface.host === host) {
         return;
       }
 
@@ -353,18 +364,27 @@ export function useZoomSession({
       const isSelfView =
         currentUserIdRef.current != null &&
         Number(targetUserId) === Number(currentUserIdRef.current);
-      const preferredQuality = getPreferredVideoQuality();
+      const preferredQuality = shouldUseLegacyRender ? VideoQuality.Video_180P : VideoQuality.Video_360P;
 
       if (existingSurface) {
         await releaseRenderSurface(client, targetUserId);
       }
+      if (!isCurrent()) return;
+      // React may reuse one host for another participant. Own a separate mount,
+      // never query/clear a different participant's children during delayed cleanup.
+      const container = document.createElement('div');
+      container.style.width = '100%';
+      container.style.height = '100%';
+      host.appendChild(container);
 
       if (shouldUseLegacyRender && mediaStream.renderVideo) {
+        let legacyElement: HTMLElement | undefined;
         try {
           const useVideoElement = Boolean(
             isSelfView && mediaStream.isRenderSelfViewWithVideoElement?.(),
           );
           const legacySurface = createLegacyRenderElement(container, useVideoElement, isSelfView);
+          legacyElement = legacySurface.element;
 
           if (legacySurface.mode === 'legacy-video') {
             const result = await mediaStream.renderVideo(
@@ -383,7 +403,8 @@ export function useZoomSession({
 
             renderSurfacesRef.current.set(targetUserId, {
               ...legacySurface,
-              host: container,
+              host,
+              mount: container,
             });
             return;
           }
@@ -410,10 +431,10 @@ export function useZoomSession({
 
           let resizeObserver: ResizeObserver | undefined;
 
-          if (typeof ResizeObserver !== 'undefined') {
+          if (isCurrent() && typeof ResizeObserver !== 'undefined') {
             resizeObserver = new ResizeObserver((entries) => {
               const entry = entries[0];
-              if (!entry) {
+              if (!entry || !isCurrent()) {
                 return;
               }
 
@@ -438,12 +459,13 @@ export function useZoomSession({
 
           renderSurfacesRef.current.set(targetUserId, {
             ...legacySurface,
-            host: container,
+            host,
+            mount: container,
             resizeObserver,
           });
           return;
         } catch (legacyError) {
-          container.innerHTML = '';
+          legacyElement?.remove();
           logUiWarning('zoom', {
             stage: 'render-video-legacy',
             targetUserId,
@@ -451,6 +473,7 @@ export function useZoomSession({
           });
         }
       }
+      if (!isCurrent()) { container.remove(); return; }
 
       try {
         const { playerContainer, player } = ensureVideoPlayer(container);
@@ -469,16 +492,18 @@ export function useZoomSession({
         attachedVideo.style.objectFit = 'cover';
 
         if (attachedVideo !== player) {
-          playerContainer.innerHTML = '';
-          playerContainer.appendChild(attachedVideo);
+          player.remove();
+          if (isCurrent()) playerContainer.appendChild(attachedVideo);
         }
 
         renderSurfacesRef.current.set(targetUserId, {
           mode: 'attach',
           element: attachedVideo,
-          host: container,
+          host,
+          mount: container,
         });
       } catch (primaryError) {
+        if (!isCurrent()) { container.remove(); return; }
         try {
           const attachedVideo = await mediaStream.attachVideo(
             targetUserId,
@@ -488,9 +513,13 @@ export function useZoomSession({
           if (!(attachedVideo instanceof HTMLElement)) {
             throw attachedVideo;
           }
+          if (!isCurrent()) {
+            renderSurfacesRef.current.set(targetUserId, { mode: 'attach', element: attachedVideo, host, mount: container });
+            return;
+          }
 
-          const { playerContainer } = ensureVideoPlayer(container);
-          playerContainer.innerHTML = '';
+          const { playerContainer, player } = ensureVideoPlayer(container);
+          if (player !== attachedVideo) player.remove();
           attachedVideo.style.width = '100%';
           attachedVideo.style.height = '100%';
           attachedVideo.style.objectFit = 'cover';
@@ -499,9 +528,11 @@ export function useZoomSession({
           renderSurfacesRef.current.set(targetUserId, {
             mode: 'attach',
             element: attachedVideo,
-            host: container,
+            host,
+            mount: container,
           });
         } catch (fallbackError) {
+          container.remove();
           logUiWarning('zoom', {
             stage: 'render-video',
             targetUserId,
@@ -515,43 +546,46 @@ export function useZoomSession({
       createLegacyRenderElement,
       ensureVideoPlayer,
       getContainerDimensions,
-      getPreferredVideoQuality,
       releaseRenderSurface,
     ],
   );
 
-  const stopVideo = useCallback(async (client: any, targetUserId: number) => {
-    const existingSurface = renderSurfacesRef.current.get(targetUserId);
-
-    if (existingSurface) {
-      await releaseRenderSurface(client, targetUserId);
-      return;
-    }
-
-    try {
-      const container = videoElementsRef.current.get(targetUserId);
-      const mediaStream = client.getMediaStream();
-      const playerElement =
-        (container?.querySelector('video-player') as HTMLElement | null) ?? undefined;
-      const elements = await mediaStream.detachVideo(targetUserId, playerElement);
-
-      if (Array.isArray(elements)) {
-        elements.forEach((element: any) => element?.remove?.());
-      } else {
-        elements?.remove?.();
+  const renderVideo = useCallback(function requestRender(client: ReturnType<typeof ZoomVideo.createClient>, id: number, attempt = 0): Promise<void> {
+    const host = videoElementsRef.current.get(id);
+    const generation = generationRef.current;
+    if (!host || clientRef.current !== client) return Promise.resolve();
+    const owner = renderOwnersRef.current.get(id) ?? {};
+    renderOwnersRef.current.set(id, owner);
+    cancelSurfaceTimer(id);
+    return enqueueSurface(id, async () => {
+      const isCurrent = () => (
+        generationRef.current === generation &&
+        clientRef.current === client &&
+        videoElementsRef.current.get(id) === host &&
+        renderOwnersRef.current.get(id) === owner
+      );
+      if (!isCurrent()) return;
+      cancelSurfaceTimer(id);
+      const { width, height } = getContainerDimensions(host);
+      if ((width < 40 || height < 40) && attempt < 12) {
+        surfaceTimersRef.current.set(id, window.setTimeout(() => {
+          surfaceTimersRef.current.delete(id);
+          if (isCurrent()) void requestRender(client, id, attempt + 1);
+        }, 150));
+        return;
       }
+      await attachSurface(client, id, isCurrent);
+      // Even an attach that completed after unmount/leave is detached by exact element,
+      // before the next operation for this participant is allowed to start.
+      if (!isCurrent()) await releaseRenderSurface(client, id);
+    });
+  }, [attachSurface, cancelSurfaceTimer, enqueueSurface, getContainerDimensions, releaseRenderSurface]);
 
-      if (container) {
-        container.innerHTML = '';
-      }
-    } catch (error) {
-      logUiWarning('zoom', {
-        stage: 'stop-video',
-        targetUserId,
-        error: serializeError(error),
-      });
-    }
-  }, [releaseRenderSurface]);
+  const stopVideo = useCallback((client: any, id: number) => {
+    renderOwnersRef.current.delete(id);
+    cancelSurfaceTimer(id);
+    return enqueueSurface(id, () => releaseRenderSurface(client, id));
+  }, [cancelSurfaceTimer, enqueueSurface, releaseRenderSurface]);
 
   const syncParticipants = useCallback((client: any) => {
     const currentUserId = client.getCurrentUserInfo?.()?.userId ?? null;
@@ -578,11 +612,11 @@ export function useZoomSession({
 
   const registerVideoContainer = useCallback((targetUserId: number, element: HTMLDivElement | null) => {
     if (!element) {
+      videoElementsRef.current.delete(targetUserId);
       const client = clientRef.current;
       if (client) {
-        void releaseRenderSurface(client, targetUserId);
+        void stopVideo(client, targetUserId);
       }
-      videoElementsRef.current.delete(targetUserId);
       return;
     }
 
@@ -597,7 +631,7 @@ export function useZoomSession({
     if (participant?.bVideoOn) {
       void renderVideo(client, targetUserId);
     }
-  }, [releaseRenderSurface, renderVideo]);
+  }, [stopVideo, renderVideo]);
 
   const sendChatMessage = useCallback(async (text: string) => {
     const client = clientRef.current;
@@ -664,15 +698,16 @@ export function useZoomSession({
     }
   }, [updateState, userName]);
 
-  const join = useCallback(async () => {
+  const joinSession = useCallback(async () => {
     if (!consultationId || !userId || !userName) {
       return;
     }
 
-    if (clientRef.current && state.isConnected) {
+    if (clientRef.current) {
       return;
     }
 
+    const generation = ++generationRef.current;
     try {
       updateState({
         isConnecting: true,
@@ -692,13 +727,16 @@ export function useZoomSession({
         leaveOnPageUnload: true,
         stayAwake: true,
       });
+      if (generationRef.current !== generation) return;
 
       const token = await fetchToken();
+      if (generationRef.current !== generation) return;
       await withTimeout(
         client.join(token.sessionName, token.signature, token.userName),
         20000,
         'Tempo limite ao conectar com a sala segura do Zoom.',
       );
+      if (generationRef.current !== generation) return;
 
       const mediaStream = client.getMediaStream();
       const supportsMultipleVideos = mediaStream.isSupportMultipleVideos?.() !== false;
@@ -713,6 +751,7 @@ export function useZoomSession({
           error: serializeError(audioError),
         });
       }
+      if (generationRef.current !== generation) return;
 
       setIsMuted(Boolean(mediaStream.isAudioMuted?.()));
 
@@ -725,6 +764,7 @@ export function useZoomSession({
               }
             : undefined,
         );
+        if (generationRef.current !== generation) return;
         setIsCameraOn(true);
       } catch (videoError) {
         setIsCameraOn(false);
@@ -733,6 +773,7 @@ export function useZoomSession({
           error: serializeError(videoError),
         });
       }
+      if (generationRef.current !== generation) return;
 
       updateState({
         isConnected: true,
@@ -749,6 +790,13 @@ export function useZoomSession({
       });
 
       const handleUsersChanged = () => {
+        const present = new Set(getClientParticipants(client).map((participant) => participant.userId));
+        videoElementsRef.current.forEach((_host, id) => {
+          if (!present.has(id)) {
+            videoElementsRef.current.delete(id);
+            void stopVideo(client, id);
+          }
+        });
         syncParticipants(client);
       };
 
@@ -760,9 +808,9 @@ export function useZoomSession({
             return;
           }
 
-          if (participant.bVideoOn) {
+          if (participant.bVideoOn === true) {
             void renderVideo(client, participant.userId);
-          } else {
+          } else if (participant.bVideoOn === false) {
             void stopVideo(client, participant.userId);
           }
         });
@@ -909,6 +957,7 @@ export function useZoomSession({
         { event: 'chat-on-message', handler: handleChatMessage },
       ];
     } catch (error) {
+      if (generationRef.current !== generation) return;
       clientRef.current = null;
       updateState({
         isConnected: false,
@@ -920,14 +969,13 @@ export function useZoomSession({
         error: serializeError(error),
       });
     } finally {
-      updateState({ isConnecting: false });
+      if (generationRef.current === generation) updateState({ isConnecting: false });
     }
   }, [
     consultationId,
     fetchToken,
     getClientParticipants,
     renderVideo,
-    state.isConnected,
     stopVideo,
     syncParticipants,
     updateState,
@@ -935,31 +983,28 @@ export function useZoomSession({
     userName,
   ]);
 
-  const leave = useCallback(async () => {
+  const join = useCallback(async () => {
+    if (leavingRef.current) await leavingRef.current;
+    if (!mountedRef.current) return;
+    if (joiningRef.current) return joiningRef.current;
+    const job = joinSession();
+    joiningRef.current = job;
+    try { await job; } finally {
+      if (joiningRef.current === job) joiningRef.current = null;
+    }
+  }, [joinSession]);
+
+  const leave = useCallback((): Promise<void> => {
+    if (leavingRef.current) return leavingRef.current;
     const client = clientRef.current;
 
     clearListeners();
-
-    if (client) {
-      try {
-        const participants = client.getAllUser?.() ?? [];
-        await Promise.allSettled(participants.map((participant: any) => stopVideo(client, participant.userId)));
-        await client.leave();
-      } catch (error) {
-        logUiWarning('zoom', {
-          stage: 'leave-session',
-          error: serializeError(error),
-        });
-      } finally {
-        clientRef.current = null;
-      }
-    }
-
+    ++generationRef.current;
+    clientRef.current = null;
+    surfaceTimersRef.current.forEach((timer) => window.clearTimeout(timer));
+    surfaceTimersRef.current.clear();
+    renderOwnersRef.current.clear();
     videoElementsRef.current.clear();
-    renderSurfacesRef.current.forEach((surface) => {
-      surface.resizeObserver?.disconnect?.();
-    });
-    renderSurfacesRef.current.clear();
     currentUserIdRef.current = null;
     pendingOutgoingMessagesRef.current = [];
     seenIncomingMessageIdsRef.current.clear();
@@ -977,6 +1022,20 @@ export function useZoomSession({
     setIsCameraOn(false);
     setIsScreenSharing(false);
     setPrefersSingleVideoLayout(false);
+    const job = (async () => {
+      await joiningRef.current;
+      await cameraJobRef.current;
+      await Promise.allSettled([...surfaceJobsRef.current.values()]);
+      if (client) {
+        await Promise.allSettled([...renderSurfacesRef.current.keys()].map((id) => stopVideo(client, id)));
+        try { await client.leave(); } catch (error) {
+          logUiWarning('zoom', { stage: 'leave-session', error: serializeError(error) });
+        }
+      }
+    })();
+    leavingRef.current = job;
+    void job.then(() => { if (leavingRef.current === job) leavingRef.current = null; });
+    return job;
   }, [clearListeners, stopVideo]);
 
   const toggleMute = useCallback(async () => {
@@ -1005,11 +1064,12 @@ export function useZoomSession({
     }
   }, [updateState]);
 
-  const toggleCamera = useCallback(async () => {
+  const toggleCameraSession = useCallback(async () => {
     const client = clientRef.current;
     if (!client) {
       return;
     }
+    const generation = generationRef.current;
 
     const mediaStream = client.getMediaStream();
     const currentUserId = client.getCurrentUserInfo?.()?.userId;
@@ -1019,6 +1079,7 @@ export function useZoomSession({
     try {
       if (isCameraOn) {
         await mediaStream.stopVideo();
+        if (generationRef.current !== generation) return;
         setIsCameraOn(false);
 
         if (currentUserId) {
@@ -1033,6 +1094,7 @@ export function useZoomSession({
               }
             : undefined,
         );
+        if (generationRef.current !== generation) return;
         setIsCameraOn(true);
 
         if (currentUserId) {
@@ -1040,8 +1102,9 @@ export function useZoomSession({
         }
       }
 
-      syncParticipants(client);
+      if (generationRef.current === generation) syncParticipants(client);
     } catch (error) {
+      if (generationRef.current !== generation) return;
       updateState({ error: 'Nao foi possivel alternar a camera.' });
       logUiWarning('zoom', {
         stage: 'toggle-camera',
@@ -1049,6 +1112,15 @@ export function useZoomSession({
       });
     }
   }, [isCameraOn, prefersSingleVideoLayout, renderVideo, stopVideo, syncParticipants, updateState]);
+
+  const toggleCamera = useCallback(async () => {
+    if (cameraJobRef.current) return cameraJobRef.current;
+    const job = toggleCameraSession();
+    cameraJobRef.current = job;
+    try { await job; } finally {
+      if (cameraJobRef.current === job) cameraJobRef.current = null;
+    }
+  }, [toggleCameraSession]);
 
   const toggleScreenShare = useCallback(async () => {
     const client = clientRef.current;
@@ -1076,7 +1148,9 @@ export function useZoomSession({
   }, [isScreenSharing, updateState]);
 
   useEffect(() => {
+    mountedRef.current = true;
     return () => {
+      mountedRef.current = false;
       void leave();
     };
   }, [leave]);
