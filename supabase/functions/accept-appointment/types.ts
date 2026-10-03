@@ -104,12 +104,11 @@ export type AcceptAppointmentRepository = {
     appointmentId: string;
     professionalProfileId: string;
   }): Promise<AcceptAppointmentTransactionRecord | null>;
-  confirmPlanCreditBeforeAcceptance(params: {
-    context: PlanAppointmentAcceptanceContext;
-  }): Promise<{
-    skipped: boolean;
-    reason: 'already_used' | 'used_now';
-  }>;
+  acceptPlanAppointment(params: {
+    appointmentId: string;
+    professionalAppUserId: string;
+    professionalProfileId: string;
+  }): Promise<{ row: AcceptAppointmentTransactionRecord; acceptedNow: boolean }>;
   acceptAppointment(params: {
     appointmentId: string;
     professionalAppUserId: string;

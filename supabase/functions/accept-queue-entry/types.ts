@@ -90,14 +90,15 @@ export type AcceptQueueEntryRepository = {
   findAppUserByAuthUserId(authUserId: string): Promise<AppUserRecord | null>;
   findProfessionalDutyContextByUserId(appUserId: string): Promise<ProfessionalDutyRecord | null>;
   findPlanQueueAcceptanceContext(queueId: string): Promise<PlanQueueAcceptanceContext | null>;
-  confirmPlanCreditBeforeAcceptance(params: {
-    context: PlanQueueAcceptanceContext;
-  }): Promise<{ skipped: boolean; reason: 'already_used' | 'used_now' }>;
+  acceptPlanQueueEntry(params: {
+    queueId: string;
+    professionalAppUserId: string;
+    professionalProfileId: string;
+  }): Promise<{ row: AcceptQueueEntryTransactionRecord; acceptedNow: boolean }>;
   acceptQueueEntry(params: {
     queueId: string;
     professionalAppUserId: string;
     professionalProfileId: string;
-    planFunded: boolean;
   }): Promise<AcceptQueueEntryTransactionRecord>;
 };
 

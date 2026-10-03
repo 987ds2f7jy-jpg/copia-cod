@@ -222,8 +222,9 @@ export async function acceptAppointment({
 
   const appointmentWindow = await repository.findAppointmentAcceptanceWindow(appointmentId);
   assertAppointmentNotExpiredForAcceptance(appointmentWindow);
+  const planContext = await repository.findPlanAppointmentAcceptanceContext(appointmentId);
 
-  if (ACCEPTED_APPOINTMENT_STATUSES.has(normalizeString(appointmentWindow.status))) {
+  if (!planContext && ACCEPTED_APPOINTMENT_STATUSES.has(normalizeString(appointmentWindow.status))) {
     if (appointmentWindow.professionalId !== professional.profileId) {
       throw new AppError({
         status: 403,
@@ -252,7 +253,6 @@ export async function acceptAppointment({
 
   assertAppointmentPaymentReady(appointmentWindow);
 
-  const planContext = await repository.findPlanAppointmentAcceptanceContext(appointmentId);
   let row: AcceptAppointmentTransactionRecord | null = null;
   let acceptedNow = false;
 
@@ -262,49 +262,27 @@ export async function acceptAppointment({
       professional,
     });
 
-    if (ACCEPTED_APPOINTMENT_STATUSES.has(normalizeString(planContext.appointment.status))) {
-      row = await repository.findAcceptedAppointmentResult({
-        appointmentId,
-        professionalProfileId: professional.profileId,
-      });
+    const accepted = await repository.acceptPlanAppointment({
+      appointmentId,
+      professionalAppUserId: professional.appUserId,
+      professionalProfileId: professional.profileId,
+    });
+    row = accepted.row;
+    acceptedNow = accepted.acceptedNow;
 
-      if (!row) {
-        throw new AppError({
-          status: 409,
-          code: 'PLAN_APPOINTMENT_ALREADY_ACCEPTED',
-          message: 'This plan-funded appointment was already accepted by another professional.',
-        });
-      }
-    } else {
-      const planCreditResult = await repository.confirmPlanCreditBeforeAcceptance({
-        context: planContext,
-      });
-
-      logTechnicalEvent('info', {
+    if (acceptedNow && planContext.usage?.id && notificationService) {
+      await notifyInternalBestEffort({
+        notificationService,
         functionName: 'accept-appointment',
         requestId,
-        operation: 'plan_credit.confirm',
-        actorId: appUser.id,
-        actorRole: appUser.role,
-        resourceType: 'appointment',
-        resourceId: appointmentId,
-        status: planCreditResult.reason,
+        input: {
+          recipientUserId: appointmentWindow.patientUserId,
+          typeKey: 'plan.credit_consumed',
+          relatedEntityType: 'appointment',
+          relatedEntityId: appointmentId,
+          deduplicationKey: `plan_credit:${planContext.usage.id}:consumed:patient:${appointmentWindow.patientUserId}`,
+        },
       });
-
-      if (planCreditResult.reason === 'used_now' && planContext.usage?.id && notificationService) {
-        await notifyInternalBestEffort({
-          notificationService,
-          functionName: 'accept-appointment',
-          requestId,
-          input: {
-            recipientUserId: appointmentWindow.patientUserId,
-            typeKey: 'plan.credit_consumed',
-            relatedEntityType: 'appointment',
-            relatedEntityId: appointmentId,
-            deduplicationKey: `plan_credit:${planContext.usage.id}:consumed:patient:${appointmentWindow.patientUserId}`,
-          },
-        });
-      }
     }
   }
 

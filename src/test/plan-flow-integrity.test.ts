@@ -365,9 +365,8 @@ describe('plan flow integrity', () => {
     expect(notify).not.toHaveBeenCalled();
   });
 
-  it('confirms a queue credit before the plan-specific acceptance transaction', async () => {
-    const confirmCredit = vi.fn().mockResolvedValue({ skipped: false, reason: 'used_now' });
-    const acceptTransaction = vi.fn().mockResolvedValue({
+  it('accepts a plan queue through one transactional repository operation', async () => {
+    const acceptedRow = {
       queue_id: '80000000-0000-4000-8000-000000000001',
       queue_status: 'assigned',
       queue_assigned_professional_id: professionalId,
@@ -384,7 +383,8 @@ describe('plan flow integrity', () => {
       consulta_professional_id: professionalId,
       consulta_professional_user_id: 'professional-user',
       consulta_professional_name: 'Professional Test',
-    });
+    };
+    const acceptTransaction = vi.fn().mockResolvedValue({ row: acceptedRow, acceptedNow: true });
     const repository = {
       findAppUserByAuthUserId: vi.fn().mockResolvedValue({
         id: 'professional-user',
@@ -419,8 +419,8 @@ describe('plan flow integrity', () => {
           externalSubscriptionScoreId: '156',
         },
       }),
-      confirmPlanCreditBeforeAcceptance: confirmCredit,
-      acceptQueueEntry: acceptTransaction,
+      acceptPlanQueueEntry: acceptTransaction,
+      acceptQueueEntry: vi.fn(),
     } as unknown as AcceptQueueEntryRepository;
 
     await acceptQueueEntry({
@@ -430,9 +430,8 @@ describe('plan flow integrity', () => {
       repository,
     });
 
-    expect(confirmCredit).toHaveBeenCalledOnce();
-    expect(acceptTransaction).toHaveBeenCalledWith(expect.objectContaining({ planFunded: true }));
-    expect(confirmCredit.mock.invocationCallOrder[0]).toBeLessThan(acceptTransaction.mock.invocationCallOrder[0]);
+    expect(acceptTransaction).toHaveBeenCalledOnce();
+    expect(repository.acceptQueueEntry).not.toHaveBeenCalled();
   });
 
   it('keeps profile standard and priority appointments strictly self-pay', () => {

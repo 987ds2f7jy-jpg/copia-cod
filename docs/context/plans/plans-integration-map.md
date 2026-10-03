@@ -11,8 +11,8 @@ client remains in the repository only for Phase 2B cleanup and is not imported b
 | Coverage check API           | `POST /subscription-score/find`          | shared `resolvePlanCoverage` → facade lookup                                                        | internal subscription and SubscriptionScore UUID    | `internal_active` | Legacy-shaped response fields carry normalized IDs only at the API boundary                                           |
 | Create appointment coverage  | external lookup                          | shared internal coverage + `create_internal_plan_funded_appointment`                                | `plan_credit_usages.internal_subscription_score_id` | `internal_active` | Creates `pending_use`; does not consume                                                                               |
 | Join queue coverage          | external lookup                          | shared internal coverage + `create_internal_plan_funded_queue`                                      | `plan_credit_usages.internal_subscription_score_id` | `internal_active` | Creates `pending_use`; does not consume                                                                               |
-| Appointment acceptance       | `POST /subscription-score/use`           | `PlansFacade.consumePlanCredit` → atomic RPC                                                        | usage + internal SubscriptionScore UUID             | `internal_active` | Score, usage and appointment coverage commit together                                                                 |
-| Queue acceptance             | same HTTP endpoint                       | same shared internal consumption path                                                               | usage + internal SubscriptionScore UUID             | `internal_active` | Score, usage and queue coverage commit together                                                                       |
+| Appointment acceptance       | `POST /subscription-score/use`           | `accept_internal_plan_appointment_transaction` → internal consume + existing appointment acceptance | usage + internal SubscriptionScore UUID             | `internal_active` | Score, usage, appointment, consulta, and coverage commit together |
+| Queue acceptance             | same HTTP endpoint                       | `accept_internal_plan_queue_entry_transaction` → internal consume + existing plan queue acceptance | usage + internal SubscriptionScore UUID             | `internal_active` | Score, usage, queue, consulta, linked appointment, and coverage commit together |
 | Financial reconciliation     | external score listing                   | facade listing + `reconcile_internal_plan_credit_usage`                                             | internal SubscriptionScore UUID                     | `internal_active` | Distributed HTTP ambiguity no longer applies to new internal usages                                                   |
 | Family membership            | external family endpoint, unused locally | `PlansFacade.addFamilyPlanMember`                                                                   | internal subscription UUID                          | `internal_ready`  | No new UI was introduced                                                                                              |
 | Monthly refresh              | Laravel scheduled command                | maintenance enqueue + refresh job/RPC                                                               | period key                                          | `internal_active` | Invoke worker with `enqueueMaintenance=true` at least daily; monthly key prevents duplicates                          |
@@ -26,9 +26,10 @@ payment confirmed → order activating_plan → durable activation job → worke
 → InternalPlansProvider → transactional subscription + grants + nutrition access → order active
 ```
 
-Appointment and queue creation only reserve an internal score. Professional acceptance invokes the atomic internal
-consumption transaction. A rolled-back internal transaction does not create the former “external consumed/local failed”
-ambiguity; reconciliation remains for historical rows and genuinely inconsistent local state.
+**[FATO]** Appointment and queue creation reserve an internal score. Professional acceptance invokes one owner-specific
+Postgres RPC; its nested credit consumption and acceptance mutations share the same transaction. A failed acceptance
+rolls back consumption. Replays return `accepted_now=false` only for the professional who owns the accepted attendance.
+Historical reconciliation remains separate.
 
 ## Scheduling and deployment
 

@@ -59,11 +59,11 @@ describe('internal notifications Phase 3A', () => {
     const appointment = read('supabase/functions/accept-appointment/service.ts');
 
     expect(queue.indexOf("typeKey: 'queue.accepted'")).toBeGreaterThan(
-      queue.indexOf('await repository.acceptQueueEntry'),
+      queue.indexOf('await repository.acceptPlanQueueEntry'),
     );
-    expect(queue).toContain("creditResult.reason === 'used_now'");
-    expect(queue).toContain('plan_credit:${planCreditUsageId}:consumed:patient:');
-    expect(appointment).toContain("planCreditResult.reason === 'used_now'");
+    expect(queue).toContain('accepted.acceptedNow && planContext.usage?.id');
+    expect(queue).toContain('plan_credit:${planContext.usage.id}:consumed:patient:');
+    expect(appointment).toContain('acceptedNow && planContext.usage?.id');
     expect(appointment).toContain('plan_credit:${planContext.usage.id}:consumed:patient:');
     expect(queue).not.toContain("creditResult.reason === 'already_used'");
     expect(appointment).not.toContain("planCreditResult.reason === 'already_used'");

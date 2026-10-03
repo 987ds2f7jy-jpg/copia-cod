@@ -20,17 +20,14 @@ describe('plan credit consumption on professional acceptance', () => {
     expect(coverage).not.toContain('/subscription-score/find');
   });
 
-  it('consumes the subscription score only inside accept-appointment', () => {
+  it('routes plan appointment acceptance through the atomic RPC', () => {
     const acceptRepository = read('supabase/functions/accept-appointment/repository.ts');
     const acceptService = read('supabase/functions/accept-appointment/service.ts');
 
-    expect(acceptRepository).toContain("consumePlanCreditOnce({");
-    expect(acceptRepository).toContain('usage.internalSubscriptionScoreId');
-    expect(acceptService).toContain('confirmPlanCreditBeforeAcceptance');
+    expect(acceptRepository).toContain('accept_internal_plan_appointment_transaction');
+    expect(acceptService).toContain('repository.acceptPlanAppointment');
     expect(acceptService).toContain('repository.acceptAppointment');
-    expect(acceptService.indexOf('confirmPlanCreditBeforeAcceptance')).toBeLessThan(
-      acceptService.indexOf('repository.acceptAppointment'),
-    );
+    expect(acceptService).not.toContain('confirmPlanCreditBeforeAcceptance');
   });
 
   it('blocks expired specialty appointments before plan credit consumption', () => {
@@ -41,7 +38,7 @@ describe('plan credit consumption on professional acceptance', () => {
     expect(acceptService).toContain('assertAppointmentNotExpiredForAcceptance');
     expect(acceptService).toContain('findAppointmentAcceptanceWindow');
     expect(acceptService.indexOf('assertAppointmentNotExpiredForAcceptance')).toBeLessThan(
-      acceptService.indexOf('confirmPlanCreditBeforeAcceptance'),
+      acceptService.indexOf('repository.acceptPlanAppointment'),
     );
     expect(acceptRepository).toContain('APPOINTMENT_EXPIRED');
     expect(rpcPatch).toContain('MESSAGE = \'APPOINTMENT_EXPIRED\'');

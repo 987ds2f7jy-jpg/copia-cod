@@ -2,7 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
 import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
-import { consumePlanCreditOnce } from '../_shared/plans/credit-consumption.ts';
 import type {
   AcceptAppointmentRepository,
   AcceptAppointmentTransactionRecord,
@@ -249,6 +248,12 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
       message: 'The active appointment charge has not been confirmed as paid.',
       details,
     });
+  }
+
+  if (['PLAN_CREDIT_OWNER_LINK_INVALID', 'PLAN_CREDIT_USAGE_LINK_INVALID',
+    'PLAN_SUBSCRIPTION_SCORE_NOT_AVAILABLE', 'PLAN_SUBSCRIPTION_NOT_ACTIVE',
+    'PLAN_CREDIT_USAGE_NOT_PENDING', 'APPOINTMENT_ACCEPTANCE_INCOMPLETE'].includes(code)) {
+    return new AppError({ status: 409, code, message: 'Plan credit or appointment state is no longer eligible for acceptance.' });
   }
 
   return new AppError({
@@ -731,24 +736,18 @@ function createSupabaseAcceptAppointmentRepository(client: SupabaseClient): Acce
     },
     */
 
-    async confirmPlanCreditBeforeAcceptance({ context }) {
-      const { appointment, usage } = context;
-      if (!usage?.id || appointment.planCreditUsageId !== usage.id || !usage.internalSubscriptionScoreId) {
-        throw new AppError({
-          status: 409,
-          code: 'PLAN_CREDIT_USAGE_REQUIRED',
-          message: 'Plan-funded appointments require an internal credit reservation.',
-          details: { appointmentId: appointment.id },
-        });
-      }
-
-      return consumePlanCreditOnce({
-        client,
-        ownerType: 'appointment',
-        ownerId: appointment.id,
-        usageId: usage.id,
-        internalSubscriptionScoreId: usage.internalSubscriptionScoreId,
+    async acceptPlanAppointment({ appointmentId, professionalAppUserId, professionalProfileId }) {
+      const { data, error } = await client.rpc('accept_internal_plan_appointment_transaction', {
+        p_appointment_id: appointmentId,
+        p_professional_app_user_id: professionalAppUserId,
+        p_professional_profile_id: professionalProfileId,
       });
+      if (error) throw mapTransactionError(error);
+      const payload = data as { accepted_now?: boolean; result?: AcceptAppointmentTransactionRecord } | null;
+      if (!payload?.result?.appointment_id || !payload.result.consulta_id) {
+        throw new AppError({ status: 500, code: 'INVALID_RPC_RESPONSE', message: 'Database transaction returned an invalid response.' });
+      }
+      return { row: payload.result, acceptedNow: payload.accepted_now === true };
     },
 
     async acceptAppointment({
