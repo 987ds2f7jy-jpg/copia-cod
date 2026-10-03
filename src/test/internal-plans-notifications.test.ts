@@ -32,17 +32,17 @@ describe('Plans notifications on the internal runtime', () => {
     expect(worker).not.toContain('plans-service');
   });
 
-  it('emits credit consumption only for the internal used_now result', () => {
+  it('emits credit consumption only after a new atomic acceptance', () => {
     const consumption = read('supabase/functions/_shared/plans/credit-consumption.ts');
     const appointment = read('supabase/functions/accept-appointment/service.ts');
     const queue = read('supabase/functions/accept-queue-entry/service.ts');
 
     expect(consumption).toContain('getPlansFacade(client).consumePlanCredit');
     expect(consumption).not.toContain('/subscription-score/use');
-    expect(appointment).toContain("planCreditResult.reason === 'used_now'");
-    expect(queue).toContain("creditResult.reason === 'used_now'");
+    expect(appointment).toContain('acceptedNow && planContext.usage?.id');
+    expect(queue).toContain('accepted.acceptedNow && planContext.usage?.id');
     expect(appointment).toContain('plan_credit:${planContext.usage.id}:consumed:patient:');
-    expect(queue).toContain('plan_credit:${planCreditUsageId}:consumed:patient:');
+    expect(queue).toContain('plan_credit:${planContext.usage.id}:consumed:patient:');
   });
 
   it('does not emit coverage denial from the read-only coverage endpoint', () => {

@@ -307,16 +307,19 @@ DECLARE
   v_plan_code TEXT;
   v_access_status SMALLINT;
 BEGIN
-  SELECT subscription, catalog.code
-  INTO v_subscription, v_plan_code
+  SELECT subscription.*
+  INTO v_subscription
   FROM public.plan_subscriptions AS subscription
-  JOIN public.plan_catalog AS catalog ON catalog.id = subscription.plan_id
   WHERE subscription.id = p_subscription_id
-  FOR UPDATE OF subscription;
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'PLAN_SUBSCRIPTION_NOT_FOUND';
   END IF;
+
+  SELECT catalog.code INTO v_plan_code
+  FROM public.plan_catalog AS catalog
+  WHERE catalog.id = v_subscription.plan_id;
 
   IF v_plan_code <> 'weight_loss' THEN
     RETURN 'not_applicable';
@@ -666,16 +669,18 @@ DECLARE
   v_member public.plan_subscription_members%ROWTYPE;
   v_people_count INTEGER;
 BEGIN
-  SELECT subscription, catalog.code
-  INTO v_subscription, v_plan_code
+  SELECT subscription.*
+  INTO v_subscription
   FROM public.plan_subscriptions AS subscription
-  JOIN public.plan_catalog AS catalog ON catalog.id = subscription.plan_id
   WHERE subscription.id = p_subscription_id
-  FOR UPDATE OF subscription;
+  FOR UPDATE;
 
   IF NOT FOUND THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'PLAN_SUBSCRIPTION_NOT_FOUND';
   END IF;
+  SELECT catalog.code INTO v_plan_code
+  FROM public.plan_catalog AS catalog
+  WHERE catalog.id = v_subscription.plan_id;
   IF lower(v_subscription.external_key) <> lower(trim(p_holder_external_key)) THEN
     RAISE EXCEPTION USING ERRCODE = 'P0001', MESSAGE = 'PLAN_FAMILY_HOLDER_REQUIRED';
   END IF;

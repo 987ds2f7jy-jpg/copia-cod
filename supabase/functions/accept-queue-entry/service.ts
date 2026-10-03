@@ -121,7 +121,7 @@ export async function acceptQueueEntry({
   const planContext = await repository.findPlanQueueAcceptanceContext(queueId);
 
   if (planContext) {
-    if (planContext.queue.status !== 'waiting') {
+    if (planContext.queue.status !== 'waiting' && !['assigned', 'in_progress', 'em_atendimento'].includes(planContext.queue.status)) {
       throw new AppError({
         status: 409,
         code: 'QUEUE_NOT_WAITING',
@@ -151,42 +151,27 @@ export async function acceptQueueEntry({
       });
     }
 
-    const planCreditUsageId = planContext.usage.id;
-    const creditResult = await repository.confirmPlanCreditBeforeAcceptance({ context: planContext });
-
-    logTechnicalEvent('info', {
-      functionName: 'accept-queue-entry',
-      requestId,
-      operation: 'plan_credit.confirm',
-      actorId: appUser.id,
-      actorRole: appUser.role,
-      resourceType: 'queue',
-      resourceId: queueId,
-      status: creditResult.reason,
-    });
-
-    if (creditResult.reason === 'used_now' && notificationService) {
-      await notifyInternalBestEffort({
-        notificationService,
-        functionName: 'accept-queue-entry',
-        requestId,
-        input: {
-          recipientUserId: planContext.queue.patientId,
-          typeKey: 'plan.credit_consumed',
-          relatedEntityType: 'queue',
-          relatedEntityId: planContext.queue.id,
-          deduplicationKey: `plan_credit:${planCreditUsageId}:consumed:patient:${planContext.queue.patientId}`,
-        },
-      });
-    }
   }
 
-  const row = await repository.acceptQueueEntry({
-    queueId,
-    professionalAppUserId: professional.appUserId,
-    professionalProfileId: professional.profileId,
-    planFunded: Boolean(planContext),
-  });
+  const accepted = planContext
+    ? await repository.acceptPlanQueueEntry({ queueId, professionalAppUserId: professional.appUserId, professionalProfileId: professional.profileId })
+    : { row: await repository.acceptQueueEntry({ queueId, professionalAppUserId: professional.appUserId, professionalProfileId: professional.profileId }), acceptedNow: true };
+  const row = accepted.row;
+
+  if (planContext && accepted.acceptedNow && planContext.usage?.id && notificationService) {
+    await notifyInternalBestEffort({
+      notificationService,
+      functionName: 'accept-queue-entry',
+      requestId,
+      input: {
+        recipientUserId: planContext.queue.patientId,
+        typeKey: 'plan.credit_consumed',
+        relatedEntityType: 'queue',
+        relatedEntityId: row.queue_id,
+        deduplicationKey: `plan_credit:${planContext.usage.id}:consumed:patient:${planContext.queue.patientId}`,
+      },
+    });
+  }
 
   logTechnicalEvent('info', {
     functionName: 'accept-queue-entry',
@@ -199,7 +184,7 @@ export async function acceptQueueEntry({
     status: 'succeeded',
   });
 
-  if (notificationService) {
+  if (accepted.acceptedNow && notificationService) {
     await notifyInternalBestEffort({
       notificationService,
       functionName: 'accept-queue-entry',

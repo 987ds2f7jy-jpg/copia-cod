@@ -2,7 +2,6 @@ import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.56.0';
 import type { AuthenticatedUserLookup } from '../_shared/auth.ts';
 import { AppError } from '../_shared/errors.ts';
 import { InternalNotificationService } from '../_shared/notifications/InternalNotificationService.ts';
-import { consumePlanCreditOnce } from '../_shared/plans/credit-consumption.ts';
 import type {
   AcceptQueueEntryRepository,
   AcceptQueueEntryTransactionRecord,
@@ -245,6 +244,12 @@ function mapTransactionError(error: { message?: string; details?: string } | nul
     });
   }
 
+  if (['PLAN_CREDIT_OWNER_LINK_INVALID', 'PLAN_CREDIT_USAGE_LINK_INVALID',
+    'PLAN_SUBSCRIPTION_SCORE_NOT_AVAILABLE', 'PLAN_SUBSCRIPTION_NOT_ACTIVE',
+    'PLAN_CREDIT_USAGE_NOT_PENDING'].includes(code)) {
+    return new AppError({ status: 409, code, message: 'Plan credit or queue state is no longer eligible for acceptance.' });
+  }
+
   if (code === 'SOLICITACAO_EXAME_NOT_FOUND_FOR_QUEUE') {
     return new AppError({
       status: 409,
@@ -390,33 +395,27 @@ function createSupabaseAcceptQueueEntryRepository(client: SupabaseClient): Accep
       };
     },
 
-    async confirmPlanCreditBeforeAcceptance({ context }) {
-      if (!context.usage?.id || !context.usage.internalSubscriptionScoreId) {
-        throw new AppError({
-          status: 409,
-          code: 'PLAN_QUEUE_CREDIT_USAGE_REQUIRED',
-          message: 'Plan-funded queue entry has no consumable credit reservation.',
-          details: { queueId: context.queue.id },
-        });
-      }
-
-      return consumePlanCreditOnce({
-        client,
-        ownerType: 'queue',
-        ownerId: context.queue.id,
-        usageId: context.usage.id,
-        internalSubscriptionScoreId: context.usage.internalSubscriptionScoreId,
+    async acceptPlanQueueEntry({ queueId, professionalAppUserId, professionalProfileId }) {
+      const { data, error } = await client.rpc('accept_internal_plan_queue_entry_transaction', {
+        p_queue_id: queueId,
+        p_professional_app_user_id: professionalAppUserId,
+        p_professional_profile_id: professionalProfileId,
       });
+      if (error) throw mapTransactionError(error);
+      const payload = data as { accepted_now?: boolean; result?: AcceptQueueEntryTransactionRecord } | null;
+      if (!payload?.result?.queue_id || !payload.result.consulta_id) {
+        throw new AppError({ status: 500, code: 'INVALID_RPC_RESPONSE', message: 'Database transaction returned an invalid response.' });
+      }
+      return { row: payload.result, acceptedNow: payload.accepted_now === true };
     },
 
     async acceptQueueEntry({
       queueId,
       professionalAppUserId,
       professionalProfileId,
-      planFunded,
     }): Promise<AcceptQueueEntryTransactionRecord> {
       const { data, error } = await client
-        .rpc(planFunded ? 'accept_plan_queue_entry_transaction' : 'accept_queue_entry_transaction', {
+        .rpc('accept_queue_entry_transaction', {
           p_queue_id: queueId,
           p_professional_app_user_id: professionalAppUserId,
           p_professional_profile_id: professionalProfileId,

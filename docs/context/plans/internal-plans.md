@@ -136,8 +136,17 @@ legacy specialization. `subscription_score.id`, not `score.id`, is the consumabl
 The product reservation lifecycle remains unchanged: lookup, appointment/queue creation, `pending_use`, professional
 acceptance, consumption, local usage finalization. All of these operations now use the internal provider.
 
-`consume_internal_plan_credit` is now wired for appointment and queue acceptance. It atomically locks and consumes the
-internal score, finalizes `plan_credit_usages`, and updates appointment/queue coverage state in one transaction.
+**[FATO]** Professional acceptance calls `accept_internal_plan_appointment_transaction` or
+`accept_internal_plan_queue_entry_transaction`. Each locks the owner, validates its linked internal usage and active
+subscription, consumes the score through `consume_internal_plan_credit`, then calls the existing appointment or
+plan-queue acceptance function in the same PostgreSQL transaction. Score, usage, owner acceptance, consultation
+creation/link, and `coverage_status=plan_used` commit together. A later acceptance error rolls back the credit.
+The queue function also links the immediate appointment in that transaction. Replays return the existing consultation
+only for the accepting professional and report `accepted_now=false`; competing professionals cannot consume again.
+Self-pay keeps the existing acceptance RPCs.
+
+**[PENDÊNCIA]** The new transaction and concurrency regression SQL requires a local Supabase/Postgres run before it can
+be classified as [TESTE].
 
 ## Monthly refresh and expiration
 
