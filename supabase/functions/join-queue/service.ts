@@ -4,6 +4,7 @@ import {
   type InternalNotificationNotifier,
 } from '../_shared/notifications/notify-best-effort.ts';
 import { logTechnicalEvent } from '../_shared/observability.ts';
+import { getPlanCoverageDenialReason } from '../_shared/plans/coverage.ts';
 import { isApprovedProfessionalStatus } from '../_shared/domains/professionalStatus.ts';
 import {
   getFeeGroupForServiceCode,
@@ -258,6 +259,46 @@ export async function joinQueue({
   });
 
   if (queueEntry.createdNow !== false && notificationService) {
+    if (
+      queueEntry.funding_source === 'plan'
+      && queueEntry.coverage_status === 'plan_pending_use'
+      && queueEntry.plan_credit_usage_id
+    ) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'join-queue',
+        requestId,
+        input: {
+          recipientUserId: appUser.id,
+          typeKey: 'plan.credit_reserved',
+          data: {
+            plan_credit_usage_id: queueEntry.plan_credit_usage_id,
+            queue_entry_id: queueEntry.id,
+          },
+          relatedEntityType: 'queue',
+          relatedEntityId: queueEntry.id,
+          deduplicationKey: `plan_credit_usage:${queueEntry.plan_credit_usage_id}:reserved:patient:${appUser.id}`,
+        },
+      });
+    } else if (!input.solicitacaoExameId && !planCoverage) {
+      await notifyInternalBestEffort({
+        notificationService,
+        functionName: 'join-queue',
+        requestId,
+        input: {
+          recipientUserId: appUser.id,
+          typeKey: 'plan.coverage_denied',
+          data: {
+            reason_code: getPlanCoverageDenialReason(input.specialty),
+            queue_entry_id: queueEntry.id,
+          },
+          relatedEntityType: 'queue',
+          relatedEntityId: queueEntry.id,
+          deduplicationKey: `queue:${queueEntry.id}:plan_coverage_denied:patient:${appUser.id}`,
+        },
+      });
+    }
+
     await notifyInternalBestEffort({
       notificationService,
       functionName: 'join-queue',

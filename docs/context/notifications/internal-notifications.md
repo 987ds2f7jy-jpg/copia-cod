@@ -24,7 +24,7 @@ End users supported by the server-side access guard:
 Creation architecture prepared in the repository:
 
 ```text
-confirmed Phase 1/Phase 2/Phase 3A/Phase 3B business flow or protected scheduler
+confirmed Phase 1/Phase 2/Phase 3A/Phase 3B/Plans-runtime business flow or protected scheduler
   → InternalNotificationService
   → notification_types lookup and template rendering
   → user_notifications snapshot
@@ -214,6 +214,11 @@ The migration seeds the following exact catalog using `ON CONFLICT (key) DO NOTH
 - `plan.credit_reserved`
 - `plan.credit_consumed`
 - `plan.coverage_denied`
+
+The five Plans-on-internal-runtime keys (`plan.credit_reserved`, `plan.coverage_denied`, `plan.expiring`,
+`plan.expired`, and `plan.cancelled`) are registered idempotently by
+`20260924110000_add_internal_plans_notification_types.sql`. Registration does not fabricate missing Plans state
+transitions: the latter three remain without emitters until the domain prerequisites below exist.
 
 ### `queue`
 
@@ -511,12 +516,23 @@ The pending-only RPC prevents emission for already-reviewed profiles. Internal r
 
 | Event | typeKey | Recipient | Trigger | Related entity | Deduplication key | Status |
 |---|---|---|---|---|---|---|
-| Plan activated | `plan.activated` | Order `app_user_id`, with the existing `patient_id` fallback resolved to `app_users.id` | `supabase/functions/_shared/plans/activate-plan-subscription.ts::activatePlanSubscriptionForPayment`, after `markOrderActive` | `plan` | `plan_order:{orderId}:activated:{recipientUserId}` | implemented |
-| Plan activation failed | `plan.activation_failed` | Order `app_user_id`, with the existing `patient_id` fallback | Same helper, only after `markOrderActivationFailed` succeeds | `plan` | `plan_order:{orderId}:activation_failed:{recipientUserId}` | implemented |
+| Plan activated | `plan.activated` | Order `app_user_id`, with `patient_id` fallback | `internal-plans-worker`, after the internal activation job is completed | `plan` | `plan_order:{orderId}:activated:{recipientUserId}` | internal active |
+| Plan activation failed | `plan.activation_failed` | Order `app_user_id`, with `patient_id` fallback | `internal-plans-worker`, after terminal failure persists `activation_failed` (enqueue failure uses the same key) | `plan` | `plan_order:{orderId}:activation_failed:{recipientUserId}` | internal active |
+| Appointment credit reserved | `plan.credit_reserved` | Appointment patient | `create-appointment`, after the internal reservation RPC returns `plan_pending_use` and a usage ID | `appointment` | `plan_credit_usage:{usageId}:reserved:patient:{patientUserId}` | internal active |
+| Queue credit reserved | `plan.credit_reserved` | Queue patient | `join-queue`, after a newly persisted internal reservation | `queue` | `plan_credit_usage:{usageId}:reserved:patient:{patientUserId}` | internal active |
 | Appointment credit consumed | `plan.credit_consumed` | Appointment patient `app_users.id` | `supabase/functions/accept-appointment/service.ts::acceptAppointment`, after credit confirmation returns `used_now` | `appointment` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
 | Queue credit consumed | `plan.credit_consumed` | Queue patient `app_users.id` | `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry`, after credit confirmation returns `used_now` | `queue` | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | implemented |
+| Appointment coverage denied | `plan.coverage_denied` | Appointment patient | `create-appointment`, after a concrete self-pay fallback is persisted | `appointment` | `appointment:{appointmentId}:plan_coverage_denied:patient:{patientUserId}` | internal active |
+| Queue coverage denied | `plan.coverage_denied` | Queue patient | `join-queue`, after a concrete non-exam self-pay fallback is persisted | `queue` | `queue:{queueId}:plan_coverage_denied:patient:{patientUserId}` | internal active |
+| Plan expiring | `plan.expiring` | Subscription holder | No emitter: canonical expiration date and warning interval are absent | `plan` | future `plan_subscription:{subscriptionId}:expiring:{expirationDate}:{recipientUserId}` | prerequisite missing |
+| Plan expired | `plan.expired` | Subscription holder | No emitter: there is no subscription-expiration transition | `plan` | future `plan_subscription:{subscriptionId}:expired:{expirationDate}:{recipientUserId}` | prerequisite missing |
+| Plan cancelled | `plan.cancelled` | Subscription holder | No emitter: there is no cancellation service/RPC/caller | `plan` | future `plan_subscription:{subscriptionId}:cancelled:{recipientUserId}` | prerequisite missing |
 
-Already-active plan repair/retry paths and `already_used` credit confirmations do not emit. Repeated representations of the same activation failure reuse one key. Expiry, cancellation, credit reservation, and coverage-denied events remain pending.
+Already-active plan repair/retry paths and `already_used` credit confirmations do not emit. Repeated representations
+reuse stable keys. `check-plan-coverage` remains notification-free, so exploratory reads/polling cannot spam users.
+Appointment/queue entities currently have no safe generic deep-link; activation lifecycle events use the existing `plan`
+destination (`/MeusPlanos`). Family lifecycle notifications remain holder-only; reservation/denial goes to the patient
+performing the concrete service action.
 
 ### Queue/immediate consultation
 
@@ -536,7 +552,9 @@ An existing active entry, including the concurrent uniqueness-recovery path, doe
 
 Idempotent room-state repair and already-finalized paths do not emit. `teleconsulta.finished` and `review.professional_pending` remain separate notifications because completion and the evaluation prompt are distinct events. Room and record availability remain pending.
 
-Result: the infrastructure, user-facing reader, five Phase 1 types, nine Phase 2 types, seven Phase 3A types, and three Phase 3B types are integrated. All remaining events stay pending as described in `notification-events-map.md`.
+Result: the existing infrastructure and user-facing reader remain authoritative. The five scoped Plans keys are registered;
+`credit_reserved` and `coverage_denied` are integrated, while `expiring`, `expired`, and `cancelled` wait on explicit
+Plans-domain prerequisites. All unrelated events remain as described in `notification-events-map.md`.
 
 ## Supabase configuration
 
@@ -642,7 +660,7 @@ limit 50;
 ```
 
 - [ ] Confirm the migration and seeded catalog exist in the target environment.
-- [ ] Create each Phase 1/Phase 2/Phase 3A/Phase 3B domain event through its trusted backend flow or protected scheduler; never insert from the browser.
+- [ ] Create each documented domain event through its trusted backend flow or protected scheduler; never insert from the browser.
 - [ ] Confirm one `user_notifications` snapshot and one `internal/sent` delivery.
 - [ ] Open `/Notifications` as the recipient and confirm list rendering.
 - [ ] Confirm the bell and avatar badges show the unread count and refresh within the polling interval.
@@ -675,7 +693,7 @@ npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-not
 ## Risks and pending verification
 
 - Remote migration, seed, Function deployment, secrets, gateway configuration, and live data cannot be confirmed from repository contents.
-- Only the documented Phase 1/Phase 2/Phase 3A/Phase 3B events create notifications; all other mapped events remain pending.
+- Only the documented integrated events create notifications; catalog-only Plans lifecycle keys have no emitter until their domain prerequisites exist.
 - Repository state cannot confirm that the remote 04:00 Supabase Cron job or its shared secret has been applied.
 - `notification_preferences` and a preferences UI are absent.
 - Only the internal channel is operational; email, WhatsApp, SMS, push, and gateway are schema/type placeholders.
@@ -684,7 +702,7 @@ npm test -- src/test/internal-notifications-phase1.test.ts src/test/internal-not
 - The template renderer returns plain strings but does not strip/escape HTML itself; safety currently depends on text-node rendering and must be preserved by future consumers.
 - Notification insertion and delivery insertion are separate database requests, not one transaction. A delivery failure can leave a notification without a delivery; a retry with the same deduplication key can repair the internal delivery.
 - Deduplication recovery looks up only the globally unique key and does not compare the existing recipient/type/entity with the new input; key construction must therefore include stable recipient and event identity.
-- Phase 1/Phase 2/Phase 3A/Phase 3B regression tests cover catalog keys, post-persistence placement, idempotent guards, owner-aware keys, recipient selection, timezone formatting, batch resilience, privacy boundaries, and best-effort behavior. Dedicated database-backed tests for notification creation, ownership, Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
+- Regression tests cover catalog keys, post-persistence placement, internal Plans sources, idempotent guards, owner-aware keys, recipient selection, timezone formatting, batch resilience, privacy boundaries, and best-effort behavior. Dedicated database-backed tests for notification creation, ownership, Function contracts, frontend hooks/components, polling, pagination, and destination access remain pending.
 - Manual browser, database, and deployed Function validation was not performed in this task.
 
 ## Future improvements

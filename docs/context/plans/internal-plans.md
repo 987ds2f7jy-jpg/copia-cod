@@ -171,6 +171,15 @@ retry. Both still converge on the same database activation identity, `payment_ch
 Payment-confirmed flows now mark the order `activating_plan` and enqueue activation. The financial request waits only for
 durable persistence, not subscription provisioning. The worker sets `active`; exhausted retries set `activation_failed`.
 
+## Notifications boundary
+
+Plans owns durable activation and credit state; Notifications owns best-effort user messages after those writes commit.
+The internal worker emits `plan.activated`/`plan.activation_failed`, acceptance emits `plan.credit_consumed`, and concrete
+appointment/queue creation emits `plan.credit_reserved` or `plan.coverage_denied`. Read-only coverage checks do not emit.
+Subscription `expiring`, `expired`, and `cancelled` types are registered, but have no emitter: the current domain has no
+canonical subscription expiration timestamp, expiry transition, warning interval, or cancellation operation. Score
+expiration is not treated as subscription expiration.
+
 ## Security and ownership
 
 All new tables have RLS enabled and forced. Public, `anon`, and `authenticated` receive no table or RPC mutation access.
@@ -224,4 +233,3 @@ environment operation and is not created automatically by repository deployment.
 Historical external orders/usages are preserved. Rows lacking internal subscription/score identities cannot be safely
 backfilled from local data alone; they remain visible through catalog fallback but are not eligible for new internal
 coverage or consumption without a separately validated authoritative backfill.
-

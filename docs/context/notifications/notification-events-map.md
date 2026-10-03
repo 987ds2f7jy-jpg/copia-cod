@@ -80,16 +80,17 @@ Status values in this table have the following meaning:
 | Professional | Legacy admin approves/rejects registration | After synchronized public/private profile updates in `supabase/functions/review-professional-application/service.ts::reviewProfessionalApplication` | `professional.registration_approved` or `professional.registration_rejected` | Professional app user | `professional_profile` / profile ID | Same profile/action/recipient key as backoffice | `needs_business_rule_verification` | A parallel legacy admin surface still exists. Decide whether it remains authoritative and use the same key to prevent duplicate notifications. |
 | Professional | Public profile is published | A possible transition is `perfil_ativo: false -> true` in `supabase/functions/upsert-professional-profile/service.ts::upsertProfessionalProfile` after approved-profile synchronization | `professional.profile_published` | Professional app user | `professional_profile` / profile ID | `professional_profile:{profileId}:published:{professionalUserId}` | `needs_business_rule_verification` | Approval and explicit profile activation have overlapping publication semantics; define the canonical event first. |
 | Professional | Profile is suspended | The legacy `reviewProfessionalApplication` flow supports `suspend`; the isolated backoffice review supports only approval/rejection | `professional.profile_suspended` | Professional app user | `professional_profile` / profile ID | `professional_profile:{profileId}:suspended:{professionalUserId}` | `needs_business_rule_verification` | Confirm which admin flow owns suspension and when public visibility is removed. |
-| Plan | Paid plan becomes active | After `markOrderActive(...)` succeeds in `supabase/functions/_shared/plans/activate-plan-subscription.ts::activatePlanSubscriptionForPayment` | `plan.activated` | Order app user (`app_user_id` or patient fallback) | `plan` / plan subscription order ID | `plan_order:{orderId}:activated:{recipientUserId}` | `already_integrated` | The stable key is shared by payment confirmation, simulation/reconciliation, and activation retry paths; `already_active` does not emit. |
-| Plan | Plan activation fails after payment | After `activatePlanSubscriptionForPayment` successfully persists an activation-failed order state | `plan.activation_failed` | Order app user | `plan` / plan subscription order ID | `plan_order:{orderId}:activation_failed:{recipientUserId}` | `already_integrated` | The Phase 3B migration adds generic copy. The shared key deduplicates webhook, retry, simulation, and reconciliation paths. |
-| Plan | Plan is close to expiry | No scheduler or subscription-expiry flow was found in this repository | `plan.expiring` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:expiring:{threshold}:{recipientUserId}` | `not_found` | Likely depends on the external plans service plus a scheduled integration. |
-| Plan | Plan expires | No local expiration transition or callback was found | `plan.expired` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:expired:{recipientUserId}` | `not_found` | Appointment/queue credit release is not plan expiration. |
-| Plan | Plan is cancelled | No local subscription-cancellation transition or callback was found | `plan.cancelled` | Plan subscriber | `plan` / subscription/order ID | `plan:{planId}:cancelled:{recipientUserId}` | `not_found` | Appointment/queue cancellation must not emit this event. |
-| Plan | Credit is reserved for an appointment | After `create_plan_funded_appointment` returns successfully from `supabase/functions/create-appointment/repository.ts::createAppointment` | `plan.credit_reserved` | Appointment patient | `appointment` / appointment ID | `plan_credit:{usageId}:reserved:patient:{patientUserId}` | `needs_schema_verification` | Prefer the `plan_credit_usages.id` as event identity; verify that the RPC result exposes it, otherwise return it from the trusted repository contract. |
-| Plan | Credit is reserved for queue attendance | After `create_plan_funded_queue` returns successfully from `supabase/functions/join-queue/repository.ts::createQueueEntry` | `plan.credit_reserved` | Queue patient | `queue` / queue ID | `plan_credit:{usageId}:reserved:patient:{patientUserId}` | `needs_schema_verification` | Same usage-ID requirement as appointment reservation. |
-| Plan | Appointment credit is consumed | After the plans service confirms use and `finalize_plan_credit_usage` succeeds in `supabase/functions/accept-appointment/repository.ts::confirmPlanCreditBeforeAcceptance` | `plan.credit_consumed` | Appointment patient from the acceptance window | `appointment` / appointment ID | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | `already_integrated` | Emits only for `reason === 'used_now'` with the real usage ID; never for `already_used`. |
+| Plan | Paid plan becomes active | Internal activation job completes and `complete_internal_plans_job` succeeds; `internal-plans-worker` runs its success hook | `plan.activated` | Order `app_user_id`, with `patient_id` fallback | `plan` / plan subscription order ID | `plan_order:{orderId}:activated:{recipientUserId}` | `internal_active` | The order/subscription is already active. Replays of the same completed job do not emit a new row. Destination: `/MeusPlanos`. |
+| Plan | Plan activation reaches terminal failure | Internal activation job reaches `dead_letter`; `markActivationFailed` persists the order before the worker failure hook | `plan.activation_failed` | Order `app_user_id`, with `patient_id` fallback | `plan` / plan subscription order ID | `plan_order:{orderId}:activation_failed:{recipientUserId}` | `internal_active` | Enqueue failure retains the same best-effort event/key. Destination: `/MeusPlanos`. |
+| Plan | Plan is close to expiry | No trigger: internal `plan_subscriptions` has no canonical expiration timestamp or warning-window rule | `plan.expiring` | Subscription holder when the prerequisite exists | `plan` / internal subscription ID | `plan_subscription:{subscriptionId}:expiring:{expirationDate}:{recipientUserId}` | `catalog_registered_domain_prerequisite_missing` | Score expiration is not subscription expiration. No scheduler/emitter was fabricated. |
+| Plan | Plan expires | No trigger: the internal Plans domain has no subscription-expiration transition | `plan.expired` | Subscription holder when the prerequisite exists | `plan` / internal subscription ID | `plan_subscription:{subscriptionId}:expired:{expirationDate}:{recipientUserId}` | `catalog_registered_domain_prerequisite_missing` | Plans must first make the transition durable; Notifications must not infer it from disabled scores. |
+| Plan | Plan is cancelled | No trigger: no internal cancellation service/RPC/caller exists | `plan.cancelled` | Subscription holder when the prerequisite exists | `plan` / internal subscription ID | `plan_subscription:{subscriptionId}:cancelled:{recipientUserId}` | `catalog_registered_domain_prerequisite_missing` | Payment, appointment, and queue cancellation are not plan cancellation. |
+| Plan | Credit is reserved for an appointment | After `create_internal_plan_funded_appointment` returns an appointment linked to a `pending_use` usage | `plan.credit_reserved` | Appointment patient `app_users.id` | `appointment` / appointment ID | `plan_credit_usage:{usageId}:reserved:patient:{patientUserId}` | `internal_active` | Synchronous best-effort emission after durable reservation. No `plan.credit_consumed` is emitted here. No deep-link: appointment destination is role-dependent. |
+| Plan | Credit is reserved for queue attendance | After `create_internal_plan_funded_queue` returns a newly created queue entry linked to a `pending_use` usage | `plan.credit_reserved` | Queue patient `app_users.id` | `queue` / queue ID | `plan_credit_usage:{usageId}:reserved:patient:{patientUserId}` | `internal_active` | Synchronous best-effort emission; existing/replayed queue entries do not emit a second logical notification. No queue deep-link exists. |
+| Plan | Appointment credit is consumed | After internal atomic `consume_internal_plan_credit` succeeds with `used_now` | `plan.credit_consumed` | Appointment patient from the acceptance window | `appointment` / appointment ID | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | `internal_active` | Never emitted for `already_used`; no external response dependency. |
 | Plan | Queue credit is consumed | After `consumePlanCreditOnce(...)` returns `used_now` in `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry` | `plan.credit_consumed` | Queue `patient_id` | `queue` / queue ID | `plan_credit:{usageId}:consumed:patient:{patientUserId}` | `already_integrated` | The trusted plan context exposes the patient app-user ID; `already_used` does not emit. |
-| Plan | Coverage is denied | `check-plan-coverage` and shared coverage resolution return multiple uncovered/fallback reasons | `plan.coverage_denied` | Patient requesting coverage | `plan` or attempted service entity | `plan_coverage:{requestOrEntityId}:denied:patient:{patientUserId}` | `needs_business_rule_verification` | Define which outcomes are genuine denials versus absence of eligibility, unsupported service, no credit, or fallback to self-pay. Avoid notifying on every exploratory coverage check. |
+| Plan | Coverage is denied for a concrete appointment | Specialty appointment creation persists a self-pay appointment after internal lookup returns no eligible coverage | `plan.coverage_denied` | Appointment patient | `appointment` / appointment ID | `appointment:{appointmentId}:plan_coverage_denied:patient:{patientUserId}` | `internal_active` | Reasons are `specialty_not_mapped` or `no_plan_credit_available`. Provider/database failures abort before persistence and do not emit. |
+| Plan | Coverage is denied for a concrete queue entry | Non-exam queue creation persists a self-pay queue after internal lookup returns no eligible coverage | `plan.coverage_denied` | Queue patient | `queue` / queue ID | `queue:{queueId}:plan_coverage_denied:patient:{patientUserId}` | `internal_active` | Linked paid exam flows do not attempt plan coverage. Read-only `check-plan-coverage` never emits, preventing polling spam. |
 | Queue | Patient joins immediate-care queue | After a newly created `repository.createQueueEntry(...)` succeeds in `supabase/functions/join-queue/service.ts::joinQueue` | `queue.joined` | Patient `appUser.id` | `queue` / queue ID | `queue:{queueId}:joined:patient:{patientUserId}` | `already_integrated` | Existing active entries and the concurrent uniqueness-recovery path do not emit. |
 | Queue | Professionals receive a new queue request | Same new-entry success point in `joinQueue` | `queue.request_received` | Eligible/on-duty professionals | `queue` / queue ID | `queue:{queueId}:request_received:professional:{professionalUserId}` | `needs_business_rule_verification` | Current on-duty profile lookup does not expose the final app-user recipient set. Define fan-out and notification-storm controls. |
 | Queue | Professional accepts queue attendance | After `repository.acceptQueueEntry(...)` succeeds in `supabase/functions/accept-queue-entry/service.ts::acceptQueueEntry` | `queue.accepted` | Queue patient (`queue_patient_id`) | `queue` / queue ID | `queue:{queueId}:accepted:patient:{patientUserId}` | `already_integrated` | The transaction also creates/returns the consultation; no room-available event or professional fan-out was added. |
@@ -135,7 +136,7 @@ Implemented without scheduler or broad fan-out:
 - `plan.activated` for the order app user;
 - `plan.credit_consumed` for appointment and queue patients only on `used_now` with a stable usage ID.
 
-Scheduler-dependent reminders/expiry, room/record availability, queue professional fan-out/expiration/cancellation, credit reservation/coverage denial, revenue availability, and withdrawal paid/rejected remain pending under their recorded constraints.
+Scheduler-dependent reminders/expiry, room/record availability, queue professional fan-out/expiration/cancellation, revenue availability, and withdrawal paid/rejected remain pending under their recorded constraints. Plans credit reservation and concrete-flow coverage denial are now integrated with the internal Plans runtime.
 
 ### Phase 3B
 
@@ -156,20 +157,20 @@ The following real or requested domain events have no matching key in the seeded
 - scheduled consultation expires or is closed as not performed;
 - patient deletes/cancels a pending clinical request, if that action is intended to notify another participant.
 
-Phase 3B adds only `plan.activation_failed`. Naming, templates, required status, and audience for the events still listed above require a separate catalog decision and migration.
+The Plans-on-internal-runtime migration adds only the five explicitly scoped Plans keys. Naming, templates, required status, and audience for the unrelated events still listed above require a separate catalog decision and migration.
 
 ## Missing Integration Points
 
-- Only the documented Phase 1/Phase 2/Phase 3A/Phase 3B flows currently call `InternalNotificationService`; all other mapped events remain pending.
+- Only the documented Phase 1/Phase 2/Phase 3A/Phase 3B and Plans-on-internal-runtime flows currently call `InternalNotificationService`; all other mapped events remain pending.
 - No professional appointment-rejection flow was found.
 - The day reminder dispatcher exists; one-hour, ten-minute, and starting reminder scheduling does not.
 - No explicit teleconsultation room-publication or clinical-document-publication transition was found.
 - No clinical-request rejection flow was found.
 - No queue-expiration worker or transition was found.
-- No local plan expiring, expired, or cancelled transition/callback was found.
+- Plans `expiring`, `expired`, and `cancelled` type keys are registered, but no emitter exists because the internal domain has no canonical subscription expiry date/transition, warning interval, or cancellation operation.
 - No withdrawal paid/rejected write-side workflow was found.
 - The scheduled-consultation expiration worker returns aggregate counts rather than affected entity/recipient IDs.
-- Several otherwise valid future trigger points do not currently carry the final recipient app-user ID or stable event identity in their service result, including clinical request completion and plan-credit reservation.
+- Several otherwise valid future trigger points do not currently carry the final recipient app-user ID or stable event identity, including clinical request completion.
 - Specialty appointment and queue fan-out do not have a defined final audience policy.
 
 ## Sensitive Data Rules
@@ -191,7 +192,7 @@ The related destination must be authenticated and must revalidate access to the 
 
 ## Implementation Notes
 
-Existing and future calls must run server-side and only after the authoritative state change has succeeded. Phase 1/Phase 2/Phase 3A/Phase 3B use best-effort behavior that logs notification failure without changing a confirmed business response; the Phase 3B batch also isolates failures per recipient. Future integrations must preserve that boundary and define any retry/observability policy explicitly.
+Existing and future calls must run server-side and only after the authoritative state change has succeeded. Integrated flows use best-effort behavior that logs notification failure without changing a confirmed business response; the scheduled batch also isolates failures per recipient. Future integrations must preserve that boundary and define any retry/observability policy explicitly.
 
 Use one stable key per logical event and recipient. Because `user_notifications.deduplication_key` is globally unique and conflict recovery does not compare recipient/type/entity, every key must include the event identity and recipient.
 
@@ -221,7 +222,7 @@ The shared payment-status helper now handles applied `paid`, `payment_failed`, `
 
 `createPaymentCharge` should emit `financial.payment_created` only for a new provider charge after its owner is attached and provider response is saved. Payment notification recipients must be resolved through the charge owner type; the gateway payload must never be passed as notification `data`.
 
-Plan activation now emits after `markOrderActive(...)` in `activatePlanSubscriptionForPayment`, using the same stable order/recipient key across webhook, simulation, reconciliation, and retry paths. After `markOrderActivationFailed(...)` succeeds, the same helper emits `plan.activation_failed` with a separate stable failure key. The early `already_active` return and failures before failure-state persistence do not emit.
+Plan activation now emits from `internal-plans-worker` after the durable activation job completes. Terminal processing failure first persists `activation_failed` and then invokes the failure notification hook. Enqueue failure retains the established failure event as a best-effort fallback. All paths use stable order/recipient keys and no external Plans response.
 
 ### Consultations and reviews
 
@@ -243,11 +244,11 @@ The legacy `reviewProfessionalApplication` path must share the same deduplicatio
 
 ### Plan credit and coverage
 
-Reservation remains pending after `create_plan_funded_appointment` or `create_plan_funded_queue` because a stable usage identity is not exposed consistently at the service boundary. Consumption now emits only on the `used_now` branch after the external plans service and local `finalize_plan_credit_usage` state both succeed.
+Reservation emits after `create_internal_plan_funded_appointment` or `create_internal_plan_funded_queue` returns the persisted owner and `plan_credit_usages.id`. The usage-based key deduplicates retries. Consumption emits only on the `used_now` branch after the internal atomic credit transaction succeeds.
 
 Appointment consumption uses the acceptance-window patient; queue consumption uses the trusted queue `patient_id`. Both keys use `plan_credit_usages.id`, and neither flow emits for `already_used`.
 
-Coverage checks are read-like and may be repeated. Do not call the service from every check until the business defines which terminal denied outcome is user-notifiable and supplies a stable attempt/entity ID.
+Read-only coverage checks remain notification-free because they may be repeated. A denial is emitted only after a concrete specialty appointment or non-exam queue entry is persisted with self-pay fallback, using that owner ID as the stable attempt identity. Infrastructure errors abort before persistence and do not emit.
 
 ### Queue and professional finance
 
@@ -263,6 +264,6 @@ Withdrawal requested now emits after `createSaque` returns the persisted withdra
 
 - Existing notification type keys were compared with the migration seed.
 - Domain services, repositories, payment webhooks, plan helpers, and scheduled workers were inspected.
-- Phase 1/Phase 2/Phase 3A/Phase 3B `InternalNotificationService` integrations are present for the documented appointment, payment, review, professional-registration, clinical-request, teleconsultation, queue, withdrawal, plan, and day-reminder events.
+- `InternalNotificationService` integrations are present for the documented appointment, payment, review, professional-registration, clinical-request, teleconsultation, queue, withdrawal, internal Plans, and day-reminder events.
 - This document does not assert that repository migrations or functions are deployed to a remote environment.
 - The scoped Phase 3B implementation adds one catalog key, updates the existing day-reminder template, and adds one protected scheduler. It does not add broad fan-out, external channels, preferences, or the one-hour, ten-minute, and starting reminders.
