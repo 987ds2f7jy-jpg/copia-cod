@@ -172,7 +172,7 @@ disabled. Recent enabled and used scores remain unchanged.
 
 Claims use `FOR UPDATE SKIP LOCKED`, five-minute leases, stale-lock recovery, bounded exponential retry, max attempts,
 result snapshots, error code/message, worker identity, and timestamps. The worker is invoked through a protected Edge
-Function using the service-role bearer token. No Redis or Laravel Queue is introduced.
+Function using a project secret API key in the `apikey` header. No Redis or Laravel Queue is introduced.
 
 The initial and operator-retry jobs use distinct queue keys so a dead-lettered initial job cannot suppress an explicit
 retry. Both still converge on the same database activation identity, `payment_charge.id`, so domain data cannot duplicate.

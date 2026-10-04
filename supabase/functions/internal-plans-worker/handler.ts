@@ -54,7 +54,7 @@ export async function handleInternalPlansWorkerRequest(req: Request) {
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405 });
     }
-    if (!isAuthorized(req)) {
+    if (!isAuthorizedWorkerRequest(req, configuredSecretKeysEnvironment())) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
     }
 
