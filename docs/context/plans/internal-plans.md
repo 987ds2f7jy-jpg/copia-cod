@@ -192,7 +192,10 @@ expiration is not treated as subscription expiration.
 ## Security and ownership
 
 All new tables have RLS enabled and forced. Public, `anon`, and `authenticated` receive no table or RPC mutation access.
-The service role owns backend reads/writes and RPC execution. `internal-plans-worker` requires the service-role bearer.
+The service role owns backend reads/writes and RPC execution. `internal-plans-worker` authenticates callers by matching
+the `apikey` header to a currently configured key in the server-provided `SUPABASE_SECRET_KEYS` map. It does not accept
+the legacy service-role bearer as its caller credential. The Function uses `verify_jwt = false`; its own check must pass
+before creating a privileged client or processing jobs. The secret key remains server-side only.
 The browser cannot directly mutate entitlement state.
 
 ## Observability

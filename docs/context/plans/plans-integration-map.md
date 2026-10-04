@@ -37,7 +37,7 @@ Deploy/redeploy every caller changed in Phase 2A plus `internal-plans-worker`. C
 
 ```http
 POST /functions/v1/internal-plans-worker
-Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+apikey: <SERVER_SIDE_SUPABASE_SECRET_KEY>
 Content-Type: application/json
 
 {"enqueueMaintenance":true,"limit":50}
@@ -47,6 +47,13 @@ Recommended operations:
 
 - queue draining: every minute, `{ "limit": 50 }`;
 - maintenance enqueue: daily after 00:05 UTC, `{ "enqueueMaintenance": true, "limit": 50 }`.
+
+Observed on 2026-10-03 in project `uyvxvphfwqzzejbqxmaj`: the existing `internal-plans-worker-every-10-minutes`
+Supabase Cron job uses the secret key in `apikey`, has no legacy `Authorization` header, and has a 60-second HTTP
+timeout. The worker is deployed with `verify_jwt = false` and checks `apikey` against `SUPABASE_SECRET_KEYS` before
+processing. A direct one-job invocation returned HTTP 200 with zero jobs claimed. The current cron schedule drains
+every ten minutes; maintenance enqueue is a separate operational requirement and was not changed here. Rotate the
+previously exposed secret key and replace the cron credential before revoking that key.
 
 Daily maintenance safely enqueues expiration for the execution date and refresh for the current month. Deterministic
 keys make repeated invocations harmless. Cron configuration is an environment operation and is not automatically

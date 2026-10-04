@@ -7,9 +7,10 @@ import {
   SupabaseInternalPlansRepository,
 } from '../_shared/plans/internal/repositories/InternalPlansRepository.ts';
 import { createServiceRoleClient, getRequiredEnv } from '../_shared/supabase.ts';
+import { isWorkerSecretKeyAuthorized } from './worker-auth.ts';
 
 function isAuthorized(req: Request) {
-  return req.headers.get('Authorization') === `Bearer ${getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY')}`;
+  return isWorkerSecretKeyAuthorized(req.headers.get('apikey'), Deno.env.get('SUPABASE_SECRET_KEYS'));
 }
 
 function utcDate(date: Date) {
