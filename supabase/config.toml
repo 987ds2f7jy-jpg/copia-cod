@@ -157,7 +157,7 @@ verify_jwt = false
 verify_jwt = false
 
 [functions.internal-plans-worker]
-verify_jwt = false
+verify_jwt = true
 
 [functions.leave-queue]
 verify_jwt = false
