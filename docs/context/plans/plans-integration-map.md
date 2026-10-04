@@ -37,7 +37,7 @@ Deploy/redeploy every caller changed in Phase 2A plus `internal-plans-worker`. C
 
 ```http
 POST /functions/v1/internal-plans-worker
-Authorization: Bearer <SUPABASE_SERVICE_ROLE_KEY>
+apikey: <SUPABASE_SECRET_KEY>
 Content-Type: application/json
 
 {"enqueueMaintenance":true,"limit":50}
