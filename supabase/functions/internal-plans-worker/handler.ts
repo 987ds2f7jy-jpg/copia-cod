@@ -7,9 +7,14 @@ import {
   SupabaseInternalPlansRepository,
 } from '../_shared/plans/internal/repositories/InternalPlansRepository.ts';
 import { createServiceRoleClient, getRequiredEnv } from '../_shared/supabase.ts';
+import { isAuthorizedWorkerRequest } from './auth.ts';
 
-function isAuthorized(req: Request) {
-  return req.headers.get('Authorization') === `Bearer ${getRequiredEnv('SUPABASE_SERVICE_ROLE_KEY')}`;
+function configuredSecretKeysEnvironment(): string | undefined {
+  try {
+    return getRequiredEnv('SUPABASE_SECRET_KEYS');
+  } catch {
+    return undefined;
+  }
 }
 
 function utcDate(date: Date) {
@@ -53,7 +58,7 @@ export async function handleInternalPlansWorkerRequest(req: Request) {
     if (req.method !== 'POST') {
       return new Response(JSON.stringify({ error: 'method_not_allowed' }), { status: 405 });
     }
-    if (!isAuthorized(req)) {
+    if (!isAuthorizedWorkerRequest(req, configuredSecretKeysEnvironment())) {
       return new Response(JSON.stringify({ error: 'unauthorized' }), { status: 401 });
     }
 

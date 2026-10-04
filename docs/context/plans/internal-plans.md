@@ -172,7 +172,7 @@ disabled. Recent enabled and used scores remain unchanged.
 
 Claims use `FOR UPDATE SKIP LOCKED`, five-minute leases, stale-lock recovery, bounded exponential retry, max attempts,
 result snapshots, error code/message, worker identity, and timestamps. The worker is invoked through a protected Edge
-Function using the service-role bearer token. No Redis or Laravel Queue is introduced.
+Function using a project secret API key in the `apikey` header. No Redis or Laravel Queue is introduced.
 
 The initial and operator-retry jobs use distinct queue keys so a dead-lettered initial job cannot suppress an explicit
 retry. Both still converge on the same database activation identity, `payment_charge.id`, so domain data cannot duplicate.
@@ -192,7 +192,8 @@ expiration is not treated as subscription expiration.
 ## Security and ownership
 
 All new tables have RLS enabled and forced. Public, `anon`, and `authenticated` receive no table or RPC mutation access.
-The service role owns backend reads/writes and RPC execution. `internal-plans-worker` requires the service-role bearer.
+The service role owns backend reads/writes and RPC execution. `internal-plans-worker` validates an inbound
+`apikey` against the named keys in `SUPABASE_SECRET_KEYS`; `verify_jwt` is disabled for this non-JWT credential.
 The browser cannot directly mutate entitlement state.
 
 ## Observability
